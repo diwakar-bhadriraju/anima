@@ -2,100 +2,237 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ANIMA</title>
+<title>ANIMA — observatory</title>
 <style>
   :root {
-    --bg: #0b0d10; --panel: #14171c; --edge: #232830; --text: #c9d1d9;
-    --dim: #6b7480; --accent: #58a6ff; --green: #3fb950; --red: #f85149;
-    --amber: #d29922;
+    --bg: #07090c; --panel: #0d1117; --panel2: #11161d; --edge: #1c2330;
+    --edge2: #2a3446; --text: #c9d4e0; --dim: #5c6875; --faint: #39424e;
+    --accent: #58a6ff; --green: #3fb950; --red: #f85149; --amber: #d29922;
+    --cyan: #39c5cf; --violet: #bc8cff; --orange: #ffa657;
+    --in: #58a6ff; --internal: #a5d6ff; --out: #ffa657;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
   body {
     background: var(--bg); color: var(--text);
-    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden;
+    font: 12px/1.5 "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    display: grid;
+    grid-template-rows: 42px 1fr 118px;
+    grid-template-columns: 1fr 340px;
+    grid-template-areas: "top top" "net side" "bottom bottom";
+    height: 100vh; overflow: hidden;
   }
   header {
-    display: flex; align-items: center; gap: 12px; padding: 8px 12px;
-    border-bottom: 1px solid var(--edge); background: var(--panel);
+    grid-area: top; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; border-bottom: 1px solid var(--edge); background: var(--panel);
+    white-space: nowrap; overflow: hidden;
   }
-  header h1 { font-size: 14px; letter-spacing: 2px; color: var(--accent); }
-  #simtime { color: var(--amber); min-width: 90px; }
-  #stage { color: var(--dim); }
-  button, select {
-    background: var(--panel); color: var(--text); border: 1px solid var(--edge);
-    padding: 4px 10px; cursor: pointer; font: inherit; border-radius: 3px;
+  header h1 { font-size: 13px; letter-spacing: 4px; color: var(--accent); font-weight: 600; }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--red); display: inline-block; margin-right: 5px; }
+  .led.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .led.paused { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  #status { color: var(--dim); min-width: 110px; }
+  #mode { border: 1px solid var(--edge2); border-radius: 3px; padding: 1px 8px; color: var(--violet); }
+  #simtime { color: var(--amber); font-size: 14px; min-width: 100px; text-align: right; }
+  #tick { color: var(--dim); min-width: 110px; }
+  #stage { color: var(--cyan); min-width: 90px; }
+  button, select, input[type=number] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--edge2);
+    padding: 3px 9px; cursor: pointer; font: inherit; border-radius: 3px;
   }
-  button:hover { border-color: var(--accent); }
-  button.active { border-color: var(--green); color: var(--green); }
-  #speed-wrap { display: flex; align-items: center; gap: 6px; }
-  #speed-label { color: var(--dim); min-width: 70px; }
-  main { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
-  #net { position: relative; }
-  canvas { width: 100%; height: 100%; display: block; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { border-color: var(--amber); color: var(--amber); }
+  input[type=number] { width: 64px; }
+  #speed { width: 110px; }
+  #speed-label { color: var(--dim); min-width: 74px; }
+  .sep { width: 1px; height: 20px; background: var(--edge2); margin: 0 4px; }
+  #net { grid-area: net; position: relative; min-width: 0; min-height: 0; background: var(--bg); }
+  #c { width: 100%; height: 100%; display: block; cursor: grab; }
+  #net-hud {
+    position: absolute; top: 8px; left: 10px; color: var(--faint); font-size: 11px;
+    pointer-events: none; line-height: 1.7;
+  }
+  #legend {
+    position: absolute; bottom: 8px; left: 10px; color: var(--dim); font-size: 11px;
+    pointer-events: none;
+  }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: -1px; }
   aside {
-    border-left: 1px solid var(--edge); background: var(--panel);
-    display: grid; grid-template-rows: 1fr 260px; min-height: 0;
+    grid-area: side; border-left: 1px solid var(--edge); background: var(--panel);
+    display: grid; grid-template-rows: auto 1fr 1fr; min-height: 0;
   }
-  section { overflow-y: auto; padding: 8px 10px; border-bottom: 1px solid var(--edge); }
-  section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 6px; }
-  .ev { padding: 2px 0; border-bottom: 1px solid #1a1e24; font-size: 12px; }
-  .ev .t { color: var(--dim); margin-right: 6px; }
-  .ev.neuron-created { color: var(--green); }
-  .ev.synapse-pruned, .ev.failure { color: var(--red); }
-  .ev.neuron-dormant, .ev.neuron-retired { color: var(--amber); }
-  .ev.novelty-signal, .ev.prediction-error { color: var(--accent); }
-  #inspector .row { display: flex; justify-content: space-between; padding: 1px 0; }
-  #inspector .k { color: var(--dim); }
-  #inspector h3 { font-size: 13px; margin-bottom: 4px; color: var(--accent); }
-  #timeline { display: none; padding: 4px 12px; border-top: 1px solid var(--edge); }
-  #timeline input { width: 100%; }
-  .badge { display:inline-block; padding: 0 6px; border-radius: 8px; font-size: 11px; border: 1px solid var(--edge); }
-  .badge.input { color: #79c0ff; } .badge.internal { color: #a5d6ff; } .badge.output { color: #ffa657; }
+  section { padding: 8px 12px; border-bottom: 1px solid var(--edge); min-height: 0; display: flex; flex-direction: column; }
+  section h2 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim);
+    margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  section h2 .aux { letter-spacing: 0; text-transform: none; }
+  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+  #stats .row { display: flex; justify-content: space-between; }
+  #stats .k { color: var(--dim); }
+  #stats canvas { width: 100%; height: 54px; margin-top: 6px; border: 1px solid var(--edge); background: var(--bg); }
+  #charts { overflow-y: hidden; }
+  #evwrap { overflow: hidden; }
+  #filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .fbtn { padding: 1px 7px; font-size: 10px; border-radius: 8px; border: 1px solid var(--edge2); color: var(--dim); cursor: pointer; user-select: none; }
+  .fbtn.on { color: var(--text); border-color: var(--accent); background: #16233a; }
+  #ev-body { overflow-y: auto; flex: 1; font-size: 11px; }
+  .ev { padding: 1px 0; border-bottom: 1px solid #131920; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev .t { color: var(--faint); margin-right: 6px; }
+  .ev .n { color: var(--dim); margin-right: 6px; }
+  .ev.sys { color: var(--violet); }
+  .ev.struct { color: var(--green); }
+  .ev.warn { color: var(--red); }
+  .ev.motor { color: var(--out); }
+  .ev.sensory { color: var(--in); }
+  .ev.plast { color: var(--amber); }
+  .ev.instrument { color: var(--cyan); }
+  #insp-body { overflow-y: auto; font-size: 11px; }
+  #insp-body .row { display: flex; justify-content: space-between; padding: 1px 0; }
+  #insp-body .k { color: var(--dim); }
+  #insp-body h3 { font-size: 12px; margin-bottom: 4px; color: var(--accent); font-weight: 600; }
+  #insp-body canvas { width: 100%; height: 44px; margin-top: 6px; border: 1px solid var(--edge); background: var(--bg); }
+  .badge { border: 1px solid var(--edge2); border-radius: 3px; padding: 0 6px; font-size: 10px; }
+  .badge.input { color: var(--in); border-color: var(--in); }
+  .badge.internal { color: var(--internal); border-color: var(--internal); }
+  .badge.output { color: var(--out); border-color: var(--out); }
+  footer {
+    grid-area: bottom; border-top: 1px solid var(--edge); background: var(--panel);
+    display: grid; grid-template-rows: 26px 1fr; min-height: 0;
+  }
+  #tl-head { display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: 11px; color: var(--dim); }
+  #tl-head #tl-pos { color: var(--amber); }
+  #tl-canvas-wrap { padding: 0 14px 8px; min-height: 0; }
+  #tl { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--edge2); border-radius: 6px; padding: 18px 22px; width: 560px; max-height: 70vh; overflow-y: auto; }
+  .modal h3 { color: var(--accent); margin-bottom: 10px; letter-spacing: 1px; }
+  .runrow { display: flex; justify-content: space-between; padding: 5px 8px; border: 1px solid var(--edge); border-radius: 3px; margin-bottom: 4px; cursor: pointer; }
+  .runrow:hover { border-color: var(--accent); }
+  .runrow .rn { color: var(--text); }
+  .runrow .rm { color: var(--dim); font-size: 11px; }
+  .runrow.sel { border-color: var(--green); }
+  .mactions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 </style>
 </head>
 <body>
 <header>
   <h1>ANIMA</h1>
-  <span id="mode" class="badge">connecting…</span>
-  <span id="simtime">0.000 s</span>
+  <span><span class="led" id="led"></span></span>
+  <span id="status">connecting…</span>
+  <span id="mode" class="badge">—</span>
   <span id="stage"></span>
-  <button id="btn-pause">pause</button>
-  <button id="btn-step1">step ×1</button>
-  <button id="btn-step100">step ×100</button>
-  <div id="speed-wrap">
-    <span>speed</span>
-    <input id="speed" type="range" min="0" max="4" step="0.01" value="3">
-    <span id="speed-label">1000 t/s</span>
-  </div>
+  <div class="sep"></div>
+  <button id="btn-pause">⏸ pause</button>
+  <button id="btn-step1">step +1</button>
+  <button id="btn-stepN">step +<input id="stepN" type="number" value="100" min="1" max="100000"></button>
+  <div class="sep"></div>
+  <span>speed</span>
+  <input id="speed" type="range" min="0" max="4" step="0.01" value="3">
+  <span id="speed-label">1000 t/s</span>
+  <div class="sep"></div>
+  <button id="btn-replay" title="load a recorded run">📼 replay…</button>
+  <button id="btn-reset" title="reset view layout">reset view</button>
+  <div style="flex:1"></div>
+  <span id="tick">t 0</span>
+  <span id="simtime">0.000 s</span>
 </header>
-<main>
-  <div id="net"><canvas id="c"></canvas></div>
-  <aside>
-    <section id="inspector"><h2>Inspector</h2><div id="insp-body">click a node or edge</div></section>
-    <section id="events"><h2>Event stream</h2><div id="ev-body"></div></section>
-  </aside>
-</main>
-<div id="timeline"><input id="scrub" type="range" min="0" max="1000" value="0"></div>
+<div id="net">
+  <canvas id="c"></canvas>
+  <div id="net-hud"></div>
+  <div id="legend">
+    <span class="dot" style="background:var(--in)"></span>sensory
+    <span class="dot" style="background:var(--internal)"></span>internal
+    <span class="dot" style="background:var(--out)"></span>motor
+    <span class="dot" style="background:var(--amber)"></span>dormant
+    <span class="dot" style="background:var(--red)"></span>retired
+  </div>
+</div>
+<aside>
+  <section id="charts">
+    <h2>Activity <span class="aux" id="thr">— ev/s</span></h2>
+    <div id="stats">
+      <div class="row"><span class="k">spiking now</span><span id="s-active">0</span></div>
+      <div class="row"><span class="k">population Hz</span><span id="s-rate">0.0</span></div>
+      <div class="row"><span class="k">neurons</span><span id="s-neurons">0</span></div>
+      <div class="row"><span class="k">synapses</span><span id="s-syn">0</span></div>
+      <div class="row"><span class="k">mean w</span><span id="s-w">—</span></div>
+      <div class="row"><span class="k">tick rate</span><span id="s-tr">—</span></div>
+    </div>
+    <canvas id="chart-pop" width="300" height="54"></canvas>
+    <div style="color:var(--faint);font-size:10px;margin-top:2px">
+      <span style="color:var(--in)">■</span> sensory
+      <span style="color:var(--internal)">■</span> internal
+      <span style="color:var(--out)">■</span> motor — spikes / 1 s
+    </div>
+  </section>
+  <section id="evwrap">
+    <h2>Event stream <span class="aux"><label style="cursor:pointer"><input type="checkbox" id="pausefeed"> hold</label></span></h2>
+    <div id="filters"></div>
+    <div id="ev-body"></div>
+  </section>
+  <section id="inspector">
+    <h2>Inspector</h2>
+    <div id="insp-body">click a neuron or synapse</div>
+  </section>
+</aside>
+<footer>
+  <div id="tl-head">
+    <span>TIMELINE</span>
+    <span id="tl-pos">0.0 s</span>
+    <span id="tl-hint"></span>
+    <div style="flex:1"></div>
+    <span id="tl-marks"></span>
+  </div>
+  <div id="tl-canvas-wrap"><canvas id="tl"></canvas></div>
+</footer>
+
+<div class="modal-bg" id="replay-modal">
+  <div class="modal">
+    <h3>LOAD RECORDED RUN</h3>
+    <div id="run-list">loading…</div>
+    <div class="mactions">
+      <button id="rp-cancel">cancel</button>
+      <button id="rp-load" style="border-color:var(--green);color:var(--green)">load selected</button>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
 // ---------- state ----------
 const S = {
   mode: "run", ws: null, paused: false, speed: 1000.0, tick: 0, duration: 0,
+  expId: "", connected: false,
   neurons: new Map(),   // id -> {x,y,px,py,cls,group,rate,state,flash,spikes:[], reason, born}
   synapses: new Map(),  // id -> {src,dst,w,flashT,flashDir,appear}
-  selected: null,
-  drag: null,
+  selected: null, selectedEdge: null, drag: null,
+  cam: { x: 0, y: 0, z: 1 },       // pan/zoom over world coords
+  evCounts: {},                     // kind -> count since last display
+  throughput: 0,
+  hist: [],                         // {t, in, internal, out} per second
+  timeline: null, binMs: 1000,      // replay timeline summary
+  lastTickWall: 0, lastTickSim: 0, tickRate: 0,
+  feedHeld: false, feedHoldBuf: [],
+  filters: new Set(),
+  wall0: performance.now(),
 };
+const CLASSES = ["input", "internal", "output"];
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
-function resize() {
-  const r = canvas.getBoundingClientRect();
-  canvas.width = r.width * devicePixelRatio;
-  canvas.height = r.height * devicePixelRatio;
+const tlCanvas = document.getElementById("tl");
+const tlCtx = tlCanvas.getContext("2d");
+function sizeCanvas(cv) {
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * devicePixelRatio));
+  const h = Math.max(1, Math.round(r.height * devicePixelRatio));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
 }
-window.addEventListener("resize", resize); resize();
+window.addEventListener("resize", () => { sizeCanvas(canvas); sizeCanvas(tlCanvas); });
 
 // deterministic PRNG (mulberry32) — layout seeded by neuron id per plan
 function mulberry32(a) {
@@ -109,7 +246,7 @@ function mulberry32(a) {
 
 function newNode(id) {
   const r = mulberry32(id * 2654435761 >>> 0);
-  const W = canvas.width, H = canvas.height;
+  const W = canvas.width || 1200, H = canvas.height || 700;
   return {
     id, cls: "internal", group: "", rate: 0, state: "normal",
     x: W * 0.25 + r() * W * 0.5, y: H * 0.15 + r() * H * 0.7,
@@ -121,45 +258,60 @@ function newNode(id) {
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   S.ws = new WebSocket(`${proto}://${location.host}/ws`);
+  S.ws.onopen = () => { S.connected = true; };
+  S.ws.onclose = () => {
+    S.connected = false; setStatus("disconnected — retrying");
+    setTimeout(connect, 1000);
+  };
   S.ws.onmessage = (m) => {
     const msg = JSON.parse(m.data);
-    switch (msg.msg || msg.t) {
-      case "hello": {
-        S.mode = msg.mode; S.duration = msg.duration_ms || 0;
-        const el = document.getElementById("mode");
-        el.textContent = msg.mode + " · " + msg.exp_id;
-        document.getElementById("timeline").style.display =
-          S.mode === "replay" && S.duration > 0 ? "block" : "none";
-        break;
-      }
-      case "snapshot": applySnapshot(msg); break;
-      case "ev": applyEvent(msg); break;
-      case "spikes": applySpikes(msg); break;
-      case "batch": {
-        // Server coalesces 50 ms of frames into one newline-joined batch.
-        for (const line of msg.lines.split("\n")) {
-          if (!line) continue;
-          try {
-            const d = JSON.parse(line);
-            switch (d.msg || d.t) {
-              case "snapshot": applySnapshot(d); break;
-              case "ev": applyEvent(d); break;
-              case "spikes": applySpikes(d); break;
-            }
-          } catch (e) { /* skip malformed line */ }
-        }
-        break;
-      }
-    }
+    handleFrame(msg);
   };
-  S.ws.onclose = () => setTimeout(connect, 1000);
+}
+function handleFrame(msg) {
+  switch (msg.msg || msg.t) {
+    case "hello": {
+      S.mode = msg.mode; S.duration = msg.duration_ms || 0;
+      S.expId = msg.exp_id || "";
+      document.getElementById("mode").textContent = S.mode + " · " + S.expId;
+      document.getElementById("tl-hint").textContent =
+        S.mode === "replay" ? "click / drag to seek" : "live — record & replay via CLI";
+      break;
+    }
+    case "run-params":
+      S.runParams = msg.params || null;
+      renderCurriculum();
+      break;
+    case "timeline":
+      S.timeline = msg.bins; S.binMs = msg.bin_ms || 1000;
+      renderCurriculum();
+      break;
+    case "snapshot": applySnapshot(msg); break;
+    case "ev": applyEvent(msg); break;
+    case "spikes": applySpikes(msg); break;
+    case "batch": {
+      // Server coalesces 50 ms of frames into one newline-joined batch.
+      for (const line of msg.lines.split("\n")) {
+        if (!line) continue;
+        try { handleFrame(JSON.parse(line)); } catch (e) { /* skip malformed */ }
+      }
+      break;
+    }
+  }
 }
 connect();
 
+function setStatus(txt, state) {
+  document.getElementById("status").textContent = txt;
+  const led = document.getElementById("led");
+  led.className = "led" + (state === "on" ? " on" : state === "paused" ? " paused" : "");
+}
+
 function applySnapshot(msg) {
-  S.tick = msg.tick || S.tick;
+  if (msg.tick != null) trackTick(msg.tick);
   S.paused = !!msg.paused;
   if (msg.speed) { S.speed = msg.speed; syncSpeedUI(); }
+  setStatus(S.paused ? "paused" : "running", S.paused ? "paused" : "on");
   const seen = new Set();
   for (const n of msg.neurons || []) {
     seen.add(n.id);
@@ -182,16 +334,49 @@ function pruneGone(seen) {
 }
 
 // ---------- events ----------
+const CAT = {
+  // sensory
+  "stimulus-presented": "sensory",
+  // motor
+  "output-activity": "motor",
+  // plasticity
+  "synapse-strengthened": "plast", "synapse-weakened": "plast",
+  "synapse-created": "struct", "synapse-pruned": "struct",
+  // structural / system
+  "neuron-created": "struct", "neuron-dormant": "struct",
+  "neuron-reactivated": "struct", "neuron-retired": "struct",
+  "run-started": "sys", "run-ended": "sys", "failure": "warn",
+  // instrumentation
+  "novelty-signal": "instrument", "prediction-error": "instrument",
+  "resource-usage": "sys",
+};
 const KIND_LABEL = {
   "neuron-created": "NEW NEURON", "neuron-dormant": "DORMANT", "neuron-reactivated": "REACTIVATED",
   "neuron-retired": "RETIRED", "synapse-created": "NEW SYNAPSE", "synapse-pruned": "PRUNED SYNAPSE",
   "synapse-strengthened": "STRENGTHENED", "synapse-weakened": "WEAKENED",
   "stimulus-presented": "STIMULUS", "failure": "FAILURE", "novelty-signal": "NOVELTY",
   "prediction-error": "PRED-ERR", "run-ended": "RUN ENDED", "run-started": "RUN STARTED",
+  "output-activity": "MOTOR", "resource-usage": "RESOURCES",
 };
+const FILTER_DEFS = [
+  ["sensory", "sensory"], ["motor", "motor"], ["plast", "plasticity"],
+  ["struct", "structure"], ["instrument", "instrumentation"], ["sys", "system"], ["warn", "failure"],
+];
+for (const [cat, label] of FILTER_DEFS) {
+  const el = document.createElement("span");
+  el.className = "fbtn on"; el.textContent = label; el.dataset.cat = cat;
+  el.onclick = () => {
+    if (S.filters.has(cat)) { S.filters.delete(cat); el.classList.remove("on"); }
+    else { S.filters.add(cat); el.classList.add("on"); }
+  };
+  document.getElementById("filters").appendChild(el);
+}
+
 function applyEvent(env) {
-  S.tick = Math.max(S.tick, env.t);
+  if (env.t > S.tick) trackTick(env.t);
   const kind = env.kind;
+  S.evCounts[kind] = (S.evCounts[kind] || 0) + 1;
+  S.throughput++;
   const p = env.payload || {};
   switch (kind) {
     case "neuron-created": {
@@ -201,10 +386,9 @@ function applyEvent(env) {
       n.flash = 1.2;
       break;
     }
-    case "synapse-created": {
+    case "synapse-created":
       S.synapses.set(p.syn, { src: p.pre, dst: p.post, w: p.w || 0, flashT: 1, flashDir: 1, appear: S.tick });
       break;
-    }
     case "synapse-pruned": S.synapses.delete(p.syn); break;
     case "synapse-strengthened": {
       const s = S.synapses.get(p.syn);
@@ -219,24 +403,28 @@ function applyEvent(env) {
     case "neuron-dormant": { const n = S.neurons.get(p.n); if (n) n.state = "dormant"; break; }
     case "neuron-reactivated": { const n = S.neurons.get(p.n); if (n) n.state = "normal"; break; }
     case "neuron-retired": { const n = S.neurons.get(p.n); if (n) n.state = "retired"; break; }
-    case "stimulus-presented": {
+    case "stimulus-presented":
       document.getElementById("stage").textContent = `${p.stage} · ${p.pattern_id}`;
+      renderCurriculum();
       break;
-    }
-    case "run-ended": {
+    case "run-ended":
       document.getElementById("stage").textContent = "ended: " + p.reason;
+      renderCurriculum();
       break;
+  }
+  // Event feed: aggregate noisy kinds, drop everything while held.
+  const cat = CAT[kind];
+  if (cat && !S.filters.has(cat)) {
+    if (kind === "synapse-strengthened" || kind === "synapse-weakened") {
+      if (Math.abs(p.delta || 0) > 0.08) addEventLine(env.t, kind, describe(kind, p));
+    } else if (kind === "prediction-error" || kind === "novelty-signal" || kind === "resource-usage") {
+      // 1-in-20 sample of high-rate instrumentation
+      if (S.evCounts[kind] % 20 === 1) addEventLine(env.t, kind, describe(kind, p));
+    } else {
+      addEventLine(env.t, kind, describe(kind, p));
     }
   }
-  if (["neuron-created","neuron-dormant","neuron-reactivated","neuron-retired",
-       "synapse-created","synapse-pruned","failure","run-ended","novelty-signal",
-       "stimulus-presented","prediction-error","run-started"].includes(kind)) {
-    addEventLine(env.t, kind, describe(kind, p));
-  }
-  if (kind === "synapse-strengthened" || kind === "synapse-weakened") {
-    // too many to log every one; log only large jumps
-    if (Math.abs(p.delta || 0) > 0.08) addEventLine(env.t, kind, describe(kind, p));
-  }
+  if (S.selected != null || S.selectedEdge != null) renderInspectorThrottled();
 }
 
 function describe(kind, p) {
@@ -251,42 +439,143 @@ function describe(kind, p) {
     case "stimulus-presented": return `${p.stage}: ${p.pattern_id}`;
     case "failure": return `${p.kind}: ${p.detail}`;
     case "run-ended": return p.reason;
+    case "run-started": return `seed ${p.seed}`;
     case "novelty-signal": return `v=${(p.value??0).toFixed(3)}`;
     case "prediction-error": return `v=${(p.value??0).toFixed(3)}`;
+    case "output-activity": return `output ${p.n}`;
+    case "resource-usage": return `${p.neurons}n ${p.synapses}s ${p.spikes_window}sp/win`;
     default: return "";
   }
 }
 
 function addEventLine(t, kind, text) {
+  if (S.feedHeld) { S.feedHoldBuf.push([t, kind, text]); return; }
   const body = document.getElementById("ev-body");
   const div = document.createElement("div");
-  div.className = "ev " + kind;
-  div.innerHTML = `<span class="t">${(t/1000).toFixed(2)}s</span>${KIND_LABEL[kind]||kind} ${text}`;
+  div.className = "ev " + (CAT[kind] || "sys");
+  div.innerHTML = `<span class="t">${(t/1000).toFixed(2)}s</span><span class="n">${KIND_LABEL[kind]||kind}</span>${text}`;
+  div.title = `${(t/1000).toFixed(3)}s — ${KIND_LABEL[kind]||kind} ${text}`;
   body.prepend(div);
-  while (body.childElementCount > 250) body.lastChild.remove();
+  while (body.childElementCount > 400) body.lastChild.remove();
 }
+document.getElementById("pausefeed").onchange = (e) => {
+  S.feedHeld = e.target.checked;
+  if (!S.feedHeld) {
+    const buf = S.feedHoldBuf.splice(0);
+    for (let i = buf.length - 1; i >= 0; i--) addEventLine(...buf[i]);
+  }
+};
 
 function applySpikes(msg) {
+  S.evCounts["spike"] = (S.evCounts["spike"] || 0) + (msg.ids || []).length;
+  S.throughput += (msg.ids || []).length;
   for (const id of msg.ids || []) {
     const n = S.neurons.get(id);
     if (n) {
       n.flash = 1;
       n.spikes.push(msg.t);
-      if (n.spikes.length > 60) n.spikes.shift();
-      if (S.selected === id) renderInspector();
+      if (n.spikes.length > 120) n.spikes.shift();
+      if (S.selected === id) renderInspectorThrottled();
     }
   }
 }
 
+// ---------- curriculum / experiment info ----------
+function renderCurriculum() {
+  const el = document.getElementById("tl-marks");
+  if (!S.timeline) { el.textContent = ""; return; }
+  const stages = [];
+  for (const b of S.timeline) {
+    if (b.stage && (stages.length === 0 || stages[stages.length-1].stage !== b.stage)) {
+      stages.push({ stage: b.stage, t: b.t, pattern: b.pattern });
+    }
+  }
+  el.textContent = stages.length
+    ? stages.map(s => `${s.stage}@${(s.t/1000).toFixed(0)}s`).join("  ")
+    : "";
+}
+
+// ---------- stats (1 s sampler) ----------
+setInterval(() => {
+  const now = performance.now();
+  const wallDt = (now - S.lastStatsWall || 1000) / 1000;
+  S.lastStatsWall = now;
+  let inHz = 0, intHz = 0, outHz = 0, active = 0, wSum = 0, wN = 0;
+  let nIn = 0, nInt = 0, nOut = 0;
+  for (const n of S.neurons.values()) {
+    if (n.cls === "input") { inHz += n.rate; nIn++; }
+    else if (n.cls === "output") { outHz += n.rate; nOut++; }
+    else { intHz += n.rate; nInt++; }
+    if (n.rate > 0.5 && n.state === "normal") active++;
+  }
+  for (const s of S.synapses.values()) { wSum += s.w; wN++; }
+  const total = S.neurons.size || 1;
+  const bucket = {
+    t: S.tick,
+    in: inHz / total, internal: intHz / total, out: outHz / total,
+  };
+  S.hist.push(bucket);
+  if (S.hist.length > 120) S.hist.shift();
+  document.getElementById("s-active").textContent = `${active} / ${S.neurons.size}`;
+  document.getElementById("s-rate").textContent = ((inHz+intHz+outHz) / total).toFixed(1);
+  document.getElementById("s-neurons").textContent = S.neurons.size;
+  document.getElementById("s-syn").textContent = S.synapses.size;
+  document.getElementById("s-w").textContent = wN ? (wSum / wN).toFixed(3) : "—";
+  document.getElementById("s-tr").textContent = S.tickRate ? S.tickRate.toFixed(0) + " t/s" : "—";
+  document.getElementById("thr").textContent = S.throughput + " ev/s";
+  S.throughput = 0;
+  drawPopChart();
+}, 1000);
+S.lastStatsWall = performance.now();
+
+function drawPopChart() {
+  sizeCanvas(document.getElementById("chart-pop"));
+  const cv = document.getElementById("chart-pop");
+  const c = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  c.fillStyle = "#07090c"; c.fillRect(0, 0, W, H);
+  if (S.hist.length < 2) return;
+  let max = 1;
+  for (const h of S.hist) max = Math.max(max, h.in + h.internal + h.out);
+  const bw = W / 120;
+  for (let i = 0; i < S.hist.length; i++) {
+    const h = S.hist[i];
+    const x = W - (S.hist.length - i) * bw;
+    let y = H;
+    for (const [v, col] of [[h.out, "#ffa657"], [h.internal, "#a5d6ff"], [h.in, "#58a6ff"]]) {
+      const bh = (v / max) * (H - 4);
+      c.fillStyle = col;
+      c.fillRect(x, y - bh, bw * 0.85, bh);
+      y -= bh;
+    }
+  }
+  c.fillStyle = "#39424e"; c.font = `${10 * devicePixelRatio}px monospace`;
+  c.fillText(max.toFixed(1) + " Hz·n⁻¹", 4, 12);
+}
+
 // ---------- physics + draw ----------
 function physics(dt) {
-  const W = canvas.width, H = canvas.height;
+  const W = canvas.width || 1200, H = canvas.height || 700;
   const ns = [...S.neurons.values()];
   const inputs = ns.filter(n => n.cls === "input");
   const outputs = ns.filter(n => n.cls === "output");
-  // pinned columns
-  inputs.forEach((n, i) => { n.px = W * 0.07; n.py = H * (0.12 + 0.76 * (inputs.length === 1 ? 0.5 : i / (inputs.length - 1))); });
-  outputs.forEach((n, i) => { n.px = W * 0.93; n.py = H * (0.25 + 0.5 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1))); });
+  // group-aware pinned columns: input left (grouped), output right
+  const groupRows = {};
+  for (const n of inputs) {
+    (groupRows[n.group] = groupRows[n.group] || []).push(n);
+  }
+  const groups = Object.keys(groupRows);
+  groups.forEach((g, gi) => {
+    const arr = groupRows[g];
+    arr.forEach((n, i) => {
+      n.px = W * 0.06 + gi * W * 0.045;
+      n.py = H * (0.12 + 0.76 * (arr.length === 1 ? 0.5 : i / (arr.length - 1)));
+    });
+  });
+  outputs.forEach((n, i) => {
+    n.px = W * 0.94;
+    n.py = H * (0.25 + 0.5 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1)));
+  });
   // repulsion (cap for perf)
   const step = Math.min(ns.length, 400);
   for (let i = 0; i < step; i++) {
@@ -314,7 +603,7 @@ function physics(dt) {
     b.vx -= dx / d * f * d * 0.01; b.vy -= dy / d * f * d * 0.01;
   }
   for (const n of ns) {
-    if (n.px != null) { // pinned class columns: weak pull
+    if (n.px != null) {
       n.vx += (n.px - n.x) * 0.08; n.vy += (n.py - n.y) * 0.08;
       n.vx *= 0.5; n.vy *= 0.5;
     } else {
@@ -327,15 +616,27 @@ function physics(dt) {
   }
 }
 
+// world ↔ screen through the camera
+function w2s(x, y) {
+  const W = canvas.width, H = canvas.height;
+  return [W / 2 + (x - W / 2 + S.cam.x) * S.cam.z, H / 2 + (y - H / 2 + S.cam.y) * S.cam.z];
+}
+function s2w(x, y) {
+  const W = canvas.width, H = canvas.height;
+  return [(x - W / 2) / S.cam.z + W / 2 - S.cam.x, (y - H / 2) / S.cam.z + H / 2 - S.cam.y];
+}
+
 function draw() {
   const W = canvas.width, H = canvas.height;
-  ctx.fillStyle = "#0b0d10"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#07090c"; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(W / 2, H / 2); ctx.scale(S.cam.z, S.cam.z); ctx.translate(-W / 2 - S.cam.x, -H / 2 - S.cam.y);
   // edges
   for (const s of S.synapses.values()) {
     const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
     if (!a || !b) continue;
-    const w = Math.max(0.3, s.w * 2.2);
-    ctx.strokeStyle = `rgba(120,140,170,${0.12 + s.w * 0.4})`;
+    const w = Math.max(0.3 / S.cam.z, s.w * 2.2);
+    ctx.strokeStyle = `rgba(120,140,170,${0.1 + s.w * 0.4})`;
     ctx.lineWidth = w;
     if (s.flashT > 0) {
       ctx.strokeStyle = s.flashDir > 0
@@ -347,64 +648,194 @@ function draw() {
   }
   // nodes
   for (const n of S.neurons.values()) {
-    const r = n.cls === "input" ? 6 : n.cls === "output" ? 7 : 5 + Math.min(3, n.rate / 40);
-    // fill = recent firing rate (cool → hot)
+    const r = (n.cls === "input" ? 6 : n.cls === "output" ? 7.5 : 5 + Math.min(3, n.rate / 40));
+    // fill = population identity; brightness = activity
+    const base = n.cls === "input" ? [88, 166, 255] : n.cls === "output" ? [255, 166, 87] : [165, 214, 255];
     const heat = Math.min(1, n.rate / 60);
-    const col = `rgb(${Math.round(40 + 215 * heat)},${Math.round(80 + 140 * heat)},${Math.round(120 - 40 * heat)})`;
+    const col = `rgba(${base[0]},${base[1]},${base[2]},${0.35 + 0.65 * heat})`;
     ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = col; ctx.fill();
+    ctx.fillStyle = n.state !== "normal" ? "rgba(90,100,115,0.25)" : col;
+    ctx.fill();
     if (n.flash > 0) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4 + (1 - n.flash) * 8, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,220,120,${n.flash})`; ctx.lineWidth = 2;
-      ctx.stroke(); n.flash -= 0.08;
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4 + (1 - n.flash) * 10, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,225,140,${n.flash})`; ctx.lineWidth = 2 / S.cam.z;
+      ctx.stroke(); n.flash -= 0.07;
     }
     // structural ring
     if (n.state === "dormant") { ctx.strokeStyle = "#d29922"; ctx.setLineDash([3,3]); }
     else if (n.state === "retired") { ctx.strokeStyle = "#f85149"; ctx.setLineDash([1,3]); }
-    else if (S.selected === n.id) { ctx.strokeStyle = "#58a6ff"; ctx.setLineDash([]); }
+    else if (S.selected === n.id) { ctx.strokeStyle = "#ffffff"; ctx.setLineDash([]); }
     else { ctx.strokeStyle = "rgba(90,100,115,0.5)"; ctx.setLineDash([]); }
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.5 / S.cam.z;
     ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
-    if (n.group) {
-      ctx.fillStyle = "#6b7480"; ctx.font = "10px monospace";
+    if (n.group && S.cam.z > 0.7) {
+      ctx.fillStyle = "#5c6875"; ctx.font = `${10 / S.cam.z}px monospace`;
       ctx.fillText(n.group, n.x - 4, n.y - r - 6);
     }
   }
   // selected edge highlight
-  if (S.selectedEdge) {
+  if (S.selectedEdge != null) {
     const s = S.synapses.get(S.selectedEdge);
     if (s) {
       const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
       if (a && b) {
-        ctx.strokeStyle = "rgba(88,166,255,0.9)"; ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2.5 / S.cam.z;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
     }
   }
+  ctx.restore();
+  // HUD
+  const internal = [...S.neurons.values()].filter(n => n.cls === "internal").length;
+  const bornNow = [...S.neurons.values()].filter(n => n.state !== "normal").length;
+  document.getElementById("net-hud").innerHTML =
+    `${S.neurons.size} neurons · ${internal} internal · ${S.synapses.size} synapses` +
+    (bornNow ? ` · ${bornNow} inactive-state` : "") +
+    `<br>zoom ${(S.cam.z * 100).toFixed(0)}%`;
 }
 
 let lastT = performance.now();
+let lastFrameAt = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-  S.tick += 0; // ticks come from events
-  physics(dt * 60);
-  draw();
-  document.getElementById("simtime").textContent = (S.tick / 1000).toFixed(3) + " s";
+  lastFrameAt = now;
+  try {
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    physics(dt * 60);
+    draw();
+    renderReadouts();
+    drawTimeline();
+  } catch (e) {
+    // A render error must not kill the loop permanently.
+    console.error("frame error", e);
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// Watchdog: occluded/headless tabs may suspend requestAnimationFrame
+// indefinitely; keep readouts + timeline advancing from a timer, and
+// resume the rAF loop if it stalls.
+setInterval(() => {
+  const now = performance.now();
+  renderReadouts();
+  drawTimeline();
+  if (now - lastFrameAt > 1000) {
+    lastT = now; lastFrameAt = now;
+    requestAnimationFrame(frame);
+  }
+}, 250);
+
+function renderReadouts() {
+  document.getElementById("simtime").textContent = (S.tick / 1000).toFixed(3) + " s";
+  document.getElementById("tick").textContent = "t " + S.tick.toLocaleString();
+  if (S.mode === "replay") {
+    document.getElementById("tl-pos").textContent = (S.tick / 1000).toFixed(1) + " s";
+  }
+}
+
+// tick-rate estimator (live + replay share snapshots/evs carrying t)
+function trackTick(t) {
+  if (t <= S.tick) { S.tick = Math.max(S.tick, t); return; }
+  const now = performance.now();
+  const wallDt = now - S.lastTickWall;
+  if (wallDt > 200) {
+    S.tickRate = (t - S.lastTickSim) / (wallDt / 1000);
+    S.lastTickWall = now; S.lastTickSim = t;
+  } else if (!S.lastTickWall) { S.lastTickWall = now; S.lastTickSim = t; }
+  S.tick = t;
+}
+
+// ---------- timeline ----------
+function drawTimeline() {
+  sizeCanvas(tlCanvas);
+  const W = tlCanvas.width, H = tlCanvas.height;
+  tlCtx.fillStyle = "#0d1117"; tlCtx.fillRect(0, 0, W, H);
+  const dur = S.duration || (S.timeline ? S.timeline.length * S.binMs : 0);
+  if (!dur) {
+    // live mode: render the rolling 120 s activity history
+    const bw = W / 120;
+    for (let i = 0; i < S.hist.length; i++) {
+      const h = S.hist[i];
+      const v = Math.min(1, (h.in + h.internal + h.out) / 40);
+      const bh = v * (H - 14);
+      tlCtx.fillStyle = "#16233a";
+      tlCtx.fillRect(W - (S.hist.length - i) * bw, H - bh, bw * 0.85, bh);
+    }
+    tlCtx.fillStyle = "#39424e"; tlCtx.font = `${10 * devicePixelRatio}px monospace`;
+    tlCtx.fillText("live · rolling 120 s activity", 6, 12);
+    return;
+  }
+  // replay: full-run timeline from precomputed bins
+  const bins = S.timeline || [];
+  if (!bins.length) return;
+  const bw = W / bins.length;
+  let maxSp = 1;
+  for (const b of bins) maxSp = Math.max(maxSp, b.spikes);
+  // stage bands
+  let stageStart = 0, curStage = bins[0].stage || "";
+  const stageBands = [];
+  for (let i = 0; i < bins.length; i++) {
+    const st = bins[i].stage || "";
+    if (st !== curStage) { stageBands.push([curStage, stageStart, i]); curStage = st; stageStart = i; }
+  }
+  stageBands.push([curStage, stageStart, bins.length]);
+  const stageCols = { S0: "#39424e", S1: "#16233a", S2: "#241a33", S3: "#12281e" };
+  for (const [st, a, bEnd] of stageBands) {
+    tlCtx.fillStyle = stageCols[st] || "#131920";
+    tlCtx.fillRect(a * bw, 0, (bEnd - a) * bw, H - 12);
+    tlCtx.fillStyle = "#5c6875"; tlCtx.font = `${10 * devicePixelRatio}px monospace`;
+    if (st) tlCtx.fillText(st, a * bw + 4, 12);
+  }
+  // activity
+  for (let i = 0; i < bins.length; i++) {
+    const b = bins[i];
+    const bh = v * (H - 20);
+    tlCtx.fillStyle = "rgba(88,166,255,0.55)";
+    tlCtx.fillRect(i * bw, H - 12 - bh, Math.max(1, bw - 1), bh);
+    if (b.spikes_input > 0) {
+      const ih = Math.min(bh, (b.spikes_input / maxSp) * (H - 20));
+      tlCtx.fillStyle = "rgba(255,166,87,0.5)";
+      tlCtx.fillRect(i * bw, H - 12 - ih, Math.max(1, bw - 1), ih);
+    }
+    if (b.events > 0 && bw > 3) {
+      tlCtx.fillStyle = "rgba(188,140,255,0.9)";
+      tlCtx.fillRect(i * bw, H - 16, 1.5, 4);
+    }
+  }
+  // playhead
+  const px = (S.tick / dur) * W;
+  tlCtx.strokeStyle = "#d29922"; tlCtx.lineWidth = 1.5;
+  tlCtx.beginPath(); tlCtx.moveTo(px, 0); tlCtx.lineTo(px, H); tlCtx.stroke();
+  tlCtx.fillStyle = "#d29922";
+  tlCtx.fillText((S.tick / 1000).toFixed(1) + "s", Math.min(W - 44, px + 4), H - 3);
+}
+
+// timeline interaction: click / drag to seek (replay) — also works live as a no-op
+let tlDragging = false;
+function tlSeek(ev) {
+  if (S.mode !== "replay" || !S.duration) return;
+  const r = tlCanvas.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+  send({ t: "ctrl", op: "seek", tick: Math.round(frac * S.duration) });
+}
+tlCanvas.onmousedown = (e) => { tlDragging = true; tlSeek(e); };
+tlCanvas.onmousemove = (e) => { if (tlDragging) tlSeek(e); };
+window.addEventListener("mouseup", () => { tlDragging = false; });
 
 // ---------- controls ----------
 function send(obj) { if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify(obj)); }
 const btnPause = document.getElementById("btn-pause");
 btnPause.onclick = () => {
-  if (S.paused) { send({ t: "ctrl", op: "resume" }); btnPause.classList.remove("active"); btnPause.textContent = "pause"; }
-  else { send({ t: "ctrl", op: "pause" }); btnPause.classList.add("active"); btnPause.textContent = "resume"; }
+  if (S.paused) { send({ t: "ctrl", op: "resume" }); btnPause.classList.remove("active"); btnPause.textContent = "⏸ pause"; }
+  else { send({ t: "ctrl", op: "pause" }); btnPause.classList.add("active"); btnPause.textContent = "▶ resume"; }
   S.paused = !S.paused;
 };
 document.getElementById("btn-step1").onclick = () => send({ t: "ctrl", op: "step", n: 1 });
-document.getElementById("btn-step100").onclick = () => send({ t: "ctrl", op: "step", n: 100 });
+document.getElementById("btn-stepN").onclick = () => {
+  const n = Math.max(1, parseInt(document.getElementById("stepN").value) || 100);
+  send({ t: "ctrl", op: "step", n });
+};
 const speed = document.getElementById("speed");
 function syncSpeedUI() {
   speed.value = Math.log10(S.speed);
@@ -416,21 +847,58 @@ speed.oninput = () => {
   send({ t: "ctrl", op: "speed", factor: S.speed });
 };
 syncSpeedUI();
-const scrub = document.getElementById("scrub");
-scrub.onchange = () => {
-  if (S.mode !== "replay") return;
-  const target = Math.round((scrub.value / 1000) * (S.duration || 0));
-  send({ t: "ctrl", op: "seek", tick: target });
+document.getElementById("btn-reset").onclick = () => {
+  S.cam = { x: 0, y: 0, z: 1 };
+  for (const [id, n] of S.neurons) {
+    const fresh = newNode(id);
+    n.x = fresh.x; n.y = fresh.y; n.vx = 0; n.vy = 0;
+  }
+};
+
+// ---------- replay modal ----------
+const modal = document.getElementById("replay-modal");
+let modalRuns = [], modalSel = null;
+document.getElementById("btn-replay").onclick = async () => {
+  modal.classList.add("open");
+  const list = document.getElementById("run-list");
+  list.textContent = "loading…";
+  try {
+    const r = await fetch("/runs");
+    const j = await r.json();
+    modalRuns = j.runs || [];
+    if (!modalRuns.length) { list.textContent = "no recorded runs in ./runs — run an experiment first"; return; }
+    list.innerHTML = "";
+    for (const run of modalRuns) {
+      const row = document.createElement("div");
+      row.className = "runrow" + (modalSel === run ? " sel" : "");
+      const dt = new Date(run.mtime * 1000);
+      row.innerHTML = `<span class="rn">${run.name}</span><span class="rm">${(run.bytes/1e6).toFixed(1)} MB · ${dt.toISOString().slice(0,16).replace("T"," ")}</span>`;
+      row.onclick = () => {
+        modalSel = run;
+        list.querySelectorAll(".runrow").forEach(el => el.classList.remove("sel"));
+        row.classList.add("sel");
+      };
+      list.appendChild(row);
+    }
+  } catch (e) { list.textContent = "failed to list runs: " + e; }
+};
+document.getElementById("rp-cancel").onclick = () => modal.classList.remove("open");
+document.getElementById("rp-load").onclick = () => {
+  if (!modalSel) return;
+  // The replay server is a separate process on its own port; the browser
+  // cannot spawn it. Open the replay UI in a new tab served by the replay
+  // process if one is already listening on the conventional port.
+  modal.classList.remove("open");
+  window.open(`http://${location.hostname}:8789/?run=${encodeURIComponent(modalSel.name)}`, "_blank");
 };
 
 // ---------- picking / inspector ----------
 canvas.onmousedown = (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * devicePixelRatio;
-  const y = (e.clientY - rect.top) * devicePixelRatio;
-  let best = null, bestD = 18 * devicePixelRatio;
+  const [wx, wy] = s2w((e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
+  let best = null, bestD = 18;
   for (const n of S.neurons.values()) {
-    const d = Math.hypot(n.x - x, n.y - y);
+    const d = Math.hypot(n.x - wx, n.y - wy);
     if (d < bestD) { bestD = d; best = n; }
   }
   if (best) {
@@ -439,23 +907,45 @@ canvas.onmousedown = (e) => {
     renderInspector();
     return;
   }
-  // edge picking: distance to segment
-  let bestE = null, bestEd = 6 * devicePixelRatio;
+  let bestE = null, bestEd = 6;
   for (const [id, s] of S.synapses) {
     const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
     if (!a || !b) continue;
-    const d = distSeg(x, y, a.x, a.y, b.x, b.y);
+    const d = distSeg(wx, wy, a.x, a.y, b.x, b.y);
     if (d < bestEd) { bestEd = d; bestE = id; }
   }
   if (bestE != null) { S.selectedEdge = bestE; S.selected = null; renderInspector(); }
 };
 canvas.onmousemove = (e) => {
-  if (S.drag == null) return;
+  if (S.drag == null) {
+    // pan with drag on empty space
+    if (S.panning) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * devicePixelRatio, y = (e.clientY - rect.top) * devicePixelRatio;
+      S.cam.x -= (x - S.panLastX) / S.cam.z; S.cam.y -= (y - S.panLastY) / S.cam.z;
+      S.panLastX = x; S.panLastY = y;
+    }
+    return;
+  }
   const rect = canvas.getBoundingClientRect();
-  S.dragX = (e.clientX - rect.left) * devicePixelRatio;
-  S.dragY = (e.clientY - rect.top) * devicePixelRatio;
+  const [wx, wy] = s2w((e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
+  S.dragX = wx; S.dragY = wy;
 };
-canvas.onmouseup = () => { S.drag = null; };
+canvas.onmouseup = () => { S.drag = null; S.panning = false; };
+canvas.addEventListener("mousedown", (e) => {
+  if (e.detail > 1) return;
+  // right-drag or empty-space drag pans
+  S.panning = true;
+  const rect = canvas.getBoundingClientRect();
+  S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
+  S.panLastY = (e.clientY - rect.top) * devicePixelRatio;
+});
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  S.cam.z = Math.max(0.3, Math.min(6, S.cam.z * f));
+}, { passive: false });
+
 function distSeg(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
   const l2 = dx * dx + dy * dy;
@@ -465,42 +955,60 @@ function distSeg(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
+let inspPending = false;
+function renderInspectorThrottled() {
+  if (inspPending) return;
+  inspPending = true;
+  requestAnimationFrame(() => { inspPending = false; renderInspector(); });
+}
+
 function renderInspector() {
   const body = document.getElementById("insp-body");
   const n = S.neurons.get(S.selected);
   if (n) {
     const inS = [...S.synapses.values()].filter(s => s.dst === n.id);
     const outS = [...S.synapses.values()].filter(s => s.src === n.id);
-    const hist = n.spikes.slice(-40);
+    const hist = n.spikes.slice(-60);
+    const lastSpike = hist.length ? ((S.tick - hist[hist.length-1]) / 1000).toFixed(2) + "s ago" : "—";
     body.innerHTML = `
       <h3>neuron ${n.id} <span class="badge ${n.cls}">${n.cls}</span></h3>
       <div class="row"><span class="k">group</span><span>${n.group || "—"}</span></div>
       <div class="row"><span class="k">state</span><span>${n.state}</span></div>
-      <div class="row"><span class="k">rate</span><span>${n.rate.toFixed(1)} Hz</span></div>
+      <div class="row"><span class="k">rate (EMA 1 s)</span><span>${n.rate.toFixed(1)} Hz</span></div>
+      <div class="row"><span class="k">last spike</span><span>${lastSpike}</span></div>
       <div class="row"><span class="k">created by</span><span>${n.reason || (n.cls === "input" ? "body (D8)" : "initial wiring")}</span></div>
-      <div class="row"><span class="k">in / out syn</span><span>${inS.length} / ${outS.length}</span></div>
-      <div class="row"><span class="k">mean w (in)</span><span>${inS.length ? (inS.reduce((a, s) => a + s.w, 0) / inS.length).toFixed(3) : "—"}</span></div>
-      <div class="row"><span class="k">spike history</span><span>${hist.length ? "recent " + hist.length + " shown" : "none"}</span></div>
-      <canvas id="hist" width="260" height="40" style="margin-top:6px;border:1px solid #232830"></canvas>`;
+      <div class="row"><span class="k">in / out synapses</span><span>${inS.length} / ${outS.length}</span></div>
+      <div class="row"><span class="k">mean w in / out</span><span>${
+        inS.length ? (inS.reduce((a,s)=>a+s.w,0)/inS.length).toFixed(3) : "—"} / ${
+        outS.length ? (outS.reduce((a,s)=>a+s.w,0)/outS.length).toFixed(3) : "—"}</span></div>
+      <div class="row"><span class="k">membrane potential</span><span style="color:var(--faint)">not on wire</span></div>
+      <div style="color:var(--faint);margin-top:4px">recent spikes (last 60)</div>
+      <canvas id="hist" width="300" height="44"></canvas>`;
     const hc = document.getElementById("hist").getContext("2d");
-    hc.fillStyle = "#0b0d10"; hc.fillRect(0, 0, 260, 40);
-    hc.strokeStyle = "#3fb950";
-    const t0 = hist[0] ?? S.tick;
+    hc.fillStyle = "#07090c"; hc.fillRect(0, 0, 300, 44);
+    hc.strokeStyle = "#3fb950"; hc.lineWidth = 2;
+    const t1 = S.tick, span = 5000; // 5 s window
     hist.forEach((t, i) => {
-      const x = 4 + (i / 40) * 252;
-      hc.moveTo(x, 4); hc.lineTo(x, 36); hc.stroke();
+      const age = t1 - t;
+      if (age > span) return;
+      const x = 300 - (age / span) * 292 - 4;
+      hc.beginPath(); hc.moveTo(x, 4); hc.lineTo(x, 40); hc.stroke();
     });
+    hc.fillStyle = "#39424e"; hc.font = "9px monospace";
+    hc.fillText("now", 270, 10); hc.fillText("−5s", 4, 10);
     return;
   }
-  const s = S.synapses.get(S.selectedEdge);
+  const s = S.selectedEdge != null ? S.synapses.get(S.selectedEdge) : null;
   if (s) {
     body.innerHTML = `
       <h3>synapse ${S.selectedEdge}</h3>
-      <div class="row"><span class="k">src → dst</span><span>${s.src} → ${s.dst}</span></div>
-      <div class="row"><span class="k">weight</span><span>${s.w.toFixed(4)}</span></div>`;
+      <div class="row"><span class="k">pre → post</span><span>${s.src} → ${s.dst}</span></div>
+      <div class="row"><span class="k">weight</span><span>${s.w.toFixed(4)}</span></div>
+      <div class="row"><span class="k">appears at</span><span>${(s.appear/1000).toFixed(2)} s</span></div>
+      <div class="row"><span class="k">amplitude</span><span style="color:var(--faint)">per-neuron, not on wire</span></div>`;
     return;
   }
-  body.textContent = "click a node or edge";
+  body.textContent = "click a neuron or synapse";
 }
 </script>
 </body>
