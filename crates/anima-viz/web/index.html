@@ -343,7 +343,7 @@ const S = {
   expId: "", connected: false,
   neurons: new Map(),   // id -> {x,y,px,py,cls,group,rate,state,flash,spikes:[], reason, born}
   synapses: new Map(),  // id -> {src,dst,w,flashT,flashDir,appear,pulses:[]}
-  selected: null, selectedEdge: null, drag: null,
+  selected: null, selectedEdge: null, drag: null, hover: null,
   cam: { x: 0, y: 0, z: 1 },
   evCounts: {},
   throughput: 0,
@@ -827,6 +827,7 @@ function s2w(x, y) {
 }
 
 function draw() {
+  sizeCanvas(canvas); // self-healing: keeps buffer matched to layout size
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -851,8 +852,9 @@ function draw() {
     }
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
-
   // --- traveling spike pulses along synapses (pre→post direction)
+  // cheap draw: two-segment fading stroke, no per-pulse gradient objects
+  ctx.lineCap = "round";
   for (let i = S.pulses.length - 1; i >= 0; i--) {
     const pu = S.pulses[i];
     pu.p += 0.055;
@@ -861,18 +863,15 @@ function draw() {
     const px = pu.ax + (pu.bx - pu.ax) * pu.p;
     const py = pu.ay + (pu.by - pu.ay) * pu.p;
     const fade = Math.sin(pu.p * Math.PI);
-    // comet tail
-    const tx = pu.ax + (pu.bx - pu.ax) * Math.max(0, pu.p - 0.12);
-    const ty = pu.ay + (pu.by - pu.ay) * Math.max(0, pu.p - 0.12);
-    const grad = ctx.createLinearGradient(tx, ty, px, py);
-    grad.addColorStop(0, `rgba(${r},${g},${b2},0)`);
-    grad.addColorStop(1, `rgba(${r},${g},${b2},${0.85 * fade})`);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = (1.2 + pu.w * 2.6) * zInv;
+    const tx = pu.ax + (pu.bx - pu.ax) * Math.max(0, pu.p - 0.15);
+    const ty = pu.ay + (pu.by - pu.ay) * Math.max(0, pu.p - 0.15);
+    ctx.strokeStyle = `rgba(${r},${g},${b2},${0.8 * fade})`;
+    ctx.lineWidth = (1.4 + pu.w * 2.4) * zInv;
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(px, py); ctx.stroke();
-    ctx.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
-    ctx.beginPath(); ctx.arc(px, py, 1.8 * zInv, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${0.85 * fade})`;
+    ctx.beginPath(); ctx.arc(px, py, 1.7 * zInv, 0, Math.PI * 2); ctx.fill();
   }
+  ctx.lineCap = "butt";
 
   // --- shockwave halos from spikes (activity makes space ring)
   for (let i = S.halo.length - 1; i >= 0; i--) {
@@ -885,20 +884,20 @@ function draw() {
     ctx.beginPath(); ctx.arc(h2.x, h2.y, h2.r, 0, Math.PI * 2); ctx.stroke();
   }
 
-  // --- neurons: sensory column glow / internal orbit / motor column glow
   for (const n of S.neurons.values()) {
     const heat = Math.min(1, n.rate / 45);          // sustained activity
     const live = Math.max(heat * 0.9, n.flash);      // spike flash on top
     const [r, g, b2] = POP_RGB[n.cls] || POP_RGB.internal;
     const quiet = n.state !== "normal";
+    const hovered = S.hover === n.id;
     const radius = n.cls === "input" ? 5.5 : n.cls === "output" ? 7 : 4.5 + Math.min(3.5, n.rate / 30);
-    // outer soft glow (activity halo) — inactive neurons stay dim
-    if (!quiet && live > 0.03) {
-      const gr = ctx.createRadialGradient(n.x, n.y, radius * 0.4, n.x, n.y, radius + 16 + live * 10);
-      gr.addColorStop(0, `rgba(${r},${g},${b2},${0.30 * live})`);
-      gr.addColorStop(1, `rgba(${r},${g},${b2},0)`);
-      ctx.fillStyle = gr;
-      ctx.beginPath(); ctx.arc(n.x, n.y, radius + 16 + live * 10, 0, Math.PI * 2); ctx.fill();
+    // activity halo: three concentric translucent arcs ≈ radial falloff
+    if (!quiet && live > 0.05) {
+      for (let k = 0; k < 3; k++) {
+        const gr = radius + 4 + k * 5 + live * 8;
+        ctx.fillStyle = `rgba(${r},${g},${b2},${(0.16 - k * 0.045) * live})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, gr, 0, Math.PI * 2); ctx.fill();
+      }
     }
     // core
     const coreA = quiet ? 0.16 : 0.3 + 0.7 * live;
@@ -921,9 +920,10 @@ function draw() {
     if (n.state === "dormant") { ctx.strokeStyle = "rgba(255,194,75,0.55)"; ctx.setLineDash([3,4]); }
     else if (n.state === "retired") { ctx.strokeStyle = "rgba(255,93,93,0.5)"; ctx.setLineDash([1,4]); }
     else if (S.selected === n.id) { ctx.strokeStyle = "#ffffff"; ctx.setLineDash([]); }
+    else if (hovered) { ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.setLineDash([]); }
     else if (!quiet) { ctx.strokeStyle = `rgba(${r},${g},${b2},${0.25 + 0.3 * heat})`; ctx.setLineDash([]); }
     else { ctx.strokeStyle = "rgba(84,96,118,0.35)"; ctx.setLineDash([]); }
-    ctx.lineWidth = 1.3 * zInv;
+    ctx.lineWidth = (S.selected === n.id || hovered ? 2 : 1.3) * zInv;
     ctx.beginPath(); ctx.arc(n.x, n.y, radius + 3.5, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
     // group label
@@ -935,7 +935,6 @@ function draw() {
       ctx.textAlign = "left";
     }
   }
-
   // --- selected edge highlight
   if (S.selectedEdge != null) {
     const s = S.synapses.get(S.selectedEdge);
@@ -1179,29 +1178,67 @@ document.getElementById("rp-load").onclick = () => {
   window.open(`http://${location.hostname}:8789/?run=${encodeURIComponent(modalSel.name)}`, "_blank");
 };
 
-// ---------- picking / inspector ----------
-canvas.onmousedown = (e) => {
+// ---------- picking / hover / inspector ----------
+// Hit-test in SCREEN space with a generous radius so neurons feel
+// directly clickable; world coords only matter for drag/pan math.
+function pickAt(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-  const [wx, wy] = s2w((e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
-  let best = null, bestD = 18;
+  const sx = (clientX - rect.left) * (canvas.width / rect.width);
+  const sy = (clientY - rect.top) * (canvas.height / rect.height);
+  const [wx, wy] = s2w(sx, sy);
+  // 14 world-units ≈ visual node + ring; scaled so zoom doesn't shrink hits
+  const hitR = 14 / S.cam.z;
+  let best = null, bestD = hitR;
   for (const n of S.neurons.values()) {
     const d = Math.hypot(n.x - wx, n.y - wy);
     if (d < bestD) { bestD = d; best = n; }
   }
-  if (best) {
-    S.selected = best.id; S.selectedEdge = null;
-    S.drag = best.id; S.dragX = best.x; S.dragY = best.y;
+  if (best) return { type: "neuron", n: best };
+  // edge pick only when reasonably zoomed (avoid noisy hits)
+  if (S.cam.z > 0.8) {
+    let bestE = null, bestEd = 7 / S.cam.z;
+    for (const [id, s] of S.synapses) {
+      const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
+      if (!a || !b) continue;
+      const d = distSeg(wx, wy, a.x, a.y, b.x, b.y);
+      if (d < bestEd) { bestEd = d; bestE = id; }
+    }
+    if (bestE != null) {
+      return { type: "synapse", s: S.synapses.get(bestE), id: bestE };
+    }
+  }
+  return null;
+}
+
+// hover: pointer cursor + soft hover highlight make targets discoverable
+canvas.addEventListener("mousemove", (e) => {
+  if (S.drag != null || S.panning) return;
+  const hit = pickAt(e.clientX, e.clientY);
+  const newHover = hit ? (hit.type === "neuron" ? hit.n.id : null) : null;
+  S.hover = newHover;
+  canvas.style.cursor = hit ? "pointer" : "grab";
+});
+
+canvas.onmousedown = (e) => {
+  const hit = pickAt(e.clientX, e.clientY);
+  if (hit && hit.type === "neuron") {
+    S.selected = hit.n.id; S.selectedEdge = null;
+    S.drag = hit.n.id; S.dragX = hit.n.x; S.dragY = hit.n.y;
+    S.panning = false;
     renderInspector();
     return;
   }
-  let bestE = null, bestEd = 6;
-  for (const [id, s] of S.synapses) {
-    const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
-    if (!a || !b) continue;
-    const d = distSeg(wx, wy, a.x, a.y, b.x, b.y);
-    if (d < bestEd) { bestEd = d; bestE = id; }
+  if (hit && hit.type === "synapse") {
+    S.selectedEdge = hit.id; S.selected = null;
+    S.panning = false;
+    renderInspector();
+    return;
   }
-  if (bestE != null) { S.selectedEdge = bestE; S.selected = null; renderInspector(); }
+  // empty space: start pan; clicking empty space deselects
+  S.panning = true;
+  const rect = canvas.getBoundingClientRect();
+  S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
+  S.panLastY = (e.clientY - rect.top) * devicePixelRatio;
 };
 canvas.onmousemove = (e) => {
   if (S.drag == null) {
@@ -1214,17 +1251,16 @@ canvas.onmousemove = (e) => {
     return;
   }
   const rect = canvas.getBoundingClientRect();
-  const [wx, wy] = s2w((e.clientX - rect.left) * devicePixelRatio, (e.clientY - rect.top) * devicePixelRatio);
+  const [wx, wy] = s2w((e.clientX - rect.left) * (canvas.width / rect.width), (e.clientY - rect.top) * (canvas.height / rect.height));
   S.dragX = wx; S.dragY = wy;
 };
-canvas.onmouseup = () => { S.drag = null; S.panning = false; };
-canvas.addEventListener("mousedown", (e) => {
-  if (e.detail > 1) return;
-  S.panning = true;
-  const rect = canvas.getBoundingClientRect();
-  S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
-  S.panLastY = (e.clientY - rect.top) * devicePixelRatio;
-});
+canvas.onmouseup = (e) => {
+  // click on empty space (no drag movement) clears selection
+  if (S.drag == null && !S.movedPan) {
+    S.selected = null; S.selectedEdge = null; renderInspector();
+  }
+  S.drag = null; S.panning = false; S.movedPan = false;
+};
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
