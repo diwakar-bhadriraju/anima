@@ -1,0 +1,24 @@
+[package]
+name = "anima-exp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anima-run"
+path = "src/main.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+toml = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+anima-core = { path = "../anima-core" }
+anima-telemetry = { path = "../anima-telemetry" }
+anima-viz = { path = "../anima-viz" }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+sha2 = "0.10"

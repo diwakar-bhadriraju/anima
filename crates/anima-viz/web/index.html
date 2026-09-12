@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ANIMA</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #14171c; --edge: #232830; --text: #c9d1d9;
+    --dim: #6b7480; --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+    --amber: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+    border-bottom: 1px solid var(--edge); background: var(--panel);
+  }
+  header h1 { font-size: 14px; letter-spacing: 2px; color: var(--accent); }
+  #simtime { color: var(--amber); min-width: 90px; }
+  #stage { color: var(--dim); }
+  button, select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--edge);
+    padding: 4px 10px; cursor: pointer; font: inherit; border-radius: 3px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { border-color: var(--green); color: var(--green); }
+  #speed-wrap { display: flex; align-items: center; gap: 6px; }
+  #speed-label { color: var(--dim); min-width: 70px; }
+  main { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  #net { position: relative; }
+  canvas { width: 100%; height: 100%; display: block; }
+  aside {
+    border-left: 1px solid var(--edge); background: var(--panel);
+    display: grid; grid-template-rows: 1fr 260px; min-height: 0;
+  }
+  section { overflow-y: auto; padding: 8px 10px; border-bottom: 1px solid var(--edge); }
+  section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 6px; }
+  .ev { padding: 2px 0; border-bottom: 1px solid #1a1e24; font-size: 12px; }
+  .ev .t { color: var(--dim); margin-right: 6px; }
+  .ev.neuron-created { color: var(--green); }
+  .ev.synapse-pruned, .ev.failure { color: var(--red); }
+  .ev.neuron-dormant, .ev.neuron-retired { color: var(--amber); }
+  .ev.novelty-signal, .ev.prediction-error { color: var(--accent); }
+  #inspector .row { display: flex; justify-content: space-between; padding: 1px 0; }
+  #inspector .k { color: var(--dim); }
+  #inspector h3 { font-size: 13px; margin-bottom: 4px; color: var(--accent); }
+  #timeline { display: none; padding: 4px 12px; border-top: 1px solid var(--edge); }
+  #timeline input { width: 100%; }
+  .badge { display:inline-block; padding: 0 6px; border-radius: 8px; font-size: 11px; border: 1px solid var(--edge); }
+  .badge.input { color: #79c0ff; } .badge.internal { color: #a5d6ff; } .badge.output { color: #ffa657; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ANIMA</h1>
+  <span id="mode" class="badge">connecting…</span>
+  <span id="simtime">0.000 s</span>
+  <span id="stage"></span>
+  <button id="btn-pause">pause</button>
+  <button id="btn-step1">step ×1</button>
+  <button id="btn-step100">step ×100</button>
+  <div id="speed-wrap">
+    <span>speed</span>
+    <input id="speed" type="range" min="0" max="4" step="0.01" value="3">
+    <span id="speed-label">1000 t/s</span>
+  </div>
+</header>
+<main>
+  <div id="net"><canvas id="c"></canvas></div>
+  <aside>
+    <section id="inspector"><h2>Inspector</h2><div id="insp-body">click a node or edge</div></section>
+    <section id="events"><h2>Event stream</h2><div id="ev-body"></div></section>
+  </aside>
+</main>
+<div id="timeline"><input id="scrub" type="range" min="0" max="1000" value="0"></div>
+
+<script>
+"use strict";
+// ---------- state ----------
+const S = {
+  mode: "run", ws: null, paused: false, speed: 1000.0, tick: 0, duration: 0,
+  neurons: new Map(),   // id -> {x,y,px,py,cls,group,rate,state,flash,spikes:[], reason, born}
+  synapses: new Map(),  // id -> {src,dst,w,flashT,flashDir,appear}
+  selected: null,
+  drag: null,
+};
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio;
+  canvas.height = r.height * devicePixelRatio;
+}
+window.addEventListener("resize", resize); resize();
+
+// deterministic PRNG (mulberry32) — layout seeded by neuron id per plan
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function newNode(id) {
+  const r = mulberry32(id * 2654435761 >>> 0);
+  const W = canvas.width, H = canvas.height;
+  return {
+    id, cls: "internal", group: "", rate: 0, state: "normal",
+    x: W * 0.25 + r() * W * 0.5, y: H * 0.15 + r() * H * 0.7,
+    vx: 0, vy: 0, flash: 0, spikes: [], reason: null, born: null,
+  };
+}
+
+// ---------- websocket ----------
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  S.ws = new WebSocket(`${proto}://${location.host}/ws`);
+  S.ws.onmessage = (m) => {
+    const msg = JSON.parse(m.data);
+    switch (msg.msg || msg.t) {
+      case "hello": {
+        S.mode = msg.mode; S.duration = msg.duration_ms || 0;
+        const el = document.getElementById("mode");
+        el.textContent = msg.mode + " · " + msg.exp_id;
+        document.getElementById("timeline").style.display =
+          S.mode === "replay" && S.duration > 0 ? "block" : "none";
+        break;
+      }
+      case "snapshot": applySnapshot(msg); break;
+      case "ev": applyEvent(msg); break;
+      case "spikes": applySpikes(msg); break;
+      case "batch": {
+        // Server coalesces 50 ms of frames into one newline-joined batch.
+        for (const line of msg.lines.split("\n")) {
+          if (!line) continue;
+          try {
+            const d = JSON.parse(line);
+            switch (d.msg || d.t) {
+              case "snapshot": applySnapshot(d); break;
+              case "ev": applyEvent(d); break;
+              case "spikes": applySpikes(d); break;
+            }
+          } catch (e) { /* skip malformed line */ }
+        }
+        break;
+      }
+    }
+  };
+  S.ws.onclose = () => setTimeout(connect, 1000);
+}
+connect();
+
+function applySnapshot(msg) {
+  S.tick = msg.tick || S.tick;
+  S.paused = !!msg.paused;
+  if (msg.speed) { S.speed = msg.speed; syncSpeedUI(); }
+  const seen = new Set();
+  for (const n of msg.neurons || []) {
+    seen.add(n.id);
+    let e = S.neurons.get(n.id);
+    if (!e) { e = newNode(n.id); S.neurons.set(n.id, e); }
+    e.cls = n.cls; e.group = n.group || ""; e.rate = n.rate || 0; e.state = n.state;
+  }
+  for (const s of msg.synapses || []) {
+    seen.add("s" + s.id);
+    let e = S.synapses.get(s.id);
+    if (!e) { e = { src: s.src, dst: s.dst, w: s.w, flashT: 0, flashDir: 0, appear: S.tick }; S.synapses.set(s.id, e); }
+    e.w = s.w;
+  }
+  pruneGone(seen);
+}
+
+function pruneGone(seen) {
+  for (const k of [...S.neurons.keys()]) if (!seen.has(k)) S.neurons.delete(k);
+  for (const k of [...S.synapses.keys()]) if (!seen.has(k)) S.synapses.delete(k);
+}
+
+// ---------- events ----------
+const KIND_LABEL = {
+  "neuron-created": "NEW NEURON", "neuron-dormant": "DORMANT", "neuron-reactivated": "REACTIVATED",
+  "neuron-retired": "RETIRED", "synapse-created": "NEW SYNAPSE", "synapse-pruned": "PRUNED SYNAPSE",
+  "synapse-strengthened": "STRENGTHENED", "synapse-weakened": "WEAKENED",
+  "stimulus-presented": "STIMULUS", "failure": "FAILURE", "novelty-signal": "NOVELTY",
+  "prediction-error": "PRED-ERR", "run-ended": "RUN ENDED", "run-started": "RUN STARTED",
+};
+function applyEvent(env) {
+  S.tick = Math.max(S.tick, env.t);
+  const kind = env.kind;
+  const p = env.payload || {};
+  switch (kind) {
+    case "neuron-created": {
+      let n = S.neurons.get(p.n);
+      if (!n) { n = newNode(p.n); S.neurons.set(p.n, n); }
+      n.reason = (p.reason && p.reason.trigger) || null;
+      n.flash = 1.2;
+      break;
+    }
+    case "synapse-created": {
+      S.synapses.set(p.syn, { src: p.pre, dst: p.post, w: p.w || 0, flashT: 1, flashDir: 1, appear: S.tick });
+      break;
+    }
+    case "synapse-pruned": S.synapses.delete(p.syn); break;
+    case "synapse-strengthened": {
+      const s = S.synapses.get(p.syn);
+      if (s) { s.w = Math.min(1, s.w + (p.delta || 0)); s.flashT = 1; s.flashDir = 1; }
+      break;
+    }
+    case "synapse-weakened": {
+      const s = S.synapses.get(p.syn);
+      if (s) { s.w = Math.max(0, s.w - Math.abs(p.delta || 0)); s.flashT = 1; s.flashDir = -1; }
+      break;
+    }
+    case "neuron-dormant": { const n = S.neurons.get(p.n); if (n) n.state = "dormant"; break; }
+    case "neuron-reactivated": { const n = S.neurons.get(p.n); if (n) n.state = "normal"; break; }
+    case "neuron-retired": { const n = S.neurons.get(p.n); if (n) n.state = "retired"; break; }
+    case "stimulus-presented": {
+      document.getElementById("stage").textContent = `${p.stage} · ${p.pattern_id}`;
+      break;
+    }
+    case "run-ended": {
+      document.getElementById("stage").textContent = "ended: " + p.reason;
+      break;
+    }
+  }
+  if (["neuron-created","neuron-dormant","neuron-reactivated","neuron-retired",
+       "synapse-created","synapse-pruned","failure","run-ended","novelty-signal",
+       "stimulus-presented","prediction-error","run-started"].includes(kind)) {
+    addEventLine(env.t, kind, describe(kind, p));
+  }
+  if (kind === "synapse-strengthened" || kind === "synapse-weakened") {
+    // too many to log every one; log only large jumps
+    if (Math.abs(p.delta || 0) > 0.08) addEventLine(env.t, kind, describe(kind, p));
+  }
+}
+
+function describe(kind, p) {
+  switch (kind) {
+    case "neuron-created": return `neuron ${p.n}${p.reason ? " · " + p.reason.trigger : ""}`;
+    case "neuron-dormant": case "neuron-reactivated": case "neuron-retired":
+      return `neuron ${p.n}`;
+    case "synapse-created": return `syn ${p.syn}: ${p.pre}→${p.post} w=${(p.w||0).toFixed(2)}`;
+    case "synapse-pruned": return `syn ${p.syn}`;
+    case "synapse-strengthened": return `syn ${p.syn} Δ+${(p.delta||0).toFixed(3)}`;
+    case "synapse-weakened": return `syn ${p.syn} Δ−${Math.abs(p.delta||0).toFixed(3)}`;
+    case "stimulus-presented": return `${p.stage}: ${p.pattern_id}`;
+    case "failure": return `${p.kind}: ${p.detail}`;
+    case "run-ended": return p.reason;
+    case "novelty-signal": return `v=${(p.value??0).toFixed(3)}`;
+    case "prediction-error": return `v=${(p.value??0).toFixed(3)}`;
+    default: return "";
+  }
+}
+
+function addEventLine(t, kind, text) {
+  const body = document.getElementById("ev-body");
+  const div = document.createElement("div");
+  div.className = "ev " + kind;
+  div.innerHTML = `<span class="t">${(t/1000).toFixed(2)}s</span>${KIND_LABEL[kind]||kind} ${text}`;
+  body.prepend(div);
+  while (body.childElementCount > 250) body.lastChild.remove();
+}
+
+function applySpikes(msg) {
+  for (const id of msg.ids || []) {
+    const n = S.neurons.get(id);
+    if (n) {
+      n.flash = 1;
+      n.spikes.push(msg.t);
+      if (n.spikes.length > 60) n.spikes.shift();
+      if (S.selected === id) renderInspector();
+    }
+  }
+}
+
+// ---------- physics + draw ----------
+function physics(dt) {
+  const W = canvas.width, H = canvas.height;
+  const ns = [...S.neurons.values()];
+  const inputs = ns.filter(n => n.cls === "input");
+  const outputs = ns.filter(n => n.cls === "output");
+  // pinned columns
+  inputs.forEach((n, i) => { n.px = W * 0.07; n.py = H * (0.12 + 0.76 * (inputs.length === 1 ? 0.5 : i / (inputs.length - 1))); });
+  outputs.forEach((n, i) => { n.px = W * 0.93; n.py = H * (0.25 + 0.5 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1))); });
+  // repulsion (cap for perf)
+  const step = Math.min(ns.length, 400);
+  for (let i = 0; i < step; i++) {
+    const a = ns[i];
+    for (let j = i + 1; j < step; j++) {
+      const b = ns[j];
+      let dx = a.x - b.x, dy = a.y - b.y;
+      let d2 = dx * dx + dy * dy + 40;
+      let f = 26000 / d2;
+      const d = Math.sqrt(d2);
+      dx /= d; dy /= d;
+      a.vx += dx * f; a.vy += dy * f;
+      b.vx -= dx * f; b.vy -= dy * f;
+    }
+  }
+  // springs
+  for (const s of S.synapses.values()) {
+    const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.max(20, Math.hypot(dx, dy));
+    const rest = 140 - s.w * 70;
+    const f = (d - rest) * 0.0015 * (0.3 + s.w);
+    a.vx += dx / d * f * d * 0.01; a.vy += dy / d * f * d * 0.01;
+    b.vx -= dx / d * f * d * 0.01; b.vy -= dy / d * f * d * 0.01;
+  }
+  for (const n of ns) {
+    if (n.px != null) { // pinned class columns: weak pull
+      n.vx += (n.px - n.x) * 0.08; n.vy += (n.py - n.y) * 0.08;
+      n.vx *= 0.5; n.vy *= 0.5;
+    } else {
+      n.vx *= 0.86; n.vy *= 0.86;
+    }
+    if (S.drag === n.id) { n.x = S.dragX; n.y = S.dragY; n.vx = n.vy = 0; continue; }
+    n.x += n.vx * dt; n.y += n.vy * dt;
+    n.x = Math.max(30, Math.min(W - 30, n.x));
+    n.y = Math.max(30, Math.min(H - 30, n.y));
+  }
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = "#0b0d10"; ctx.fillRect(0, 0, W, H);
+  // edges
+  for (const s of S.synapses.values()) {
+    const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
+    if (!a || !b) continue;
+    const w = Math.max(0.3, s.w * 2.2);
+    ctx.strokeStyle = `rgba(120,140,170,${0.12 + s.w * 0.4})`;
+    ctx.lineWidth = w;
+    if (s.flashT > 0) {
+      ctx.strokeStyle = s.flashDir > 0
+        ? `rgba(63,185,80,${s.flashT})`
+        : `rgba(248,81,73,${s.flashT})`;
+      s.flashT -= 0.02;
+    }
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  // nodes
+  for (const n of S.neurons.values()) {
+    const r = n.cls === "input" ? 6 : n.cls === "output" ? 7 : 5 + Math.min(3, n.rate / 40);
+    // fill = recent firing rate (cool → hot)
+    const heat = Math.min(1, n.rate / 60);
+    const col = `rgb(${Math.round(40 + 215 * heat)},${Math.round(80 + 140 * heat)},${Math.round(120 - 40 * heat)})`;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = col; ctx.fill();
+    if (n.flash > 0) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4 + (1 - n.flash) * 8, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,220,120,${n.flash})`; ctx.lineWidth = 2;
+      ctx.stroke(); n.flash -= 0.08;
+    }
+    // structural ring
+    if (n.state === "dormant") { ctx.strokeStyle = "#d29922"; ctx.setLineDash([3,3]); }
+    else if (n.state === "retired") { ctx.strokeStyle = "#f85149"; ctx.setLineDash([1,3]); }
+    else if (S.selected === n.id) { ctx.strokeStyle = "#58a6ff"; ctx.setLineDash([]); }
+    else { ctx.strokeStyle = "rgba(90,100,115,0.5)"; ctx.setLineDash([]); }
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    if (n.group) {
+      ctx.fillStyle = "#6b7480"; ctx.font = "10px monospace";
+      ctx.fillText(n.group, n.x - 4, n.y - r - 6);
+    }
+  }
+  // selected edge highlight
+  if (S.selectedEdge) {
+    const s = S.synapses.get(S.selectedEdge);
+    if (s) {
+      const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
+      if (a && b) {
+        ctx.strokeStyle = "rgba(88,166,255,0.9)"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+  }
+}
+
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  S.tick += 0; // ticks come from events
+  physics(dt * 60);
+  draw();
+  document.getElementById("simtime").textContent = (S.tick / 1000).toFixed(3) + " s";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- controls ----------
+function send(obj) { if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify(obj)); }
+const btnPause = document.getElementById("btn-pause");
+btnPause.onclick = () => {
+  if (S.paused) { send({ t: "ctrl", op: "resume" }); btnPause.classList.remove("active"); btnPause.textContent = "pause"; }
+  else { send({ t: "ctrl", op: "pause" }); btnPause.classList.add("active"); btnPause.textContent = "resume"; }
+  S.paused = !S.paused;
+};
+document.getElementById("btn-step1").onclick = () => send({ t: "ctrl", op: "step", n: 1 });
+document.getElementById("btn-step100").onclick = () => send({ t: "ctrl", op: "step", n: 100 });
+const speed = document.getElementById("speed");
+function syncSpeedUI() {
+  speed.value = Math.log10(S.speed);
+  document.getElementById("speed-label").textContent = S.speed + " t/s";
+}
+speed.oninput = () => {
+  S.speed = Math.round(Math.pow(10, parseFloat(speed.value)));
+  document.getElementById("speed-label").textContent = S.speed + " t/s";
+  send({ t: "ctrl", op: "speed", factor: S.speed });
+};
+syncSpeedUI();
+const scrub = document.getElementById("scrub");
+scrub.onchange = () => {
+  if (S.mode !== "replay") return;
+  const target = Math.round((scrub.value / 1000) * (S.duration || 0));
+  send({ t: "ctrl", op: "seek", tick: target });
+};
+
+// ---------- picking / inspector ----------
+canvas.onmousedown = (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * devicePixelRatio;
+  const y = (e.clientY - rect.top) * devicePixelRatio;
+  let best = null, bestD = 18 * devicePixelRatio;
+  for (const n of S.neurons.values()) {
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d < bestD) { bestD = d; best = n; }
+  }
+  if (best) {
+    S.selected = best.id; S.selectedEdge = null;
+    S.drag = best.id; S.dragX = best.x; S.dragY = best.y;
+    renderInspector();
+    return;
+  }
+  // edge picking: distance to segment
+  let bestE = null, bestEd = 6 * devicePixelRatio;
+  for (const [id, s] of S.synapses) {
+    const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
+    if (!a || !b) continue;
+    const d = distSeg(x, y, a.x, a.y, b.x, b.y);
+    if (d < bestEd) { bestEd = d; bestE = id; }
+  }
+  if (bestE != null) { S.selectedEdge = bestE; S.selected = null; renderInspector(); }
+};
+canvas.onmousemove = (e) => {
+  if (S.drag == null) return;
+  const rect = canvas.getBoundingClientRect();
+  S.dragX = (e.clientX - rect.left) * devicePixelRatio;
+  S.dragY = (e.clientY - rect.top) * devicePixelRatio;
+};
+canvas.onmouseup = () => { S.drag = null; };
+function distSeg(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function renderInspector() {
+  const body = document.getElementById("insp-body");
+  const n = S.neurons.get(S.selected);
+  if (n) {
+    const inS = [...S.synapses.values()].filter(s => s.dst === n.id);
+    const outS = [...S.synapses.values()].filter(s => s.src === n.id);
+    const hist = n.spikes.slice(-40);
+    body.innerHTML = `
+      <h3>neuron ${n.id} <span class="badge ${n.cls}">${n.cls}</span></h3>
+      <div class="row"><span class="k">group</span><span>${n.group || "—"}</span></div>
+      <div class="row"><span class="k">state</span><span>${n.state}</span></div>
+      <div class="row"><span class="k">rate</span><span>${n.rate.toFixed(1)} Hz</span></div>
+      <div class="row"><span class="k">created by</span><span>${n.reason || (n.cls === "input" ? "body (D8)" : "initial wiring")}</span></div>
+      <div class="row"><span class="k">in / out syn</span><span>${inS.length} / ${outS.length}</span></div>
+      <div class="row"><span class="k">mean w (in)</span><span>${inS.length ? (inS.reduce((a, s) => a + s.w, 0) / inS.length).toFixed(3) : "—"}</span></div>
+      <div class="row"><span class="k">spike history</span><span>${hist.length ? "recent " + hist.length + " shown" : "none"}</span></div>
+      <canvas id="hist" width="260" height="40" style="margin-top:6px;border:1px solid #232830"></canvas>`;
+    const hc = document.getElementById("hist").getContext("2d");
+    hc.fillStyle = "#0b0d10"; hc.fillRect(0, 0, 260, 40);
+    hc.strokeStyle = "#3fb950";
+    const t0 = hist[0] ?? S.tick;
+    hist.forEach((t, i) => {
+      const x = 4 + (i / 40) * 252;
+      hc.moveTo(x, 4); hc.lineTo(x, 36); hc.stroke();
+    });
+    return;
+  }
+  const s = S.synapses.get(S.selectedEdge);
+  if (s) {
+    body.innerHTML = `
+      <h3>synapse ${S.selectedEdge}</h3>
+      <div class="row"><span class="k">src → dst</span><span>${s.src} → ${s.dst}</span></div>
+      <div class="row"><span class="k">weight</span><span>${s.w.toFixed(4)}</span></div>`;
+    return;
+  }
+  body.textContent = "click a node or edge";
+}
+</script>
+</body>
+</html>
