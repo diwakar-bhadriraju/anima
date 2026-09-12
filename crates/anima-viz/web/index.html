@@ -2,202 +2,335 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ANIMA — observatory</title>
+<title>ANIMA — neural microscope</title>
 <style>
+  @font-face { font-family: "inter-fallback"; src: local("Inter"), local("Segoe UI"), local("Roboto"); }
   :root {
-    --bg: #07090c; --panel: #0d1117; --panel2: #11161d; --edge: #1c2330;
-    --edge2: #2a3446; --text: #c9d4e0; --dim: #5c6875; --faint: #39424e;
-    --accent: #58a6ff; --green: #3fb950; --red: #f85149; --amber: #d29922;
-    --cyan: #39c5cf; --violet: #bc8cff; --orange: #ffa657;
-    --in: #58a6ff; --internal: #a5d6ff; --out: #ffa657;
+    --bg: #04060a;
+    --deep: #060a12;
+    --panel: #0a0f18;
+    --panel2: #0e1520;
+    --edge: #131c2a;
+    --edge2: #1e2a3d;
+    --text: #d7e1ee;
+    --dim: #77879b;
+    --faint: #45536a;
+    --ghost: #2c3850;
+    --accent: #4cc2ff;
+    --blue: #4c8dff;
+    --sensory: #46a8ff;
+    --internal: #9db8e8;
+    --motor: #ffb066;
+    --green: #43d17c;
+    --red: #ff5d5d;
+    --amber: #ffc24b;
+    --cyan: #3fd8cf;
+    --violet: #b18cff;
+    --glow-in: 70, 168, 255;
+    --glow-int: 157, 184, 232;
+    --glow-out: 255, 176, 102;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
     background: var(--bg); color: var(--text);
-    font: 12px/1.5 "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font: 13px/1.45 "inter-fallback", -apple-system, "Segoe UI", Roboto, sans-serif;
     display: grid;
-    grid-template-rows: 42px 1fr 118px;
-    grid-template-columns: 1fr 340px;
+    grid-template-rows: 52px 1fr 128px;
+    grid-template-columns: 1fr 332px;
     grid-template-areas: "top top" "net side" "bottom bottom";
     height: 100vh; overflow: hidden;
   }
+
+  /* ---------- header ---------- */
   header {
-    grid-area: top; display: flex; align-items: center; gap: 10px;
-    padding: 0 14px; border-bottom: 1px solid var(--edge); background: var(--panel);
-    white-space: nowrap; overflow: hidden;
+    grid-area: top; display: flex; align-items: center; gap: 18px;
+    padding: 0 20px; background: linear-gradient(180deg, #0b1220 0%, #080d16 100%);
+    border-bottom: 1px solid var(--edge);
   }
-  header h1 { font-size: 13px; letter-spacing: 4px; color: var(--accent); font-weight: 600; }
-  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--red); display: inline-block; margin-right: 5px; }
-  .led.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .led.paused { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-  #status { color: var(--dim); min-width: 110px; }
-  #mode { border: 1px solid var(--edge2); border-radius: 3px; padding: 1px 8px; color: var(--violet); }
-  #simtime { color: var(--amber); font-size: 14px; min-width: 100px; text-align: right; }
-  #tick { color: var(--dim); min-width: 110px; }
-  #stage { color: var(--cyan); min-width: 90px; }
-  button, select, input[type=number] {
-    background: var(--panel2); color: var(--text); border: 1px solid var(--edge2);
-    padding: 3px 9px; cursor: pointer; font: inherit; border-radius: 3px;
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 {
+    font-size: 17px; font-weight: 700; letter-spacing: 7px;
+    color: #e8f2ff;
+    text-shadow: 0 0 22px rgba(76,194,255,0.35);
   }
-  button:hover { border-color: var(--accent); color: var(--accent); }
-  button.active { border-color: var(--amber); color: var(--amber); }
-  input[type=number] { width: 64px; }
-  #speed { width: 110px; }
-  #speed-label { color: var(--dim); min-width: 74px; }
-  .sep { width: 1px; height: 20px; background: var(--edge2); margin: 0 4px; }
-  #net { grid-area: net; position: relative; min-width: 0; min-height: 0; background: var(--bg); }
+  .brand .sub { font-size: 10px; letter-spacing: 2.5px; color: var(--faint); text-transform: uppercase; }
+  .hdr-stat { display: flex; flex-direction: column; justify-content: center; min-width: 86px; }
+  .hdr-stat .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+  .hdr-stat .k { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--faint); }
+  #simtime { color: var(--amber); }
+  #tick { color: var(--dim); font-size: 12px; }
+  .hdr-sep { width: 1px; height: 26px; background: var(--edge2); }
+  #stage-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--edge2); border-radius: 20px; padding: 4px 14px;
+    background: var(--panel2); font-size: 12px; color: var(--cyan); letter-spacing: 1px;
+    min-height: 26px;
+  }
+  #stage-pill .stage-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  #conn { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim); }
+  .led { width: 9px; height: 9px; border-radius: 50%; background: var(--red); transition: all 0.3s; }
+  .led.on { background: var(--green); box-shadow: 0 0 10px var(--green); animation: breathe 2.4s ease-in-out infinite; }
+  .led.paused { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  @keyframes breathe { 50% { opacity: 0.55; } }
+  #mode { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--violet); border: 1px solid #2a2440; background: #171327; padding: 3px 10px; border-radius: 12px; }
+
+  /* ---------- network stage ---------- */
+  #net { grid-area: net; position: relative; min-width: 0; min-height: 0; background: radial-gradient(ellipse at 50% 42%, #0a1220 0%, #05080f 62%, #03050a 100%); }
   #c { width: 100%; height: 100%; display: block; cursor: grab; }
-  #net-hud {
-    position: absolute; top: 8px; left: 10px; color: var(--faint); font-size: 11px;
-    pointer-events: none; line-height: 1.7;
+  #c:active { cursor: grabbing; }
+  #net-vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(2,4,8,0.55) 100%);
   }
-  #legend {
-    position: absolute; bottom: 8px; left: 10px; color: var(--dim); font-size: 11px;
+  .hud-chip {
+    position: absolute; display: flex; align-items: center; gap: 8px;
+    background: rgba(10,16,26,0.82); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 6px 12px; backdrop-filter: blur(6px); font-size: 11px; color: var(--dim);
     pointer-events: none;
   }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: -1px; }
+  #hud-tl { top: 14px; left: 16px; }
+  #hud-zoom { bottom: 14px; right: 16px; }
+  .hud-chip b { color: var(--text); font-weight: 600; }
+  .pop-legend { position: absolute; left: 16px; bottom: 14px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+  .pop-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim); }
+  .pop-item .sw { width: 10px; height: 10px; border-radius: 50%; }
+  .pop-item .bar-wrap { width: 64px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .pop-item .bar { height: 100%; border-radius: 2px; width: 0%; transition: width 0.6s ease; }
+  .pop-item b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; min-width: 24px; text-align: right; }
+
+  /* ---------- controls bar (inside bottom, above timeline) ---------- */
+  .ctl {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    background: var(--panel2); color: var(--text); border: 1px solid var(--edge2);
+    padding: 6px 13px; cursor: pointer; font: inherit; font-size: 12px; border-radius: 7px;
+    transition: border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .ctl:hover { border-color: var(--accent); color: #fff; background: #122033; }
+  .ctl.primary { background: #12203a; border-color: #2a4a78; }
+  .ctl.primary:hover { border-color: var(--accent); }
+  .ctl.danger:hover { border-color: var(--red); color: var(--red); }
+  .ctl.active { border-color: var(--amber); color: var(--amber); background: #2a2410; }
+  .ctl svg { display: block; }
+  .stepbox { display: inline-flex; align-items: stretch; }
+  .stepbox input {
+    width: 58px; background: var(--panel2); border: 1px solid var(--edge2); color: var(--text);
+    border-radius: 7px 0 0 7px; padding: 0 8px; font: inherit; font-size: 12px; text-align: center;
+  }
+  .stepbox input:focus { outline: none; border-color: var(--accent); }
+  .stepbox .ctl { border-radius: 0 7px 7px 0; border-left: none; }
+  #speed { -webkit-appearance: none; width: 130px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--ghost), var(--edge2)); outline: none; }
+  #speed::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; box-shadow: 0 0 8px rgba(76,194,255,0.6);
+  }
+  #speed-label { font-size: 11px; color: var(--dim); min-width: 66px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- sidebar ---------- */
   aside {
-    grid-area: side; border-left: 1px solid var(--edge); background: var(--panel);
-    display: grid; grid-template-rows: auto 1fr 1fr; min-height: 0;
+    grid-area: side; background: var(--panel); border-left: 1px solid var(--edge);
+    display: grid; grid-template-rows: auto 265px 1fr; min-height: 0;
   }
-  section { padding: 8px 12px; border-bottom: 1px solid var(--edge); min-height: 0; display: flex; flex-direction: column; }
-  section h2 {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim);
-    margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;
+  section { min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid var(--edge); }
+  section:last-child { border-bottom: none; }
+  .sec-h {
+    display: flex; align-items: center; gap: 8px; padding: 11px 16px 8px;
+    font-size: 10px; font-weight: 600; letter-spacing: 2.2px; text-transform: uppercase; color: var(--faint);
   }
-  section h2 .aux { letter-spacing: 0; text-transform: none; }
-  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
-  #stats .row { display: flex; justify-content: space-between; }
-  #stats .k { color: var(--dim); }
-  #stats canvas { width: 100%; height: 54px; margin-top: 6px; border: 1px solid var(--edge); background: var(--bg); }
-  #charts { overflow-y: hidden; }
+  .sec-h .rule { flex: 1; height: 1px; background: var(--edge); }
+  .sec-h .aux { font-weight: 400; letter-spacing: 0.5px; text-transform: none; font-size: 11px; color: var(--dim); }
+
+  /* metrics */
+  #metrics { padding: 0 16px 12px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mcard {
+    background: var(--panel2); border: 1px solid var(--edge); border-radius: 9px;
+    padding: 9px 10px 7px;
+  }
+  .mcard .mv { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; color: #eef5ff; line-height: 1.15; }
+  .mcard .mv small { font-size: 10px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+  .mcard .mk { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--faint); margin-top: 1px; }
+  .mcard.hot .mv { color: var(--amber); }
+  .chart-wrap { margin-top: 9px; border: 1px solid var(--edge); border-radius: 8px; overflow: hidden; background: var(--deep); }
+  #chart-pop { width: 100%; height: 58px; display: block; }
+  .chart-key { display: flex; gap: 14px; padding: 5px 12px 7px; font-size: 10px; color: var(--faint); }
+  .chart-key span { display: flex; align-items: center; gap: 5px; }
+  .chart-key i { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* events */
   #evwrap { overflow: hidden; }
-  #filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-  .fbtn { padding: 1px 7px; font-size: 10px; border-radius: 8px; border: 1px solid var(--edge2); color: var(--dim); cursor: pointer; user-select: none; }
-  .fbtn.on { color: var(--text); border-color: var(--accent); background: #16233a; }
-  #ev-body { overflow-y: auto; flex: 1; font-size: 11px; }
-  .ev { padding: 1px 0; border-bottom: 1px solid #131920; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ev .t { color: var(--faint); margin-right: 6px; }
-  .ev .n { color: var(--dim); margin-right: 6px; }
-  .ev.sys { color: var(--violet); }
-  .ev.struct { color: var(--green); }
-  .ev.warn { color: var(--red); }
-  .ev.motor { color: var(--out); }
-  .ev.sensory { color: var(--in); }
-  .ev.plast { color: var(--amber); }
-  .ev.instrument { color: var(--cyan); }
-  #insp-body { overflow-y: auto; font-size: 11px; }
-  #insp-body .row { display: flex; justify-content: space-between; padding: 1px 0; }
-  #insp-body .k { color: var(--dim); }
-  #insp-body h3 { font-size: 12px; margin-bottom: 4px; color: var(--accent); font-weight: 600; }
-  #insp-body canvas { width: 100%; height: 44px; margin-top: 6px; border: 1px solid var(--edge); background: var(--bg); }
-  .badge { border: 1px solid var(--edge2); border-radius: 3px; padding: 0 6px; font-size: 10px; }
-  .badge.input { color: var(--in); border-color: var(--in); }
-  .badge.internal { color: var(--internal); border-color: var(--internal); }
-  .badge.output { color: var(--out); border-color: var(--out); }
+  .filter-row { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 16px 9px; }
+  .fbtn {
+    padding: 2px 10px; font-size: 10.5px; border-radius: 10px; border: 1px solid var(--edge2);
+    color: var(--faint); cursor: pointer; user-select: none; transition: all 0.15s; letter-spacing: 0.3px;
+  }
+  .fbtn.on { color: var(--text); border-color: rgba(76,194,255,0.45); background: rgba(76,194,255,0.09); }
+  #ev-body { overflow-y: auto; flex: 1; padding: 0 10px 10px; scrollbar-width: thin; scrollbar-color: var(--ghost) transparent; }
+  .ev {
+    display: flex; align-items: baseline; gap: 8px; padding: 4px 6px; margin: 0 2px 1px;
+    border-radius: 6px; font-size: 11.5px; line-height: 1.35;
+  }
+  .ev:nth-child(odd) { background: rgba(255,255,255,0.015); }
+  .ev .t { color: var(--ghost); font-variant-numeric: tabular-nums; font-size: 10.5px; min-width: 52px; }
+  .ev .n { color: var(--dim); font-weight: 600; font-size: 10px; letter-spacing: 0.6px; min-width: 72px; }
+  .ev .x { color: var(--dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev.sensory .n { color: var(--sensory); } .ev.sensory { border-left: 2px solid rgba(70,168,255,0.5); }
+  .ev.motor .n { color: var(--motor); } .ev.motor { border-left: 2px solid rgba(255,176,102,0.5); }
+  .ev.plast .n { color: var(--amber); } .ev.plast { border-left: 2px solid rgba(255,194,75,0.4); }
+  .ev.struct .n { color: var(--green); } .ev.struct { border-left: 2px solid rgba(67,209,124,0.4); }
+  .ev.instrument .n { color: var(--cyan); } .ev.instrument { border-left: 2px solid rgba(63,216,207,0.4); }
+  .ev.sys .n { color: var(--violet); } .ev.sys { border-left: 2px solid rgba(177,140,255,0.4); }
+  .ev.warn { background: rgba(255,93,93,0.07); } .ev.warn .n { color: var(--red); } .ev.warn { border-left: 2px solid var(--red); }
+
+  /* inspector */
+  #insp-body { overflow-y: auto; padding: 0 16px 14px; font-size: 12px; scrollbar-width: thin; scrollbar-color: var(--ghost) transparent; }
+  #insp-body .placeholder { color: var(--faint); padding: 14px 0; text-align: center; font-size: 12px; }
+  #insp-body h3 { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 650; color: #eef5ff; margin: 2px 0 10px; }
+  .tag { font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; padding: 2px 9px; border-radius: 9px; font-weight: 600; }
+  .tag.input { color: var(--sensory); background: rgba(70,168,255,0.12); border: 1px solid rgba(70,168,255,0.35); }
+  .tag.internal { color: var(--internal); background: rgba(157,184,232,0.1); border: 1px solid rgba(157,184,232,0.3); }
+  .tag.output { color: var(--motor); background: rgba(255,176,102,0.12); border: 1px solid rgba(255,176,102,0.35); }
+  .kv { display: flex; justify-content: space-between; padding: 4.5px 0; border-bottom: 1px solid rgba(19,28,42,0.7); }
+  .kv:last-of-type { border-bottom: none; }
+  .kv .k { color: var(--faint); }
+  .kv .v { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; }
+  .kv .v.na { color: var(--ghost); font-weight: 400; font-style: italic; }
+  #insp-body canvas { width: 100%; height: 46px; margin-top: 9px; border-radius: 7px; border: 1px solid var(--edge); background: var(--deep); }
+  .cap { font-size: 10px; color: var(--faint); margin-top: 7px; letter-spacing: 0.5px; }
+
+  /* ---------- footer: transport + timeline ---------- */
   footer {
     grid-area: bottom; border-top: 1px solid var(--edge); background: var(--panel);
-    display: grid; grid-template-rows: 26px 1fr; min-height: 0;
+    display: grid; grid-template-rows: 50px 1fr; min-height: 0;
   }
-  #tl-head { display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: 11px; color: var(--dim); }
-  #tl-head #tl-pos { color: var(--amber); }
-  #tl-canvas-wrap { padding: 0 14px 8px; min-height: 0; }
-  #tl { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  #transport {
+    display: flex; align-items: center; gap: 10px; padding: 0 20px;
+    border-bottom: 1px solid var(--edge);
+  }
+  #transport .group { display: flex; align-items: center; gap: 7px; }
+  #transport .gap { flex: 1; }
+  #tl-meta { display: flex; align-items: baseline; gap: 12px; }
+  #tl-pos { font-size: 15px; font-weight: 650; color: var(--amber); font-variant-numeric: tabular-nums; }
+  #tl-dur { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  #tl-hint { font-size: 11px; color: var(--faint); letter-spacing: 0.4px; }
+  #tl-marks { font-size: 10px; color: var(--faint); letter-spacing: 1px; }
+  #tl-canvas-wrap { position: relative; padding: 8px 20px 10px; min-height: 0; }
+  #tl { width: 100%; height: 100%; display: block; cursor: crosshair; border-radius: 6px; }
+
+  /* ---------- modal ---------- */
   .modal-bg {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
-    align-items: center; justify-content: center; z-index: 10;
+    position: fixed; inset: 0; background: rgba(2,4,9,0.75); display: none;
+    align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(4px);
   }
   .modal-bg.open { display: flex; }
-  .modal { background: var(--panel); border: 1px solid var(--edge2); border-radius: 6px; padding: 18px 22px; width: 560px; max-height: 70vh; overflow-y: auto; }
-  .modal h3 { color: var(--accent); margin-bottom: 10px; letter-spacing: 1px; }
-  .runrow { display: flex; justify-content: space-between; padding: 5px 8px; border: 1px solid var(--edge); border-radius: 3px; margin-bottom: 4px; cursor: pointer; }
+  .modal { background: var(--panel); border: 1px solid var(--edge2); border-radius: 14px; padding: 22px 26px; width: 580px; max-height: 72vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.6); }
+  .modal h3 { font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .runrow { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--edge); border-radius: 9px; margin-bottom: 6px; cursor: pointer; transition: border-color 0.15s; }
   .runrow:hover { border-color: var(--accent); }
-  .runrow .rn { color: var(--text); }
-  .runrow .rm { color: var(--dim); font-size: 11px; }
-  .runrow.sel { border-color: var(--green); }
-  .mactions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .runrow.sel { border-color: var(--green); background: rgba(67,209,124,0.05); }
+  .runrow .rn { color: var(--text); font-weight: 500; font-size: 13px; }
+  .runrow .rm { color: var(--faint); font-size: 11px; }
+  .mactions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>ANIMA</h1>
-  <span><span class="led" id="led"></span></span>
-  <span id="status">connecting…</span>
-  <span id="mode" class="badge">—</span>
-  <span id="stage"></span>
-  <div class="sep"></div>
-  <button id="btn-pause">⏸ pause</button>
-  <button id="btn-step1">step +1</button>
-  <button id="btn-stepN">step +<input id="stepN" type="number" value="100" min="1" max="100000"></button>
-  <div class="sep"></div>
-  <span>speed</span>
-  <input id="speed" type="range" min="0" max="4" step="0.01" value="3">
-  <span id="speed-label">1000 t/s</span>
-  <div class="sep"></div>
-  <button id="btn-replay" title="load a recorded run">📼 replay…</button>
-  <button id="btn-reset" title="reset view layout">reset view</button>
-  <div style="flex:1"></div>
-  <span id="tick">t 0</span>
-  <span id="simtime">0.000 s</span>
+  <div class="brand">
+    <h1>ANIMA</h1>
+    <span class="sub">neural microscope</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-stat"><span class="v" id="simtime">0.000 s</span><span class="k">sim time</span></div>
+  <div class="hdr-stat"><span class="v" id="tick" style="font-size:13px">0</span><span class="k">tick</span></div>
+  <div class="hdr-stat"><span class="v" id="s-tr" style="font-size:13px">—</span><span class="k">rate</span></div>
+  <div class="hdr-sep"></div>
+  <div id="stage-pill"><span class="stage-dot"></span><span id="stage">—</span></div>
+  <div class="hdr-right">
+    <span id="mode">—</span>
+    <div id="conn"><span class="led" id="led"></span><span id="status">connecting</span></div>
+  </div>
 </header>
+
 <div id="net">
   <canvas id="c"></canvas>
-  <div id="net-hud"></div>
-  <div id="legend">
-    <span class="dot" style="background:var(--in)"></span>sensory
-    <span class="dot" style="background:var(--internal)"></span>internal
-    <span class="dot" style="background:var(--out)"></span>motor
-    <span class="dot" style="background:var(--amber)"></span>dormant
-    <span class="dot" style="background:var(--red)"></span>retired
+  <div id="net-vignette"></div>
+  <div class="hud-chip" id="hud-tl">
+    <b id="hud-n">0</b>&nbsp;neurons&nbsp;·&nbsp;<b id="hud-s">0</b>&nbsp;synapses&nbsp;·&nbsp;<span id="hud-extra"></span>
+  </div>
+  <div class="hud-chip" id="hud-zoom"><span id="zoom-v">100%</span></div>
+  <div class="pop-legend" id="pop-legend">
+    <div class="pop-item"><span class="sw" style="background:var(--sensory)"></span>sensory<span class="bar-wrap"><span class="bar" id="bar-in" style="background:var(--sensory)"></span></span><b id="hz-in">0</b> Hz</div>
+    <div class="pop-item"><span class="sw" style="background:var(--internal)"></span>internal<span class="bar-wrap"><span class="bar" id="bar-int" style="background:var(--internal)"></span></span><b id="hz-int">0</b> Hz</div>
+    <div class="pop-item"><span class="sw" style="background:var(--motor)"></span>motor<span class="bar-wrap"><span class="bar" id="bar-out" style="background:var(--motor)"></span></span><b id="hz-out">0</b> Hz</div>
   </div>
 </div>
+
 <aside>
   <section id="charts">
-    <h2>Activity <span class="aux" id="thr">— ev/s</span></h2>
-    <div id="stats">
-      <div class="row"><span class="k">spiking now</span><span id="s-active">0</span></div>
-      <div class="row"><span class="k">population Hz</span><span id="s-rate">0.0</span></div>
-      <div class="row"><span class="k">neurons</span><span id="s-neurons">0</span></div>
-      <div class="row"><span class="k">synapses</span><span id="s-syn">0</span></div>
-      <div class="row"><span class="k">mean w</span><span id="s-w">—</span></div>
-      <div class="row"><span class="k">tick rate</span><span id="s-tr">—</span></div>
-    </div>
-    <canvas id="chart-pop" width="300" height="54"></canvas>
-    <div style="color:var(--faint);font-size:10px;margin-top:2px">
-      <span style="color:var(--in)">■</span> sensory
-      <span style="color:var(--internal)">■</span> internal
-      <span style="color:var(--out)">■</span> motor — spikes / 1 s
+    <div class="sec-h">Activity<span class="rule"></span><span class="aux" id="thr">— ev/s</span></div>
+    <div id="metrics">
+      <div class="metric-grid">
+        <div class="mcard hot"><div class="mv" id="s-active">0</div><div class="mk">spiking now</div></div>
+        <div class="mcard"><div class="mv" id="s-rate">0<small>Hz</small></div><div class="mk">pop. rate</div></div>
+        <div class="mcard"><div class="mv" id="s-w">—</div><div class="mk">mean weight</div></div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-pop"></canvas></div>
+      <div class="chart-key">
+        <span><i style="background:var(--sensory)"></i>sensory</span>
+        <span><i style="background:var(--internal)"></i>internal</span>
+        <span><i style="background:var(--motor)"></i>motor</span>
+      </div>
     </div>
   </section>
   <section id="evwrap">
-    <h2>Event stream <span class="aux"><label style="cursor:pointer"><input type="checkbox" id="pausefeed"> hold</label></span></h2>
-    <div id="filters"></div>
+    <div class="sec-h">Event stream<span class="rule"></span><span class="aux"><label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pausefeed" style="accent-color:var(--amber)">hold</label></span></div>
+    <div class="filter-row" id="filters"></div>
     <div id="ev-body"></div>
   </section>
   <section id="inspector">
-    <h2>Inspector</h2>
-    <div id="insp-body">click a neuron or synapse</div>
+    <div class="sec-h">Inspector</div>
+    <div id="insp-body"><div class="placeholder">select a neuron or synapse</div></div>
   </section>
 </aside>
+
 <footer>
-  <div id="tl-head">
-    <span>TIMELINE</span>
-    <span id="tl-pos">0.0 s</span>
-    <span id="tl-hint"></span>
-    <div style="flex:1"></div>
-    <span id="tl-marks"></span>
+  <div id="transport">
+    <div class="group">
+      <button class="ctl primary" id="btn-pause">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><rect x="1" y="1" width="3.2" height="9" rx="1"/><rect x="6.8" y="1" width="3.2" height="9" rx="1"/></svg>
+        pause
+      </button>
+      <button class="ctl" id="btn-step1">+1</button>
+      <span class="stepbox"><input id="stepN" type="number" value="100" min="1" max="100000"><button class="ctl" id="btn-stepN">step</button></span>
+    </div>
+    <div class="group">
+      <input id="speed" type="range" min="0" max="4" step="0.01" value="3">
+      <span id="speed-label">1000 t/s</span>
+    </div>
+    <div class="group">
+      <button class="ctl" id="btn-reset">reset view</button>
+      <button class="ctl" id="btn-replay">replay…</button>
+    </div>
+    <div class="gap"></div>
+    <div id="tl-meta">
+      <span id="tl-pos">0.0 s</span>
+      <span id="tl-dur"></span>
+      <span id="tl-hint"></span>
+      <span id="tl-marks"></span>
+    </div>
   </div>
   <div id="tl-canvas-wrap"><canvas id="tl"></canvas></div>
 </footer>
 
 <div class="modal-bg" id="replay-modal">
   <div class="modal">
-    <h3>LOAD RECORDED RUN</h3>
+    <h3>Load recorded run</h3>
     <div id="run-list">loading…</div>
     <div class="mactions">
-      <button id="rp-cancel">cancel</button>
-      <button id="rp-load" style="border-color:var(--green);color:var(--green)">load selected</button>
+      <button class="ctl" id="rp-cancel">cancel</button>
+      <button class="ctl primary" id="rp-load">load selected</button>
     </div>
   </div>
 </div>
@@ -209,17 +342,24 @@ const S = {
   mode: "run", ws: null, paused: false, speed: 1000.0, tick: 0, duration: 0,
   expId: "", connected: false,
   neurons: new Map(),   // id -> {x,y,px,py,cls,group,rate,state,flash,spikes:[], reason, born}
-  synapses: new Map(),  // id -> {src,dst,w,flashT,flashDir,appear}
+  synapses: new Map(),  // id -> {src,dst,w,flashT,flashDir,appear,pulses:[]}
   selected: null, selectedEdge: null, drag: null,
-  cam: { x: 0, y: 0, z: 1 },       // pan/zoom over world coords
-  evCounts: {},                     // kind -> count since last display
+  cam: { x: 0, y: 0, z: 1 },
+  evCounts: {},
   throughput: 0,
   hist: [],                         // {t, in, internal, out} per second
-  timeline: null, binMs: 1000,      // replay timeline summary
+  timeline: null, binMs: 1000,
   lastTickWall: 0, lastTickSim: 0, tickRate: 0,
   feedHeld: false, feedHoldBuf: [],
   filters: new Set(),
   wall0: performance.now(),
+  pulses: [],                       // traveling spike pulses {ax,ay,bx,by,p,cls,w}
+  halo: [],                         // soft shockwaves from spikes {x,y,r,a,cls}
+};
+const POP_RGB = {
+  input: [70, 168, 255],
+  internal: [157, 184, 232],
+  output: [255, 176, 102],
 };
 const CLASSES = ["input", "internal", "output"];
 const canvas = document.getElementById("c");
@@ -233,7 +373,6 @@ function sizeCanvas(cv) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
 }
 window.addEventListener("resize", () => { sizeCanvas(canvas); sizeCanvas(tlCanvas); });
-
 // deterministic PRNG (mulberry32) — layout seeded by neuron id per plan
 function mulberry32(a) {
   return function() {
@@ -251,31 +390,26 @@ function newNode(id) {
     id, cls: "internal", group: "", rate: 0, state: "normal",
     x: W * 0.25 + r() * W * 0.5, y: H * 0.15 + r() * H * 0.7,
     vx: 0, vy: 0, flash: 0, spikes: [], reason: null, born: null,
+    glow: 0,
   };
 }
-
 // ---------- websocket ----------
-function connect() {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  S.ws = new WebSocket(`${proto}://${location.host}/ws`);
-  S.ws.onopen = () => { S.connected = true; };
-  S.ws.onclose = () => {
-    S.connected = false; setStatus("disconnected — retrying");
-    setTimeout(connect, 1000);
-  };
-  S.ws.onmessage = (m) => {
-    const msg = JSON.parse(m.data);
-    handleFrame(msg);
-  };
-}
+// Primary: page-owned socket (universally supported). If the tab is
+// throttled by the browser, frames stall — detected by the watchdog —
+// and we transparently hand the socket to a Web Worker, which keeps
+// receiving in the background.
+let worker = null;
+let usingWorker = false;
+let lastFrameWall = performance.now();
 function handleFrame(msg) {
+  lastFrameWall = performance.now();
   switch (msg.msg || msg.t) {
     case "hello": {
       S.mode = msg.mode; S.duration = msg.duration_ms || 0;
       S.expId = msg.exp_id || "";
       document.getElementById("mode").textContent = S.mode + " · " + S.expId;
       document.getElementById("tl-hint").textContent =
-        S.mode === "replay" ? "click / drag to seek" : "live — record & replay via CLI";
+        S.mode === "replay" ? "click / drag timeline to seek" : "";
       break;
     }
     case "run-params":
@@ -290,28 +424,74 @@ function handleFrame(msg) {
     case "ev": applyEvent(msg); break;
     case "spikes": applySpikes(msg); break;
     case "batch": {
-      // Server coalesces 50 ms of frames into one newline-joined batch.
       for (const line of msg.lines.split("\n")) {
         if (!line) continue;
-        try { handleFrame(JSON.parse(line)); } catch (e) { /* skip malformed */ }
+        try { handleFrame(JSON.parse(line)); } catch (e) { /* skip */ }
       }
       break;
     }
   }
 }
-connect();
+function connect() {
+  S.ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  S.ws.onopen = () => { S.connected = true; };
+  S.ws.onclose = () => {
+    S.connected = false;
+    if (!usingWorker) {
+      setStatus("reconnecting", "off");
+      setTimeout(connect, 1000);
+    }
+  };
+  S.ws.onmessage = (m) => handleFrame(JSON.parse(m.data));
+}
+
+// Hand the socket to a worker when the page stops receiving (hidden-tab
+// throttling). The worker reconnects and feeds frames via postMessage.
+function escalateToWorker() {
+  if (usingWorker || !window.Worker) return;
+  usingWorker = true;
+  try { S.ws && S.ws.close(); } catch (e) {}
+  worker = new Worker("/socket-worker.js");
+  worker.onmessage = (e) => {
+    const d = e.data;
+    if (d.t === "ws-open") { S.connected = true; }
+    else if (d.t === "ws-closed") { S.connected = false; setStatus("reconnecting", "off"); }
+    else if (d.t === "ws-frame") handleFrame(JSON.parse(d.data));
+  };
+  worker.onerror = () => {
+    // worker unusable (old browser): back to page socket
+    usingWorker = false;
+    worker = null;
+    connect();
+  };
+  worker.postMessage({ t: "start" });
+}
+
+// Throttle watchdog: no frames for 4 s while "live" → escalate.
+setInterval(() => {
+  if (S.connected && !usingWorker && performance.now() - lastFrameWall > 4000) {
+    escalateToWorker();
+  }
+}, 1500);
+
+function send(obj) {
+  if (usingWorker && worker) worker.postMessage({ t: "send", data: JSON.stringify(obj) });
+  else if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify(obj));
+}
 
 function setStatus(txt, state) {
   document.getElementById("status").textContent = txt;
-  const led = document.getElementById("led");
-  led.className = "led" + (state === "on" ? " on" : state === "paused" ? " paused" : "");
+  document.getElementById("led").className = "led" + (state === "on" ? " on" : state === "paused" ? " paused" : "");
 }
+
+connect();
+
 
 function applySnapshot(msg) {
   if (msg.tick != null) trackTick(msg.tick);
   S.paused = !!msg.paused;
   if (msg.speed) { S.speed = msg.speed; syncSpeedUI(); }
-  setStatus(S.paused ? "paused" : "running", S.paused ? "paused" : "on");
+  setStatus(S.paused ? "paused" : "live", S.paused ? "paused" : "on");
   const seen = new Set();
   for (const n of msg.neurons || []) {
     seen.add(n.id);
@@ -322,7 +502,7 @@ function applySnapshot(msg) {
   for (const s of msg.synapses || []) {
     seen.add("s" + s.id);
     let e = S.synapses.get(s.id);
-    if (!e) { e = { src: s.src, dst: s.dst, w: s.w, flashT: 0, flashDir: 0, appear: S.tick }; S.synapses.set(s.id, e); }
+    if (!e) { e = { src: s.src, dst: s.dst, w: s.w, flashT: 0, flashDir: 0, appear: S.tick, pulses: [] }; S.synapses.set(s.id, e); }
     e.w = s.w;
   }
   pruneGone(seen);
@@ -335,28 +515,23 @@ function pruneGone(seen) {
 
 // ---------- events ----------
 const CAT = {
-  // sensory
   "stimulus-presented": "sensory",
-  // motor
   "output-activity": "motor",
-  // plasticity
   "synapse-strengthened": "plast", "synapse-weakened": "plast",
   "synapse-created": "struct", "synapse-pruned": "struct",
-  // structural / system
   "neuron-created": "struct", "neuron-dormant": "struct",
   "neuron-reactivated": "struct", "neuron-retired": "struct",
   "run-started": "sys", "run-ended": "sys", "failure": "warn",
-  // instrumentation
   "novelty-signal": "instrument", "prediction-error": "instrument",
   "resource-usage": "sys",
 };
 const KIND_LABEL = {
-  "neuron-created": "NEW NEURON", "neuron-dormant": "DORMANT", "neuron-reactivated": "REACTIVATED",
-  "neuron-retired": "RETIRED", "synapse-created": "NEW SYNAPSE", "synapse-pruned": "PRUNED SYNAPSE",
-  "synapse-strengthened": "STRENGTHENED", "synapse-weakened": "WEAKENED",
-  "stimulus-presented": "STIMULUS", "failure": "FAILURE", "novelty-signal": "NOVELTY",
-  "prediction-error": "PRED-ERR", "run-ended": "RUN ENDED", "run-started": "RUN STARTED",
-  "output-activity": "MOTOR", "resource-usage": "RESOURCES",
+  "neuron-created": "birth", "neuron-dormant": "dormant", "neuron-reactivated": "reactivate",
+  "neuron-retired": "retired", "synapse-created": "synapse+", "synapse-pruned": "synapse−",
+  "synapse-strengthened": "potentiate", "synapse-weakened": "depress",
+  "stimulus-presented": "stimulus", "failure": "failure", "novelty-signal": "novelty",
+  "prediction-error": "pred-err", "run-ended": "run ended", "run-started": "run started",
+  "output-activity": "motor", "resource-usage": "resources",
 };
 const FILTER_DEFS = [
   ["sensory", "sensory"], ["motor", "motor"], ["plast", "plasticity"],
@@ -383,11 +558,12 @@ function applyEvent(env) {
       let n = S.neurons.get(p.n);
       if (!n) { n = newNode(p.n); S.neurons.set(p.n, n); }
       n.reason = (p.reason && p.reason.trigger) || null;
-      n.flash = 1.2;
+      n.flash = 1.2; n.glow = 1;
+      S.halo.push({ x: n.x, y: n.y, r: 0, a: 0.8, cls: n.cls });
       break;
     }
     case "synapse-created":
-      S.synapses.set(p.syn, { src: p.pre, dst: p.post, w: p.w || 0, flashT: 1, flashDir: 1, appear: S.tick });
+      S.synapses.set(p.syn, { src: p.pre, dst: p.post, w: p.w || 0, flashT: 1, flashDir: 1, appear: S.tick, pulses: [] });
       break;
     case "synapse-pruned": S.synapses.delete(p.syn); break;
     case "synapse-strengthened": {
@@ -404,21 +580,19 @@ function applyEvent(env) {
     case "neuron-reactivated": { const n = S.neurons.get(p.n); if (n) n.state = "normal"; break; }
     case "neuron-retired": { const n = S.neurons.get(p.n); if (n) n.state = "retired"; break; }
     case "stimulus-presented":
-      document.getElementById("stage").textContent = `${p.stage} · ${p.pattern_id}`;
+      document.getElementById("stage").textContent = `${p.stage} · pattern ${p.pattern_id}`;
       renderCurriculum();
       break;
     case "run-ended":
-      document.getElementById("stage").textContent = "ended: " + p.reason;
+      document.getElementById("stage").textContent = "ended · " + p.reason;
       renderCurriculum();
       break;
   }
-  // Event feed: aggregate noisy kinds, drop everything while held.
   const cat = CAT[kind];
   if (cat && !S.filters.has(cat)) {
     if (kind === "synapse-strengthened" || kind === "synapse-weakened") {
       if (Math.abs(p.delta || 0) > 0.08) addEventLine(env.t, kind, describe(kind, p));
     } else if (kind === "prediction-error" || kind === "novelty-signal" || kind === "resource-usage") {
-      // 1-in-20 sample of high-rate instrumentation
       if (S.evCounts[kind] % 20 === 1) addEventLine(env.t, kind, describe(kind, p));
     } else {
       addEventLine(env.t, kind, describe(kind, p));
@@ -432,18 +606,18 @@ function describe(kind, p) {
     case "neuron-created": return `neuron ${p.n}${p.reason ? " · " + p.reason.trigger : ""}`;
     case "neuron-dormant": case "neuron-reactivated": case "neuron-retired":
       return `neuron ${p.n}`;
-    case "synapse-created": return `syn ${p.syn}: ${p.pre}→${p.post} w=${(p.w||0).toFixed(2)}`;
-    case "synapse-pruned": return `syn ${p.syn}`;
-    case "synapse-strengthened": return `syn ${p.syn} Δ+${(p.delta||0).toFixed(3)}`;
-    case "synapse-weakened": return `syn ${p.syn} Δ−${Math.abs(p.delta||0).toFixed(3)}`;
-    case "stimulus-presented": return `${p.stage}: ${p.pattern_id}`;
-    case "failure": return `${p.kind}: ${p.detail}`;
+    case "synapse-created": return `${p.pre} → ${p.post} · w ${(p.w||0).toFixed(2)}`;
+    case "synapse-pruned": return `synapse ${p.syn}`;
+    case "synapse-strengthened": return `syn ${p.syn} · Δ +${(p.delta||0).toFixed(3)}`;
+    case "synapse-weakened": return `syn ${p.syn} · Δ −${Math.abs(p.delta||0).toFixed(3)}`;
+    case "stimulus-presented": return `${p.stage} · ${p.pattern_id}`;
+    case "failure": return `${p.kind} · ${p.detail}`;
     case "run-ended": return p.reason;
     case "run-started": return `seed ${p.seed}`;
-    case "novelty-signal": return `v=${(p.value??0).toFixed(3)}`;
-    case "prediction-error": return `v=${(p.value??0).toFixed(3)}`;
-    case "output-activity": return `output ${p.n}`;
-    case "resource-usage": return `${p.neurons}n ${p.synapses}s ${p.spikes_window}sp/win`;
+    case "novelty-signal": return `v = ${(p.value??0).toFixed(3)}`;
+    case "prediction-error": return `v = ${(p.value??0).toFixed(3)}`;
+    case "output-activity": return `neuron ${p.n} fired`;
+    case "resource-usage": return `${p.neurons}n · ${p.synapses}s · ${p.spikes_window} sp/win`;
     default: return "";
   }
 }
@@ -453,10 +627,10 @@ function addEventLine(t, kind, text) {
   const body = document.getElementById("ev-body");
   const div = document.createElement("div");
   div.className = "ev " + (CAT[kind] || "sys");
-  div.innerHTML = `<span class="t">${(t/1000).toFixed(2)}s</span><span class="n">${KIND_LABEL[kind]||kind}</span>${text}`;
-  div.title = `${(t/1000).toFixed(3)}s — ${KIND_LABEL[kind]||kind} ${text}`;
+  div.innerHTML = `<span class="t">${(t/1000).toFixed(2)}s</span><span class="n">${KIND_LABEL[kind]||kind}</span><span class="x">${text}</span>`;
+  div.title = `${(t/1000).toFixed(3)}s · ${KIND_LABEL[kind]||kind} · ${text}`;
   body.prepend(div);
-  while (body.childElementCount > 400) body.lastChild.remove();
+  while (body.childElementCount > 300) body.lastChild.remove();
 }
 document.getElementById("pausefeed").onchange = (e) => {
   S.feedHeld = e.target.checked;
@@ -472,11 +646,36 @@ function applySpikes(msg) {
   for (const id of msg.ids || []) {
     const n = S.neurons.get(id);
     if (n) {
-      n.flash = 1;
+      n.flash = 1; n.glow = Math.min(1, n.glow + 0.55);
       n.spikes.push(msg.t);
       if (n.spikes.length > 120) n.spikes.shift();
       if (S.selected === id) renderInspectorThrottled();
     }
+  }
+  // spawn pulse visuals: spike → every outgoing synapse of spiking neurons
+  for (const id of msg.ids || []) {
+    const n = S.neurons.get(id);
+    if (!n) continue;
+    let out = S._outCache && S._outCacheTick === msg.t ? S._outCache.get(id) : null;
+    if (!out) {
+      // build lazily per cache generation
+      if (!S._outCache || S._outCacheTick !== msg.t) {
+        S._outCache = new Map(); S._outCacheTick = msg.t;
+        for (const s of S.synapses.values()) {
+          const arr = S._outCache.get(s.src) || [];
+          arr.push(s); S._outCache.set(s.src, arr);
+        }
+      }
+      out = S._outCache.get(id) || [];
+    }
+    for (const s of out) {
+      const b = S.neurons.get(s.dst);
+      if (!b) continue;
+      S.pulses.push({ ax: n.x, ay: n.y, bx: b.x, by: b.y, p: 0, cls: n.cls, w: s.w });
+    }
+    if (S.pulses.length > 900) S.pulses.splice(0, S.pulses.length - 900);
+    if (n.cls !== "input") S.halo.push({ x: n.x, y: n.y, r: 0, a: 0.5, cls: n.cls });
+    if (S.halo.length > 120) S.halo.splice(0, S.halo.length - 120);
   }
 }
 
@@ -491,38 +690,44 @@ function renderCurriculum() {
     }
   }
   el.textContent = stages.length
-    ? stages.map(s => `${s.stage}@${(s.t/1000).toFixed(0)}s`).join("  ")
+    ? stages.map(s => `${s.stage} @ ${(s.t/1000).toFixed(0)}s`).join("   ")
     : "";
 }
 
 // ---------- stats (1 s sampler) ----------
 setInterval(() => {
   const now = performance.now();
-  const wallDt = (now - S.lastStatsWall || 1000) / 1000;
   S.lastStatsWall = now;
   let inHz = 0, intHz = 0, outHz = 0, active = 0, wSum = 0, wN = 0;
-  let nIn = 0, nInt = 0, nOut = 0;
   for (const n of S.neurons.values()) {
-    if (n.cls === "input") { inHz += n.rate; nIn++; }
-    else if (n.cls === "output") { outHz += n.rate; nOut++; }
-    else { intHz += n.rate; nInt++; }
+    if (n.cls === "input") inHz += n.rate;
+    else if (n.cls === "output") outHz += n.rate;
+    else intHz += n.rate;
     if (n.rate > 0.5 && n.state === "normal") active++;
   }
   for (const s of S.synapses.values()) { wSum += s.w; wN++; }
   const total = S.neurons.size || 1;
-  const bucket = {
-    t: S.tick,
-    in: inHz / total, internal: intHz / total, out: outHz / total,
-  };
-  S.hist.push(bucket);
+  S.hist.push({ t: S.tick, in: inHz / total, internal: intHz / total, out: outHz / total });
   if (S.hist.length > 120) S.hist.shift();
-  document.getElementById("s-active").textContent = `${active} / ${S.neurons.size}`;
-  document.getElementById("s-rate").textContent = ((inHz+intHz+outHz) / total).toFixed(1);
-  document.getElementById("s-neurons").textContent = S.neurons.size;
-  document.getElementById("s-syn").textContent = S.synapses.size;
+  document.getElementById("s-active").textContent = active;
+  document.getElementById("s-rate").innerHTML = ((inHz+intHz+outHz) / total).toFixed(1) + "<small>Hz</small>";
   document.getElementById("s-w").textContent = wN ? (wSum / wN).toFixed(3) : "—";
   document.getElementById("s-tr").textContent = S.tickRate ? S.tickRate.toFixed(0) + " t/s" : "—";
   document.getElementById("thr").textContent = S.throughput + " ev/s";
+  // per-population legend bars (Hz averaged over population members)
+  const counts = { input: 0, internal: 0, output: 0 };
+  for (const n of S.neurons.values()) counts[n.cls] = (counts[n.cls] || 0) + 1;
+  const avg = (sum, c) => c ? (sum / c) : 0;
+  const inAvg = avg(inHz, counts.input), intAvg = avg(intHz, counts.internal), outAvg = avg(outHz, counts.output);
+  const maxAvg = Math.max(1, inAvg, intAvg, outAvg);
+  document.getElementById("bar-in").style.width = (inAvg / maxAvg * 100).toFixed(0) + "%";
+  document.getElementById("bar-int").style.width = (intAvg / maxAvg * 100).toFixed(0) + "%";
+  document.getElementById("bar-out").style.width = (outAvg / maxAvg * 100).toFixed(0) + "%";
+  document.getElementById("hz-in").textContent = inAvg.toFixed(0);
+  document.getElementById("hz-int").textContent = intAvg.toFixed(0);
+  document.getElementById("hz-out").textContent = outAvg.toFixed(0);
+  document.getElementById("hud-n").textContent = S.neurons.size;
+  document.getElementById("hud-s").textContent = S.synapses.size;
   S.throughput = 0;
   drawPopChart();
 }, 1000);
@@ -533,7 +738,7 @@ function drawPopChart() {
   const cv = document.getElementById("chart-pop");
   const c = cv.getContext("2d");
   const W = cv.width, H = cv.height;
-  c.fillStyle = "#07090c"; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#060a12"; c.fillRect(0, 0, W, H);
   if (S.hist.length < 2) return;
   let max = 1;
   for (const h of S.hist) max = Math.max(max, h.in + h.internal + h.out);
@@ -542,15 +747,15 @@ function drawPopChart() {
     const h = S.hist[i];
     const x = W - (S.hist.length - i) * bw;
     let y = H;
-    for (const [v, col] of [[h.out, "#ffa657"], [h.internal, "#a5d6ff"], [h.in, "#58a6ff"]]) {
-      const bh = (v / max) * (H - 4);
+    for (const [v, col] of [[h.out, "#ffb066"], [h.internal, "#9db8e8"], [h.in, "#46a8ff"]]) {
+      const bh = (v / max) * (H - 6);
       c.fillStyle = col;
-      c.fillRect(x, y - bh, bw * 0.85, bh);
+      c.fillRect(x, y - bh, Math.max(1, bw * 0.8), bh);
       y -= bh;
     }
   }
-  c.fillStyle = "#39424e"; c.font = `${10 * devicePixelRatio}px monospace`;
-  c.fillText(max.toFixed(1) + " Hz·n⁻¹", 4, 12);
+  c.fillStyle = "#45536a"; c.font = `${9.5 * devicePixelRatio}px sans-serif`;
+  c.fillText(max.toFixed(0) + " Hz/neuron", 6, 12);
 }
 
 // ---------- physics + draw ----------
@@ -568,15 +773,14 @@ function physics(dt) {
   groups.forEach((g, gi) => {
     const arr = groupRows[g];
     arr.forEach((n, i) => {
-      n.px = W * 0.06 + gi * W * 0.045;
-      n.py = H * (0.12 + 0.76 * (arr.length === 1 ? 0.5 : i / (arr.length - 1)));
+      n.px = W * 0.075 + gi * W * 0.052;
+      n.py = H * (0.14 + 0.72 * (arr.length === 1 ? 0.5 : i / (arr.length - 1)));
     });
   });
   outputs.forEach((n, i) => {
-    n.px = W * 0.94;
-    n.py = H * (0.25 + 0.5 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1)));
+    n.px = W * 0.925;
+    n.py = H * (0.28 + 0.44 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1)));
   });
-  // repulsion (cap for perf)
   const step = Math.min(ns.length, 400);
   for (let i = 0; i < step; i++) {
     const a = ns[i];
@@ -591,7 +795,6 @@ function physics(dt) {
       b.vx -= dx * f; b.vy -= dy * f;
     }
   }
-  // springs
   for (const s of S.synapses.values()) {
     const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
     if (!a || !b) continue;
@@ -613,14 +816,11 @@ function physics(dt) {
     n.x += n.vx * dt; n.y += n.vy * dt;
     n.x = Math.max(30, Math.min(W - 30, n.x));
     n.y = Math.max(30, Math.min(H - 30, n.y));
+    n.glow *= 0.94; // decay glow
   }
 }
 
 // world ↔ screen through the camera
-function w2s(x, y) {
-  const W = canvas.width, H = canvas.height;
-  return [W / 2 + (x - W / 2 + S.cam.x) * S.cam.z, H / 2 + (y - H / 2 + S.cam.y) * S.cam.z];
-}
 function s2w(x, y) {
   const W = canvas.width, H = canvas.height;
   return [(x - W / 2) / S.cam.z + W / 2 - S.cam.x, (y - H / 2) / S.cam.z + H / 2 - S.cam.y];
@@ -628,71 +828,128 @@ function s2w(x, y) {
 
 function draw() {
   const W = canvas.width, H = canvas.height;
-  ctx.fillStyle = "#07090c"; ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
   ctx.save();
   ctx.translate(W / 2, H / 2); ctx.scale(S.cam.z, S.cam.z); ctx.translate(-W / 2 - S.cam.x, -H / 2 - S.cam.y);
-  // edges
+  const zInv = 1 / S.cam.z;
+
+  // --- edges: weight = opacity/width; stronger synapses are brighter conduits
   for (const s of S.synapses.values()) {
     const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
     if (!a || !b) continue;
-    const w = Math.max(0.3 / S.cam.z, s.w * 2.2);
-    ctx.strokeStyle = `rgba(120,140,170,${0.1 + s.w * 0.4})`;
-    ctx.lineWidth = w;
+    const dormant = a.state !== "normal" || b.state !== "normal";
+    const baseA = dormant ? 0.05 : 0.07 + s.w * 0.3;
+    ctx.strokeStyle = dormant
+      ? `rgba(80,90,110,${baseA})`
+      : `rgba(140,170,215,${baseA})`;
+    ctx.lineWidth = (0.5 + s.w * 2.4) * zInv;
     if (s.flashT > 0) {
       ctx.strokeStyle = s.flashDir > 0
-        ? `rgba(63,185,80,${s.flashT})`
-        : `rgba(248,81,73,${s.flashT})`;
+        ? `rgba(67,209,124,${s.flashT * 0.9})`
+        : `rgba(255,93,93,${s.flashT * 0.9})`;
       s.flashT -= 0.02;
     }
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
-  // nodes
+
+  // --- traveling spike pulses along synapses (pre→post direction)
+  for (let i = S.pulses.length - 1; i >= 0; i--) {
+    const pu = S.pulses[i];
+    pu.p += 0.055;
+    if (pu.p >= 1) { S.pulses.splice(i, 1); continue; }
+    const [r, g, b2] = POP_RGB[pu.cls] || POP_RGB.internal;
+    const px = pu.ax + (pu.bx - pu.ax) * pu.p;
+    const py = pu.ay + (pu.by - pu.ay) * pu.p;
+    const fade = Math.sin(pu.p * Math.PI);
+    // comet tail
+    const tx = pu.ax + (pu.bx - pu.ax) * Math.max(0, pu.p - 0.12);
+    const ty = pu.ay + (pu.by - pu.ay) * Math.max(0, pu.p - 0.12);
+    const grad = ctx.createLinearGradient(tx, ty, px, py);
+    grad.addColorStop(0, `rgba(${r},${g},${b2},0)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b2},${0.85 * fade})`);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = (1.2 + pu.w * 2.6) * zInv;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(px, py); ctx.stroke();
+    ctx.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
+    ctx.beginPath(); ctx.arc(px, py, 1.8 * zInv, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // --- shockwave halos from spikes (activity makes space ring)
+  for (let i = S.halo.length - 1; i >= 0; i--) {
+    const h2 = S.halo[i];
+    h2.r += 1.8; h2.a *= 0.9;
+    if (h2.a < 0.02) { S.halo.splice(i, 1); continue; }
+    const [r, g, b2] = POP_RGB[h2.cls] || POP_RGB.internal;
+    ctx.strokeStyle = `rgba(${r},${g},${b2},${h2.a * 0.35})`;
+    ctx.lineWidth = 1.4 * zInv;
+    ctx.beginPath(); ctx.arc(h2.x, h2.y, h2.r, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // --- neurons: sensory column glow / internal orbit / motor column glow
   for (const n of S.neurons.values()) {
-    const r = (n.cls === "input" ? 6 : n.cls === "output" ? 7.5 : 5 + Math.min(3, n.rate / 40));
-    // fill = population identity; brightness = activity
-    const base = n.cls === "input" ? [88, 166, 255] : n.cls === "output" ? [255, 166, 87] : [165, 214, 255];
-    const heat = Math.min(1, n.rate / 60);
-    const col = `rgba(${base[0]},${base[1]},${base[2]},${0.35 + 0.65 * heat})`;
-    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = n.state !== "normal" ? "rgba(90,100,115,0.25)" : col;
+    const heat = Math.min(1, n.rate / 45);          // sustained activity
+    const live = Math.max(heat * 0.9, n.flash);      // spike flash on top
+    const [r, g, b2] = POP_RGB[n.cls] || POP_RGB.internal;
+    const quiet = n.state !== "normal";
+    const radius = n.cls === "input" ? 5.5 : n.cls === "output" ? 7 : 4.5 + Math.min(3.5, n.rate / 30);
+    // outer soft glow (activity halo) — inactive neurons stay dim
+    if (!quiet && live > 0.03) {
+      const gr = ctx.createRadialGradient(n.x, n.y, radius * 0.4, n.x, n.y, radius + 16 + live * 10);
+      gr.addColorStop(0, `rgba(${r},${g},${b2},${0.30 * live})`);
+      gr.addColorStop(1, `rgba(${r},${g},${b2},0)`);
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(n.x, n.y, radius + 16 + live * 10, 0, Math.PI * 2); ctx.fill();
+    }
+    // core
+    const coreA = quiet ? 0.16 : 0.3 + 0.7 * live;
+    ctx.beginPath(); ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = quiet ? "rgba(84,96,118,0.35)" : `rgba(${r},${g},${b2},${coreA})`;
     ctx.fill();
+    // bright center dot for active neurons
+    if (!quiet && n.flash > 0.15) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, radius * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${n.flash * 0.95})`;
+      ctx.fill();
+    }
+    // spike ring
     if (n.flash > 0) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4 + (1 - n.flash) * 10, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,225,140,${n.flash})`; ctx.lineWidth = 2 / S.cam.z;
-      ctx.stroke(); n.flash -= 0.07;
+      ctx.beginPath(); ctx.arc(n.x, n.y, radius + 3 + (1 - n.flash) * 12, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,235,180,${n.flash * 0.8})`; ctx.lineWidth = 1.6 * zInv;
+      ctx.stroke(); n.flash -= 0.065;
     }
     // structural ring
-    if (n.state === "dormant") { ctx.strokeStyle = "#d29922"; ctx.setLineDash([3,3]); }
-    else if (n.state === "retired") { ctx.strokeStyle = "#f85149"; ctx.setLineDash([1,3]); }
+    if (n.state === "dormant") { ctx.strokeStyle = "rgba(255,194,75,0.55)"; ctx.setLineDash([3,4]); }
+    else if (n.state === "retired") { ctx.strokeStyle = "rgba(255,93,93,0.5)"; ctx.setLineDash([1,4]); }
     else if (S.selected === n.id) { ctx.strokeStyle = "#ffffff"; ctx.setLineDash([]); }
-    else { ctx.strokeStyle = "rgba(90,100,115,0.5)"; ctx.setLineDash([]); }
-    ctx.lineWidth = 1.5 / S.cam.z;
-    ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, Math.PI * 2); ctx.stroke();
+    else if (!quiet) { ctx.strokeStyle = `rgba(${r},${g},${b2},${0.25 + 0.3 * heat})`; ctx.setLineDash([]); }
+    else { ctx.strokeStyle = "rgba(84,96,118,0.35)"; ctx.setLineDash([]); }
+    ctx.lineWidth = 1.3 * zInv;
+    ctx.beginPath(); ctx.arc(n.x, n.y, radius + 3.5, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
-    if (n.group && S.cam.z > 0.7) {
-      ctx.fillStyle = "#5c6875"; ctx.font = `${10 / S.cam.z}px monospace`;
-      ctx.fillText(n.group, n.x - 4, n.y - r - 6);
+    // group label
+    if (n.group && S.cam.z > 0.65) {
+      ctx.fillStyle = "rgba(119,135,155,0.8)";
+      ctx.font = `${600} ${10.5 * zInv}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(n.group, n.x, n.y - radius - 9);
+      ctx.textAlign = "left";
     }
   }
-  // selected edge highlight
+
+  // --- selected edge highlight
   if (S.selectedEdge != null) {
     const s = S.synapses.get(S.selectedEdge);
     if (s) {
       const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
       if (a && b) {
-        ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2.5 / S.cam.z;
+        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2.2 * zInv;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
     }
   }
   ctx.restore();
-  // HUD
-  const internal = [...S.neurons.values()].filter(n => n.cls === "internal").length;
-  const bornNow = [...S.neurons.values()].filter(n => n.state !== "normal").length;
-  document.getElementById("net-hud").innerHTML =
-    `${S.neurons.size} neurons · ${internal} internal · ${S.synapses.size} synapses` +
-    (bornNow ? ` · ${bornNow} inactive-state` : "") +
-    `<br>zoom ${(S.cam.z * 100).toFixed(0)}%`;
+
+  document.getElementById("zoom-v").textContent = (S.cam.z * 100).toFixed(0) + "%";
 }
 
 let lastT = performance.now();
@@ -706,16 +963,13 @@ function frame(now) {
     renderReadouts();
     drawTimeline();
   } catch (e) {
-    // A render error must not kill the loop permanently.
     console.error("frame error", e);
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-// Watchdog: occluded/headless tabs may suspend requestAnimationFrame
-// indefinitely; keep readouts + timeline advancing from a timer, and
-// resume the rAF loop if it stalls.
+// Watchdog: occluded tabs suspend rAF; keep readouts + timeline advancing.
 setInterval(() => {
   const now = performance.now();
   renderReadouts();
@@ -728,7 +982,7 @@ setInterval(() => {
 
 function renderReadouts() {
   document.getElementById("simtime").textContent = (S.tick / 1000).toFixed(3) + " s";
-  document.getElementById("tick").textContent = "t " + S.tick.toLocaleString();
+  document.getElementById("tick").textContent = S.tick.toLocaleString();
   if (S.mode === "replay") {
     document.getElementById("tl-pos").textContent = (S.tick / 1000).toFixed(1) + " s";
   }
@@ -747,71 +1001,99 @@ function trackTick(t) {
 }
 
 // ---------- timeline ----------
+const STAGE_TINT = { S0: "13,18,28", S1: "18,30,50", S2: "36,26,54", S3: "18,40,30" };
+function stageBandsOf(bins) {
+  let stageStart = 0, curStage = bins[0].stage || "";
+  const bands = [];
+  for (let i = 0; i < bins.length; i++) {
+    const st = bins[i].stage || "";
+    if (st !== curStage) { bands.push([curStage, stageStart, i]); curStage = st; stageStart = i; }
+  }
+  bands.push([curStage, stageStart, bins.length]);
+  return bands;
+}
 function drawTimeline() {
   sizeCanvas(tlCanvas);
   const W = tlCanvas.width, H = tlCanvas.height;
-  tlCtx.fillStyle = "#0d1117"; tlCtx.fillRect(0, 0, W, H);
+  tlCtx.clearRect(0, 0, W, H);
   const dur = S.duration || (S.timeline ? S.timeline.length * S.binMs : 0);
+  const labelFont = `${10 * devicePixelRatio}px sans-serif`;
+
   if (!dur) {
-    // live mode: render the rolling 120 s activity history
+    // live mode: rolling 120 s activity density
     const bw = W / 120;
+    tlCtx.fillStyle = "#060a12"; tlCtx.fillRect(0, 0, W, H);
     for (let i = 0; i < S.hist.length; i++) {
       const h = S.hist[i];
       const v = Math.min(1, (h.in + h.internal + h.out) / 40);
-      const bh = v * (H - 14);
-      tlCtx.fillStyle = "#16233a";
-      tlCtx.fillRect(W - (S.hist.length - i) * bw, H - bh, bw * 0.85, bh);
+      const bh = v * (H - 6);
+      const x = W - (S.hist.length - i) * bw;
+      tlCtx.fillStyle = "rgba(76,194,255,0.5)";
+      tlCtx.fillRect(x, H - bh, Math.max(1, bw - 1), bh);
+      // input share tinted
+      const ih = (h.in / 40) * (H - 6) * Math.min(1, (h.in + h.internal + h.out) / 40);
+      if (h.in > 0) {
+        tlCtx.fillStyle = "rgba(255,176,102,0.45)";
+        tlCtx.fillRect(x, H - ih, Math.max(1, bw - 1), ih);
+      }
     }
-    tlCtx.fillStyle = "#39424e"; tlCtx.font = `${10 * devicePixelRatio}px monospace`;
-    tlCtx.fillText("live · rolling 120 s activity", 6, 12);
+    // now-line
+    tlCtx.strokeStyle = "rgba(255,194,75,0.8)"; tlCtx.lineWidth = 1.2;
+    tlCtx.beginPath(); tlCtx.moveTo(W - 2, 0); tlCtx.lineTo(W - 2, H); tlCtx.stroke();
+    tlCtx.fillStyle = "#45536a"; tlCtx.font = labelFont;
+    tlCtx.fillText("live · rolling window", 8, 13);
     return;
   }
-  // replay: full-run timeline from precomputed bins
+
+  // replay: full-run binned timeline
   const bins = S.timeline || [];
   if (!bins.length) return;
   const bw = W / bins.length;
   let maxSp = 1;
   for (const b of bins) maxSp = Math.max(maxSp, b.spikes);
-  // stage bands
-  let stageStart = 0, curStage = bins[0].stage || "";
-  const stageBands = [];
-  for (let i = 0; i < bins.length; i++) {
-    const st = bins[i].stage || "";
-    if (st !== curStage) { stageBands.push([curStage, stageStart, i]); curStage = st; stageStart = i; }
+  // stage tint bands
+  for (const [st, a, bEnd] of stageBandsOf(bins)) {
+    tlCtx.fillStyle = `rgba(${STAGE_TINT[st] || "13,18,28"},0.85)`;
+    tlCtx.fillRect(a * bw, 0, (bEnd - a) * bw, H - 16);
+    if (st) {
+      tlCtx.fillStyle = "rgba(119,135,155,0.85)"; tlCtx.font = `600 ${10 * devicePixelRatio}px sans-serif`;
+      tlCtx.fillText(st, a * bw + 7, 14);
+    }
   }
-  stageBands.push([curStage, stageStart, bins.length]);
-  const stageCols = { S0: "#39424e", S1: "#16233a", S2: "#241a33", S3: "#12281e" };
-  for (const [st, a, bEnd] of stageBands) {
-    tlCtx.fillStyle = stageCols[st] || "#131920";
-    tlCtx.fillRect(a * bw, 0, (bEnd - a) * bw, H - 12);
-    tlCtx.fillStyle = "#5c6875"; tlCtx.font = `${10 * devicePixelRatio}px monospace`;
-    if (st) tlCtx.fillText(st, a * bw + 4, 12);
-  }
-  // activity
+  // mirrored density area: top = total spikes, bottom = input share
   for (let i = 0; i < bins.length; i++) {
     const b = bins[i];
-    const bh = v * (H - 20);
-    tlCtx.fillStyle = "rgba(88,166,255,0.55)";
-    tlCtx.fillRect(i * bw, H - 12 - bh, Math.max(1, bw - 1), bh);
-    if (b.spikes_input > 0) {
-      const ih = Math.min(bh, (b.spikes_input / maxSp) * (H - 20));
-      tlCtx.fillStyle = "rgba(255,166,87,0.5)";
-      tlCtx.fillRect(i * bw, H - 12 - ih, Math.max(1, bw - 1), ih);
-    }
-    if (b.events > 0 && bw > 3) {
-      tlCtx.fillStyle = "rgba(188,140,255,0.9)";
-      tlCtx.fillRect(i * bw, H - 16, 1.5, 4);
+    const v = b.spikes / maxSp;
+    const bh = v * (H / 2 - 14);
+    tlCtx.fillStyle = "rgba(76,194,255,0.65)";
+    tlCtx.fillRect(i * bw, (H - 16) / 2 - bh, Math.max(1, bw - 0.5), bh);
+    const iv = (b.spikes_input || 0) / maxSp;
+    const ibh = iv * (H / 2 - 14);
+    tlCtx.fillStyle = "rgba(255,176,102,0.6)";
+    tlCtx.fillRect(i * bw, (H - 16) / 2, Math.max(1, bw - 0.5), ibh);
+    if (b.events > 0 && bw > 2) {
+      tlCtx.fillStyle = "rgba(177,140,255,0.9)";
+      tlCtx.fillRect(i * bw, H - 15, 1.5, 4);
     }
   }
+  // baseline
+  tlCtx.fillStyle = "rgba(30,42,61,0.8)";
+  tlCtx.fillRect(0, (H - 16) / 2 - 0.5, W, 1);
   // playhead
   const px = (S.tick / dur) * W;
-  tlCtx.strokeStyle = "#d29922"; tlCtx.lineWidth = 1.5;
-  tlCtx.beginPath(); tlCtx.moveTo(px, 0); tlCtx.lineTo(px, H); tlCtx.stroke();
-  tlCtx.fillStyle = "#d29922";
-  tlCtx.fillText((S.tick / 1000).toFixed(1) + "s", Math.min(W - 44, px + 4), H - 3);
+  tlCtx.strokeStyle = "#ffc24b"; tlCtx.lineWidth = 1.6;
+  tlCtx.beginPath(); tlCtx.moveTo(px, 0); tlCtx.lineTo(px, H - 14); tlCtx.stroke();
+  // playhead knob
+  tlCtx.fillStyle = "#ffc24b";
+  tlCtx.beginPath(); tlCtx.arc(px, 6, 3.4, 0, Math.PI * 2); tlCtx.fill();
+  tlCtx.font = `600 ${10 * devicePixelRatio}px sans-serif`;
+  tlCtx.fillStyle = "#ffc24b";
+  const label = (S.tick / 1000).toFixed(1) + "s";
+  const lx = Math.min(W - 46, Math.max(2, px + 6));
+  tlCtx.fillText(label, lx, H - 4);
 }
 
-// timeline interaction: click / drag to seek (replay) — also works live as a no-op
+// timeline interaction: click / drag to seek (replay)
 let tlDragging = false;
 function tlSeek(ev) {
   if (S.mode !== "replay" || !S.duration) return;
@@ -824,11 +1106,19 @@ tlCanvas.onmousemove = (e) => { if (tlDragging) tlSeek(e); };
 window.addEventListener("mouseup", () => { tlDragging = false; });
 
 // ---------- controls ----------
-function send(obj) { if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify(obj)); }
 const btnPause = document.getElementById("btn-pause");
+const ICON_PAUSE = '<svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><rect x="1" y="1" width="3.2" height="9" rx="1"/><rect x="6.8" y="1" width="3.2" height="9" rx="1"/></svg>';
+const ICON_PLAY = '<svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M2 1.2v8.6c0 .8.9 1.3 1.6.9l7-4.3c.7-.4.7-1.4 0-1.8l-7-4.3C2.9-.1 2 .4 2 1.2z"/></svg>';
 btnPause.onclick = () => {
-  if (S.paused) { send({ t: "ctrl", op: "resume" }); btnPause.classList.remove("active"); btnPause.textContent = "⏸ pause"; }
-  else { send({ t: "ctrl", op: "pause" }); btnPause.classList.add("active"); btnPause.textContent = "▶ resume"; }
+  if (S.paused) {
+    send({ t: "ctrl", op: "resume" });
+    btnPause.classList.remove("active");
+    btnPause.innerHTML = ICON_PAUSE + " pause";
+  } else {
+    send({ t: "ctrl", op: "pause" });
+    btnPause.classList.add("active");
+    btnPause.innerHTML = ICON_PLAY + " resume";
+  }
   S.paused = !S.paused;
 };
 document.getElementById("btn-step1").onclick = () => send({ t: "ctrl", op: "step", n: 1 });
@@ -866,7 +1156,7 @@ document.getElementById("btn-replay").onclick = async () => {
     const r = await fetch("/runs");
     const j = await r.json();
     modalRuns = j.runs || [];
-    if (!modalRuns.length) { list.textContent = "no recorded runs in ./runs — run an experiment first"; return; }
+    if (!modalRuns.length) { list.textContent = "no recorded runs found — run an experiment first"; return; }
     list.innerHTML = "";
     for (const run of modalRuns) {
       const row = document.createElement("div");
@@ -885,9 +1175,6 @@ document.getElementById("btn-replay").onclick = async () => {
 document.getElementById("rp-cancel").onclick = () => modal.classList.remove("open");
 document.getElementById("rp-load").onclick = () => {
   if (!modalSel) return;
-  // The replay server is a separate process on its own port; the browser
-  // cannot spawn it. Open the replay UI in a new tab served by the replay
-  // process if one is already listening on the conventional port.
   modal.classList.remove("open");
   window.open(`http://${location.hostname}:8789/?run=${encodeURIComponent(modalSel.name)}`, "_blank");
 };
@@ -918,7 +1205,6 @@ canvas.onmousedown = (e) => {
 };
 canvas.onmousemove = (e) => {
   if (S.drag == null) {
-    // pan with drag on empty space
     if (S.panning) {
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) * devicePixelRatio, y = (e.clientY - rect.top) * devicePixelRatio;
@@ -934,7 +1220,6 @@ canvas.onmousemove = (e) => {
 canvas.onmouseup = () => { S.drag = null; S.panning = false; };
 canvas.addEventListener("mousedown", (e) => {
   if (e.detail > 1) return;
-  // right-drag or empty-space drag pans
   S.panning = true;
   const rect = canvas.getBoundingClientRect();
   S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
@@ -969,46 +1254,47 @@ function renderInspector() {
     const inS = [...S.synapses.values()].filter(s => s.dst === n.id);
     const outS = [...S.synapses.values()].filter(s => s.src === n.id);
     const hist = n.spikes.slice(-60);
-    const lastSpike = hist.length ? ((S.tick - hist[hist.length-1]) / 1000).toFixed(2) + "s ago" : "—";
+    const lastSpike = hist.length ? ((S.tick - hist[hist.length-1]) / 1000).toFixed(2) + " s ago" : "—";
+    const na = `<span class="v na">not on wire</span>`;
     body.innerHTML = `
-      <h3>neuron ${n.id} <span class="badge ${n.cls}">${n.cls}</span></h3>
-      <div class="row"><span class="k">group</span><span>${n.group || "—"}</span></div>
-      <div class="row"><span class="k">state</span><span>${n.state}</span></div>
-      <div class="row"><span class="k">rate (EMA 1 s)</span><span>${n.rate.toFixed(1)} Hz</span></div>
-      <div class="row"><span class="k">last spike</span><span>${lastSpike}</span></div>
-      <div class="row"><span class="k">created by</span><span>${n.reason || (n.cls === "input" ? "body (D8)" : "initial wiring")}</span></div>
-      <div class="row"><span class="k">in / out synapses</span><span>${inS.length} / ${outS.length}</span></div>
-      <div class="row"><span class="k">mean w in / out</span><span>${
+      <h3>neuron ${n.id} <span class="tag ${n.cls}">${n.cls}</span></h3>
+      <div class="kv"><span class="k">group</span><span class="v">${n.group || "—"}</span></div>
+      <div class="kv"><span class="k">state</span><span class="v">${n.state}</span></div>
+      <div class="kv"><span class="k">firing rate</span><span class="v">${n.rate.toFixed(1)} Hz</span></div>
+      <div class="kv"><span class="k">last spike</span><span class="v">${lastSpike}</span></div>
+      <div class="kv"><span class="k">created by</span><span class="v">${n.reason || (n.cls === "input" ? "sensory boundary" : "initial wiring")}</span></div>
+      <div class="kv"><span class="k">in / out synapses</span><span class="v">${inS.length} / ${outS.length}</span></div>
+      <div class="kv"><span class="k">mean weight in / out</span><span class="v">${
         inS.length ? (inS.reduce((a,s)=>a+s.w,0)/inS.length).toFixed(3) : "—"} / ${
         outS.length ? (outS.reduce((a,s)=>a+s.w,0)/outS.length).toFixed(3) : "—"}</span></div>
-      <div class="row"><span class="k">membrane potential</span><span style="color:var(--faint)">not on wire</span></div>
-      <div style="color:var(--faint);margin-top:4px">recent spikes (last 60)</div>
-      <canvas id="hist" width="300" height="44"></canvas>`;
+      <div class="kv"><span class="k">membrane potential</span>${na}</div>
+      <div class="cap">SPIKE RASTER · LAST 5 s</div>
+      <canvas id="hist"></canvas>`;
     const hc = document.getElementById("hist").getContext("2d");
-    hc.fillStyle = "#07090c"; hc.fillRect(0, 0, 300, 44);
-    hc.strokeStyle = "#3fb950"; hc.lineWidth = 2;
-    const t1 = S.tick, span = 5000; // 5 s window
-    hist.forEach((t, i) => {
+    sizeCanvas(document.getElementById("hist"));
+    const cw = document.getElementById("hist").width, ch = document.getElementById("hist").height;
+    hc.fillStyle = "#060a12"; hc.fillRect(0, 0, cw, ch);
+    hc.strokeStyle = "#43d17c"; hc.lineWidth = 2;
+    const t1 = S.tick, span = 5000;
+    hist.forEach((t) => {
       const age = t1 - t;
       if (age > span) return;
-      const x = 300 - (age / span) * 292 - 4;
-      hc.beginPath(); hc.moveTo(x, 4); hc.lineTo(x, 40); hc.stroke();
+      const x = cw - (age / span) * (cw - 12) - 6;
+      hc.beginPath(); hc.moveTo(x, 5); hc.lineTo(x, ch - 5); hc.stroke();
     });
-    hc.fillStyle = "#39424e"; hc.font = "9px monospace";
-    hc.fillText("now", 270, 10); hc.fillText("−5s", 4, 10);
     return;
   }
   const s = S.selectedEdge != null ? S.synapses.get(S.selectedEdge) : null;
   if (s) {
     body.innerHTML = `
-      <h3>synapse ${S.selectedEdge}</h3>
-      <div class="row"><span class="k">pre → post</span><span>${s.src} → ${s.dst}</span></div>
-      <div class="row"><span class="k">weight</span><span>${s.w.toFixed(4)}</span></div>
-      <div class="row"><span class="k">appears at</span><span>${(s.appear/1000).toFixed(2)} s</span></div>
-      <div class="row"><span class="k">amplitude</span><span style="color:var(--faint)">per-neuron, not on wire</span></div>`;
+      <h3>synapse <span class="tag internal">#${S.selectedEdge}</span></h3>
+      <div class="kv"><span class="k">pre → post</span><span class="v">${s.src} → ${s.dst}</span></div>
+      <div class="kv"><span class="k">weight</span><span class="v">${s.w.toFixed(4)}</span></div>
+      <div class="kv"><span class="k">appeared at</span><span class="v">${(s.appear/1000).toFixed(2)} s</span></div>
+      <div class="kv"><span class="k">amplitude</span>${na.replace("not on wire", "per-neuron · not on wire")}</div>`;
     return;
   }
-  body.textContent = "click a neuron or synapse";
+  body.innerHTML = `<div class="placeholder">select a neuron or synapse</div>`;
 }
 </script>
 </body>

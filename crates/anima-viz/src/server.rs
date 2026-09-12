@@ -105,6 +105,7 @@ impl ServerHandle {
 
 
 const INDEX_HTML: &str = include_str!("../web/index.html");
+const SOCKET_WORKER_JS: &str = include_str!("../web/socket-worker.js");
 
 /// Serve forever on the current tokio runtime. Called inside a spawned
 /// runtime thread by [`start`].
@@ -118,6 +119,14 @@ async fn serve(port: u16, shared: Arc<Shared>) {
     async fn index() -> Html<&'static str> {
         Html(INDEX_HTML)
     }
+
+    async fn worker_js() -> impl axum::response::IntoResponse {
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            SOCKET_WORKER_JS,
+        )
+    }
+
 
     async fn ws_handler(
         ws: WebSocketUpgrade,
@@ -165,6 +174,7 @@ async fn serve(port: u16, shared: Arc<Shared>) {
         .route("/", get(index))
         .route("/ws", get(ws_handler))
         .route("/runs", get(runs_index))
+        .route("/socket-worker.js", get(worker_js))
         .with_state(shared.clone());
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
