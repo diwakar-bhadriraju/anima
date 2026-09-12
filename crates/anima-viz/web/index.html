@@ -445,34 +445,54 @@ function connect() {
   S.ws.onmessage = (m) => handleFrame(JSON.parse(m.data));
 }
 
-// Hand the socket to a worker when the page stops receiving (hidden-tab
-// throttling). The worker reconnects and feeds frames via postMessage.
-function escalateToWorker() {
-  if (usingWorker || !window.Worker) return;
-  usingWorker = true;
-  try { S.ws && S.ws.close(); } catch (e) {}
-  worker = new Worker("/socket-worker.js");
-  worker.onmessage = (e) => {
-    const d = e.data;
-    if (d.t === "ws-open") { S.connected = true; }
-    else if (d.t === "ws-closed") { S.connected = false; setStatus("reconnecting", "off"); }
-    else if (d.t === "ws-frame") handleFrame(JSON.parse(d.data));
-  };
-  worker.onerror = () => {
-    // worker unusable (old browser): back to page socket
-    usingWorker = false;
-    worker = null;
-    connect();
-  };
-  worker.postMessage({ t: "start" });
-}
-
-// Throttle watchdog: no frames for 4 s while "live" → escalate.
-setInterval(() => {
-  if (S.connected && !usingWorker && performance.now() - lastFrameWall > 4000) {
-    escalateToWorker();
+  // Throttle watchdog: if page-owned frames stall for 4 s, hand the
+  // socket to a worker — but only once, and only if the worker actually
+  // manages to open its socket within 3 s. In browsers where worker
+  // sockets hang (some embedded/CDP builds), we permanently revert to
+  // the page socket instead of getting stuck in "reconnecting".
+  let workerFailed = false;
+  function escalateToWorker() {
+    if (usingWorker || workerFailed || !window.Worker) return;
+    usingWorker = true;
+    try { S.ws && S.ws.close(); } catch (e) {}
+    worker = new Worker("/socket-worker.js");
+    let workerOpened = false;
+    worker.onmessage = (e) => {
+      const d = e.data;
+      if (d.t === "ws-open") {
+        workerOpened = true;
+        S.connected = true;
+      }
+      else if (d.t === "ws-closed") {
+        S.connected = false;
+        setStatus("reconnecting", "off");
+      }
+      else if (d.t === "ws-frame") handleFrame(JSON.parse(d.data));
+    };
+    worker.onerror = () => revertToPageSocket();
+    worker.postMessage({ t: "start" });
+    setTimeout(() => {
+      if (!workerOpened) revertToPageSocket();
+    }, 3000);
   }
-}, 1500);
+  function revertToPageSocket() {
+    workerFailed = true;
+    usingWorker = false;
+    if (worker) { try { worker.postMessage({ t: "stop" }); worker.terminate(); } catch (e) {} worker = null; }
+    connect();
+    lastFrameWall = performance.now();
+  }
+
+  // stall detector: also treats "never connected" as stall once the run
+  // should clearly be streaming
+  setInterval(() => {
+    if (!usingWorker && !workerFailed && S.connected === false &&
+        performance.now() - lastFrameWall > 8000) {
+      escalateToWorker();
+    } else if (S.connected && !usingWorker && performance.now() - lastFrameWall > 4000) {
+      escalateToWorker();
+    }
+  }, 1500);
 
 function send(obj) {
   if (usingWorker && worker) worker.postMessage({ t: "send", data: JSON.stringify(obj) });
@@ -506,6 +526,15 @@ function applySnapshot(msg) {
     e.w = s.w;
   }
   pruneGone(seen);
+  // First snapshot: warm the force layout so neurons appear at their
+  // resting positions immediately — a drifting layout makes clicking
+  // impossible during the first minute.
+  if (!S.layoutWarmed && S.neurons.size > 0) {
+    S.layoutWarmed = true;
+    sizeCanvas(canvas);
+    for (let i = 0; i < 320; i++) physics(1 / 60);
+    for (const n of S.neurons.values()) { n.vx = 0; n.vy = 0; }
+  }
 }
 
 function pruneGone(seen) {
@@ -884,6 +913,50 @@ function draw() {
     ctx.beginPath(); ctx.arc(h2.x, h2.y, h2.r, 0, Math.PI * 2); ctx.stroke();
   }
 
+  // --- population regions: subtle tint + column headers make the
+  // sensory → internal → motor flow readable at a glance
+  const regions = [
+    { label: "SENSORY", x: W * 0.02, w: inputs.length ? W * 0.19 : 0 },
+    { label: "INTERNAL", x: W * 0.235, w: W * 0.55 },
+    { label: "MOTOR", x: W * 0.80, w: W * 0.18 },
+  ];
+  for (const rg of regions) {
+    if (rg.w <= 0) continue;
+    ctx.fillStyle = "rgba(255,255,255,0.012)";
+    ctx.fillRect(rg.x, H * 0.04, rg.w, H * 0.92);
+    ctx.strokeStyle = "rgba(120,145,180,0.07)";
+    ctx.lineWidth = 1 * zInv;
+    ctx.strokeRect(rg.x, H * 0.04, rg.w, H * 0.92);
+    ctx.fillStyle = "rgba(119,135,155,0.5)";
+    ctx.font = `600 ${11 * zInv}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(rg.label, rg.x + rg.w / 2, H * 0.04 + 16 * zInv);
+    ctx.textAlign = "left";
+  }
+
+  // --- neurons: glow from arcs (no per-frame gradient objects — fast)
+  // shape encodes population: rounded square = sensory, circle =
+  // internal, diamond = motor. Color+shape together: never ambiguous.
+  function shapePath(cls, x, y, r0) {
+    ctx.beginPath();
+    if (cls === "input") {
+      // rounded square
+      const s = r0 * 1.05, k = r0 * 0.45;
+      ctx.moveTo(x - s + k, y - s);
+      ctx.arcTo(x + s, y - s, x + s, y + s, k);
+      ctx.arcTo(x + s, y + s, x - s, y + s, k);
+      ctx.arcTo(x - s, y + s, x - s, y - s, k);
+      ctx.arcTo(x - s, y - s, x + s, y - s, k);
+      ctx.closePath();
+    } else if (cls === "output") {
+      // diamond
+      const s = r0 * 1.25;
+      ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y);
+      ctx.closePath();
+    } else {
+      ctx.arc(x, y, r0, 0, Math.PI * 2);
+    }
+  }
   for (const n of S.neurons.values()) {
     const heat = Math.min(1, n.rate / 45);          // sustained activity
     const live = Math.max(heat * 0.9, n.flash);      // spike flash on top
@@ -896,12 +969,13 @@ function draw() {
       for (let k = 0; k < 3; k++) {
         const gr = radius + 4 + k * 5 + live * 8;
         ctx.fillStyle = `rgba(${r},${g},${b2},${(0.16 - k * 0.045) * live})`;
-        ctx.beginPath(); ctx.arc(n.x, n.y, gr, 0, Math.PI * 2); ctx.fill();
+        shapePath(n.cls, n.x, n.y, gr);
+        ctx.fill();
       }
     }
     // core
     const coreA = quiet ? 0.16 : 0.3 + 0.7 * live;
-    ctx.beginPath(); ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+    shapePath(n.cls, n.x, n.y, radius);
     ctx.fillStyle = quiet ? "rgba(84,96,118,0.35)" : `rgba(${r},${g},${b2},${coreA})`;
     ctx.fill();
     // bright center dot for active neurons
@@ -916,7 +990,7 @@ function draw() {
       ctx.strokeStyle = `rgba(255,235,180,${n.flash * 0.8})`; ctx.lineWidth = 1.6 * zInv;
       ctx.stroke(); n.flash -= 0.065;
     }
-    // structural ring
+    // structural / selection / hover ring
     if (n.state === "dormant") { ctx.strokeStyle = "rgba(255,194,75,0.55)"; ctx.setLineDash([3,4]); }
     else if (n.state === "retired") { ctx.strokeStyle = "rgba(255,93,93,0.5)"; ctx.setLineDash([1,4]); }
     else if (S.selected === n.id) { ctx.strokeStyle = "#ffffff"; ctx.setLineDash([]); }
@@ -924,7 +998,8 @@ function draw() {
     else if (!quiet) { ctx.strokeStyle = `rgba(${r},${g},${b2},${0.25 + 0.3 * heat})`; ctx.setLineDash([]); }
     else { ctx.strokeStyle = "rgba(84,96,118,0.35)"; ctx.setLineDash([]); }
     ctx.lineWidth = (S.selected === n.id || hovered ? 2 : 1.3) * zInv;
-    ctx.beginPath(); ctx.arc(n.x, n.y, radius + 3.5, 0, Math.PI * 2); ctx.stroke();
+    shapePath(n.cls, n.x, n.y, radius + 3.5);
+    ctx.stroke();
     ctx.setLineDash([]);
     // group label
     if (n.group && S.cam.z > 0.65) {
@@ -933,17 +1008,6 @@ function draw() {
       ctx.textAlign = "center";
       ctx.fillText(n.group, n.x, n.y - radius - 9);
       ctx.textAlign = "left";
-    }
-  }
-  // --- selected edge highlight
-  if (S.selectedEdge != null) {
-    const s = S.synapses.get(S.selectedEdge);
-    if (s) {
-      const a = S.neurons.get(s.src), b = S.neurons.get(s.dst);
-      if (a && b) {
-        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2.2 * zInv;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
     }
   }
   ctx.restore();
@@ -1194,7 +1258,6 @@ function pickAt(clientX, clientY) {
     if (d < bestD) { bestD = d; best = n; }
   }
   if (best) return { type: "neuron", n: best };
-  // edge pick only when reasonably zoomed (avoid noisy hits)
   if (S.cam.z > 0.8) {
     let bestE = null, bestEd = 7 / S.cam.z;
     for (const [id, s] of S.synapses) {
@@ -1203,27 +1266,22 @@ function pickAt(clientX, clientY) {
       const d = distSeg(wx, wy, a.x, a.y, b.x, b.y);
       if (d < bestEd) { bestEd = d; bestE = id; }
     }
-    if (bestE != null) {
-      return { type: "synapse", s: S.synapses.get(bestE), id: bestE };
-    }
+    if (bestE != null) return { type: "synapse", s: S.synapses.get(bestE), id: bestE };
   }
   return null;
 }
 
-// hover: pointer cursor + soft hover highlight make targets discoverable
-canvas.addEventListener("mousemove", (e) => {
-  if (S.drag != null || S.panning) return;
-  const hit = pickAt(e.clientX, e.clientY);
-  const newHover = hit ? (hit.type === "neuron" ? hit.n.id : null) : null;
-  S.hover = newHover;
-  canvas.style.cursor = hit ? "pointer" : "grab";
-});
-
 canvas.onmousedown = (e) => {
   const hit = pickAt(e.clientX, e.clientY);
+  const rect = canvas.getBoundingClientRect();
+  S.downX = e.clientX; S.downY = e.clientY;
+  S.dragMoved = false;
   if (hit && hit.type === "neuron") {
+    // select immediately on press — snappy, no waiting for mouseup
     S.selected = hit.n.id; S.selectedEdge = null;
-    S.drag = hit.n.id; S.dragX = hit.n.x; S.dragY = hit.n.y;
+    S.drag = hit.n.id;
+    S.dragStart = { x: hit.n.x, y: hit.n.y };
+    S.dragX = hit.n.x; S.dragY = hit.n.y;
     S.panning = false;
     renderInspector();
     return;
@@ -1234,9 +1292,8 @@ canvas.onmousedown = (e) => {
     renderInspector();
     return;
   }
-  // empty space: start pan; clicking empty space deselects
+  // empty space: start pan
   S.panning = true;
-  const rect = canvas.getBoundingClientRect();
   S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
   S.panLastY = (e.clientY - rect.top) * devicePixelRatio;
 };
@@ -1247,18 +1304,28 @@ canvas.onmousemove = (e) => {
       const x = (e.clientX - rect.left) * devicePixelRatio, y = (e.clientY - rect.top) * devicePixelRatio;
       S.cam.x -= (x - S.panLastX) / S.cam.z; S.cam.y -= (y - S.panLastY) / S.cam.z;
       S.panLastX = x; S.panLastY = y;
+      S.movedPan = true;
     }
     return;
   }
+  // neuron drag only engages after a 5 px threshold, so plain clicks
+  // never accidentally fling a neuron
+  const dx = e.clientX - S.downX, dy = e.clientY - S.downY;
+  if (Math.hypot(dx, dy) < 5) return;
+  S.dragMoved = true;
   const rect = canvas.getBoundingClientRect();
   const [wx, wy] = s2w((e.clientX - rect.left) * (canvas.width / rect.width), (e.clientY - rect.top) * (canvas.height / rect.height));
   S.dragX = wx; S.dragY = wy;
 };
 canvas.onmouseup = (e) => {
-  // click on empty space (no drag movement) clears selection
-  if (S.drag == null && !S.movedPan) {
+  // plain click on empty space clears the selection
+  if (S.drag == null && S.panning && !S.movedPan) {
     S.selected = null; S.selectedEdge = null; renderInspector();
   }
+  S.drag = null; S.panning = false; S.movedPan = false;
+};
+canvas.onmouseleave = () => {
+  // leaving the canvas mid-gesture must not latch pan/drag state
   S.drag = null; S.panning = false; S.movedPan = false;
 };
 canvas.addEventListener("wheel", (e) => {
@@ -1285,13 +1352,13 @@ function renderInspectorThrottled() {
 
 function renderInspector() {
   const body = document.getElementById("insp-body");
+  const na = `<span class="v na">not on wire</span>`;
   const n = S.neurons.get(S.selected);
   if (n) {
     const inS = [...S.synapses.values()].filter(s => s.dst === n.id);
     const outS = [...S.synapses.values()].filter(s => s.src === n.id);
     const hist = n.spikes.slice(-60);
     const lastSpike = hist.length ? ((S.tick - hist[hist.length-1]) / 1000).toFixed(2) + " s ago" : "—";
-    const na = `<span class="v na">not on wire</span>`;
     body.innerHTML = `
       <h3>neuron ${n.id} <span class="tag ${n.cls}">${n.cls}</span></h3>
       <div class="kv"><span class="k">group</span><span class="v">${n.group || "—"}</span></div>
