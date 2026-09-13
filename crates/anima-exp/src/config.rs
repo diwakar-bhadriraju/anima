@@ -78,6 +78,10 @@ pub struct StructuralSection {
     pub trigger_rate_hz: Option<f32>,
     #[serde(default)]
     pub trigger_sustained_ms: Option<u64>,
+    /// A8/E4b: minimum sim-ms between homeostatic-saturation births
+    /// (0 = no limit, E4/E3 behavior).
+    #[serde(default)]
+    pub trigger_cooldown_ms: Option<u64>,
     pub dormancy_rate_hz: f32,
     pub dormancy_ms: u64,
     pub recovery_rate_hz: f32,

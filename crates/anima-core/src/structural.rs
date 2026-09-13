@@ -64,15 +64,27 @@ impl BirthTrigger for NoBirth {
 }
 
 /// Region mean rate > 25 Hz sustained 2 s.
+/// A8/E4b: optional `cooldown_ms` — after a birth, the armed trigger is
+/// held (over_since NOT reset) until the cooldown elapses, so an ongoing
+/// overload admits at most one birth per cooldown window. 0 = no limit
+/// (E4/E3 behavior).
 pub struct HomeostaticSaturation {
     pub rate_threshold_hz: f32,
     pub sustained_ms: u64,
+    pub cooldown_ms: u64,
     over_since: Option<Tick>,
+    last_birth: Option<Tick>,
 }
 
 impl HomeostaticSaturation {
     pub fn new() -> Self {
-        Self { rate_threshold_hz: 25.0, sustained_ms: 2_000, over_since: None }
+        Self {
+            rate_threshold_hz: 25.0,
+            sustained_ms: 2_000,
+            cooldown_ms: 0,
+            over_since: None,
+            last_birth: None,
+        }
     }
 }
 
@@ -93,10 +105,20 @@ impl BirthTrigger for HomeostaticSaturation {
         if mean > self.rate_threshold_hz {
             let since = *self.over_since.get_or_insert(net.tick);
             if net.tick.0.saturating_sub(since.0) >= self.sustained_ms {
+                // A8/E4b: if a birth happened recently, hold the armed
+                // state (keep over_since) and fire once the cooldown
+                // elapsed — at most one birth per cooldown window under
+                // continuous overload.
+                if let Some(lb) = self.last_birth {
+                    if net.tick.0.saturating_sub(lb.0) < self.cooldown_ms {
+                        return None;
+                    }
+                }
                 // Re-arm: fire once per sustained episode, not every tick
                 // while overloaded (otherwise admission windows exhaust
                 // and the run aborts with birth-rate-limit).
                 self.over_since = None;
+                self.last_birth = Some(net.tick);
                 return Some(
                     Reason::new("homeostatic-saturation")
                         .factor("region-mean-rate-hz", mean)
@@ -161,6 +183,7 @@ pub fn make_trigger(
     kind: &str,
     rate_hz: Option<f32>,
     sustained_ms: Option<u64>,
+    cooldown_ms: Option<u64>,
 ) -> Box<dyn BirthTrigger> {
     match kind {
         "none" => Box::new(NoBirth),
@@ -171,6 +194,9 @@ pub fn make_trigger(
             }
             if let Some(s) = sustained_ms {
                 t.sustained_ms = s;
+            }
+            if let Some(c) = cooldown_ms {
+                t.cooldown_ms = c;
             }
             Box::new(t)
         }
@@ -368,7 +394,7 @@ mod tests {
         for n in net.neurons.iter_mut() {
             n.rate_hz = 40.0;
         }
-        let mut trig = HomeostaticSaturation { rate_threshold_hz: 25.0, sustained_ms: 25, over_since: None };
+        let mut trig = HomeostaticSaturation { rate_threshold_hz: 25.0, sustained_ms: 25, cooldown_ms: 0, over_since: None, last_birth: None };
         // Continuous overload over 100 ticks with sustained 25 ms: must
         // fire exactly 3× (t=+25, +50, +75), NOT once per tick.
         let mut fire_ticks = Vec::new();
@@ -394,6 +420,59 @@ mod tests {
         net.tick = Tick(5_115);
         let r = trig.should_birth(&net, &Signals::default()).expect("second episode fires");
         assert_eq!(r.trigger, "homeostatic-saturation");
+    }
+
+    /// A8/E4b: with cooldown_ms set, an ongoing overload admits at most
+    /// one birth per cooldown window; the armed state is held, so the
+    /// next fire lands exactly at cooldown expiry.
+    #[test]
+    fn saturation_trigger_cooldown_limits_cadence() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
+        for n in net.neurons.iter_mut() {
+            n.rate_hz = 40.0;
+        }
+        let mut trig = HomeostaticSaturation {
+            rate_threshold_hz: 25.0,
+            sustained_ms: 25,
+            cooldown_ms: 100,
+            over_since: None,
+            last_birth: None,
+        };
+        let mut fire_ticks = Vec::new();
+        // Continuous overload over 300 ticks with 100 ms cooldown:
+        // fires at 1025, then holds until 1126-ish, then 1227-ish…
+        for d in 0..300u64 {
+            net.tick = Tick(1_000 + d);
+            if trig.should_birth(&net, &Signals::default()).is_some() {
+                fire_ticks.push(1_000 + d);
+            }
+        }
+        // Latch spacing is 26 (25 sustained + 1 re-arm tick); cooldown
+        // keeps the spacing at <= 26 + 100 between fires.
+        let gaps: Vec<u64> = fire_ticks.windows(2).map(|w| w[1] - w[0]).collect();
+        assert!(fire_ticks.len() >= 3, "cooldown must not silence growth: {fire_ticks:?}");
+        for g in &gaps {
+            assert!(*g >= 100, "fires must be >= cooldown apart (gap {g}, ticks {fire_ticks:?})");
+        }
+    }
+
+    /// A8 default: cooldown_ms = 0 reproduces the E4 latch cadence
+    /// exactly (no additional spacing).
+    #[test]
+    fn saturation_trigger_cooldown_zero_is_noop() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
+        for n in net.neurons.iter_mut() {
+            n.rate_hz = 40.0;
+        }
+        let mut trig = HomeostaticSaturation { rate_threshold_hz: 25.0, sustained_ms: 25, cooldown_ms: 0, over_since: None, last_birth: None };
+        let mut ticks = Vec::new();
+        for d in 0..100u64 {
+            net.tick = Tick(1_000 + d);
+            if trig.should_birth(&net, &Signals::default()).is_some() {
+                ticks.push(1_000 + d);
+            }
+        }
+        assert_eq!(ticks, vec![1_025, 1_051, 1_077], "cooldown 0 = E4 cadence");
     }
 
     #[test]

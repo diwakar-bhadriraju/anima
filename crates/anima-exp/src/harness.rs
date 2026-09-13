@@ -142,6 +142,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         &cfg.structural.birth_trigger,
         cfg.structural.trigger_rate_hz,
         cfg.structural.trigger_sustained_ms,
+        cfg.structural.trigger_cooldown_ms,
     );
     let mut resources = ResourceMonitor::new(ResourceConfig {
         max_neurons: cfg.resources.max_neurons,

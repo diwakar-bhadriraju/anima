@@ -162,3 +162,96 @@ a schedule revisit.
      learnable frontier, not at saturation.
   3. E5 learning gates (excluded by user instruction until now-h).
 - Learning gates remain excluded from E4 scope (user instruction).
+
+---
+
+## E4b rerun — rate-gated birth schedule (authorized by REGRESSION branch)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before implementation.**
+
+The REGRESSION branch of the original registration forwards to a
+schedule revisit; the user approved the rerun. Scientific goal:
+**isolate the ALLOCATION direction (away from co-active pool) from the
+CADENCE coupling** that caused the regression. All endpoints, guards,
+and verdict rules of the original registration remain in force and
+unchanged; the only new intervention is the schedule itself:
+
+- **A8 (only delta vs E4)**: `trigger_cooldown_ms = 30_000` — after a
+  birth, the homeostatic-saturation trigger is held (armed, not
+  reset) for 30 s of sim time before the next birth is admitted.
+  Expected total births ≈ 20–30 over the 875 s curriculum (vs 43
+  births in the first 540 s of E4, accelerating without bound).
+- Everything else identical to E4: homeostatic-saturation 25 Hz /
+  2000 ms, `wiring_avoid_coactive = true`, E3 arm-B base (curriculum,
+  seed 20260912, additive STDP, adaptation 200/0.05, thresholds,
+  caps).
+- Implementation note (pre-frozen): cooldown is enforced inside
+  `HomeostaticSaturation` by holding `over_since` armed while the
+  cooldown runs, so an ongoing overload fires exactly one birth per
+  30 s rather than waiting for a fresh sustained episode. Default
+  cooldown 0 ⇒ behavior identical to E4/E3 (unit-tested).
+
+Verdict rules: identical to E4 pre-registration. If guard (4) still
+fails (runaway) with cadence bounded ≈ 1 per 30 s, the instability is
+attributable to allocation itself (each birth adds 20 afferents' worth
+of recruitment regardless of cadence) — a WEAKENED/REGRESSION outcome
+recorded with that attribution.
+
+---
+
+## E4b execution record
+
+### Amendment A9 (cadence shortfall, logged post-run)
+
+A8 pre-registered expected ≈ 20–30 births over 875 s at 30 s
+cooldown. Realized: **2 births** (t = 19,064 ms and t = 451,041 ms).
+Cause: the sustained-2 s trigger re-arms during every off-period mean
+dip (< 25 Hz, 1500 ms of each 2000 ms cycle), so the 30 s cooldown
+never binds — the effective cadence is one birth per sustained-
+overload EPISODE, and such episodes recur far more slowly than assumed
+from the E4 (no-cooldown) acceleration tail. The probe (1 birth/73 s)
+already signaled this; extrapolation ×12 understated the episode
+rarity in the full curriculum.
+
+### Artifact
+
+- `runs/e4b-20260913T170047Z` — completed curriculum-complete,
+  seed 20260912, cooldown 30 s, adaptation 200/0.05, avoid-coactive
+  wiring. 2 real births (76 initial excluded).
+
+### Outcome vs frozen endpoints
+
+| Metric (late S1) | E3 armB | E4b | Endpoint |
+|---|---|---|---|
+| cross A-B / A-C / B-C | 0.753 / 0.603 / 0.670 | 0.764 / 0.631 / 0.681 | — |
+| **mean cross** | **0.675** | **0.692** | (1) < 0.60 → FAIL |
+| **selectivity median** | **0.455** | **0.420** (n=86) | (2) > 0.50 → FAIL |
+| within-pattern | 0.846 | 0.848 | (3) ≥ 0.80 → PASS |
+| failures / peak / ratevar | 0 / 195 Hz / 296.5 | **0** / 221.6 Hz / 308.6 | (4) → PASS |
+| retention A/B/C | 1.10+ | 1.131/1.101/1.369 | (5) ≥ 0.80 → PASS |
+
+All guards pass — the rate-gated schedule **does** stabilize (E4's
+runaway is gone; completion achieved). The two separation endpoints
+fail; numerically E4b ≈ E3 armB within noise (mean cross +0.017).
+
+### Verdict classification — INCONCLUSIVE (inert intervention), with
+### an honest note attached
+
+Guard 6's own text: "births actually occurred (≥ 1) — otherwise the
+intervention is inert and the run is INCONCLUSIVE, not negative."
+E4b passed the literal ≥ 1 bar but fell 10–15× short of the A8
+operating point: 2 births add 40 synapses to a ~1500-synapse network.
+An inert intervention cannot test the allocation hypothesis; a
+WEAKENED reading would be a Type-II confound. **Classified:
+INCONCLUSIVE (intervention effectively inert; cadence miscalibration,
+A9).** Endpoint non-movement is consistent with E3-baseline noise and
+carries no information about the allocation direction.
+
+### Recommended follow-up (user decision required — A10, not yet logged)
+
+Recalibrate the schedule so the run exercises the registered band:
+`trigger_cooldown_ms ≈ 3–5 s` (est. 60–150 s between episodes → ~15–40
+births over S1; verify on probe before the run, log as amendment).
+This tests the actual scientific question — does allocation away from
+the co-active pool separate representations — now that A8 proved the
+schedule can stabilize. All endpoints/guards unchanged.

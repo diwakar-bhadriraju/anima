@@ -269,6 +269,7 @@ mod tests {
                 birth_trigger: "none".into(),
                 trigger_rate_hz: None,
                 trigger_sustained_ms: None,
+                trigger_cooldown_ms: None,
                 dormancy_rate_hz: 0.1,
                 dormancy_ms: 30000,
                 recovery_rate_hz: 1.0,
