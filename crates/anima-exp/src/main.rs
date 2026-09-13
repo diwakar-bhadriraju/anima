@@ -89,9 +89,73 @@ mod report {
 
     use anima_telemetry::report::generate_report;
 
-    /// Analyze a run dir: telemetry.jsonl (+snapshots) → metrics.json + report.md.
+    /// Analyze a run dir: telemetry (v2 chunks or legacy JSONL) + snapshots
+    /// → metrics.json + report.md.
     pub fn regenerate(dir: &Path) -> std::io::Result<()> {
-        let events = anima_telemetry::read_telemetry(&dir.join("telemetry.jsonl"))?;
+        let events = if dir.join("telemetry").is_dir() {
+            // v2: stream chunks. Pass 1: collect stimulus windows (tiny).
+            // Pass 2: keep only events the analyzer uses, and for spikes
+            // only those inside a presentation window (+ a small margin) —
+            // this is lossless for metrics; analyze() only counts spikes
+            // within windows. Full-fidelity telemetry stays in the chunks.
+            let reader = anima_telemetry::TelemetryReader::open(&dir.join("telemetry"))?;
+            let mut windows: Vec<(u64, u64)> = Vec::new();
+            let mut exp_id = String::from("unknown");
+            for c in 0..reader.chunk_index().len() {
+                for row in reader.chunk_rows(c)? {
+                    if row.kind == 5 {
+                        if let Some(env) = row.envelope("unknown").ok().as_ref() {
+                            if let anima_telemetry::events::Payload::StimulusPresented { .. } =
+                                env.payload
+                            {
+                                windows.push((env.t, env.t + 500));
+                            }
+                            if exp_id == "unknown" {
+                                exp_id = env.exp_id.clone();
+                            }
+                        }
+                    } else if row.kind == 0 && exp_id == "unknown" {
+                        if let Some(env) = row.envelope("unknown").ok().as_ref() {
+                            exp_id = env.exp_id.clone();
+                        }
+                    }
+                }
+            }
+            windows.sort_unstable();
+            let mut events = Vec::new();
+            for c in 0..reader.chunk_index().len() {
+                for row in reader.chunk_rows(c)? {
+                    // drop high-volume kinds with no analysis use:
+                    // spikes outside windows (3/4) and weight deltas (8/9)
+                    // — the analyzer never reads those kinds; final weights
+                    // live in snapshots.
+                    if row.kind == 8 || row.kind == 9 {
+                        continue;
+                    }
+                    if row.kind == 3 || row.kind == 4 {
+                        let t = row.t;
+                        let in_window = windows
+                            .binary_search_by(|&(s, e)| {
+                                if t < s {
+                                    std::cmp::Ordering::Greater
+                                } else if t > e {
+                                    std::cmp::Ordering::Less
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
+                            })
+                            .is_ok();
+                        if !in_window {
+                            continue;
+                        }
+                    }
+                    events.push(row.envelope(&exp_id)?);
+                }
+            }
+            events
+        } else {
+            anima_telemetry::read_telemetry(&dir.join("telemetry.jsonl"))?
+        };
         let metrics = anima_telemetry::analyze(&events);
         serde_json::to_writer_pretty(
             std::fs::File::create(dir.join("metrics.json"))?,

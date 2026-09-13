@@ -9,3 +9,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 zstd = { workspace = true }
 anima-core = { path = "../anima-core" }
+parquet = { version = "59.3.0", default-features = false, features = ["zstd", "snap", "arrow"] }

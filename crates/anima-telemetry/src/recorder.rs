@@ -42,7 +42,11 @@ pub struct SynapseState {
 
 pub struct Recorder {
     dir: PathBuf,
-    telemetry: BufWriter<File>,
+    /// Columnar chunk store (telemetry-v2). Present for new runs.
+    pub chunks: Option<crate::chunks::ChunkedTelemetry>,
+    /// Legacy JSONL sink (only for pre-v2 runs replayed through Recorder;
+    /// new runs never touch this).
+    telemetry: Option<BufWriter<File>>,
     snapshot: Option<zstd::stream::write::AutoFinishEncoder<'static, BufWriter<File>>>,
     events_written: u64,
 }
@@ -74,29 +78,29 @@ fn civil_from_unix(secs: u64) -> (i64, u32, u32, u32, u32, u32) {
     let y = if m <= 2 { y + 1 } else { y };
     (y, m, d, (rem / 3600) as u32, ((rem % 3600) / 60) as u32, (rem % 60) as u32)
 }
-
 impl Recorder {
-    /// Create run dir `runs/<exp_id>-<ts>/` with telemetry + snapshot files.
-    /// Refuses an existing dir.
+    /// Create run dir `runs/<exp_id>-<UTC timestamp>/` with chunked
+    /// columnar telemetry + snapshot file. Refuses an existing dir.
     pub fn create(runs_root: &Path, exp_id: &str) -> io::Result<Self> {
         let dir = runs_root.join(format!("{exp_id}-{}", utc_timestamp()));
         if dir.exists() {
             return Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("run dir {} exists", dir.display())));
         }
         fs::create_dir_all(&dir)?;
-        let telemetry = BufWriter::new(
-            OpenOptions::new()
-                .create_new(true)
-                .append(true)
-                .open(dir.join("telemetry.jsonl"))?,
-        );
+        let chunks = Some(crate::chunks::ChunkedTelemetry::create(&dir.join("telemetry"))?);
         let snapshot_file = OpenOptions::new()
             .create_new(true)
             .append(true)
             .open(dir.join("snapshots.bin.zst"))?;
         let snapshot =
             zstd::Encoder::new(BufWriter::new(snapshot_file), 3)?.auto_finish();
-        Ok(Self { dir, telemetry, snapshot: Some(snapshot), events_written: 0 })
+        Ok(Self {
+            dir,
+            chunks,
+            telemetry: None,
+            snapshot: Some(snapshot),
+            events_written: 0,
+        })
     }
 
     pub fn dir(&self) -> &Path {
@@ -107,17 +111,24 @@ impl Recorder {
         self.events_written
     }
 
-    /// Append one JSONL line. Error aborts the run (caller's policy).
+    /// Append one event. Routes to the chunked columnar store (v2) or the
+    /// legacy JSONL sink. Error aborts the run (caller's policy).
     pub fn write(&mut self, env: &Envelope) -> io::Result<()> {
-        let mut line = serde_json::to_string(env)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        line.push('\n');
-        self.telemetry.write_all(line.as_bytes())?;
+        if let Some(chunks) = self.chunks.as_mut() {
+            chunks.append(env)?;
+        } else if let Some(tel) = self.telemetry.as_mut() {
+            let mut line = serde_json::to_string(env)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            line.push('\n');
+            tel.write_all(line.as_bytes())?;
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotConnected, "no telemetry sink"));
+        }
         self.events_written += 1;
         Ok(())
     }
 
-    /// Append a compressed snapshot frame: [u32 LE length][bincode-less JSON bytes].
+    /// Append a compressed snapshot frame: [u32 LE length][JSON bytes].
     pub fn write_snapshot(&mut self, snap: &NetworkStateSnapshot) -> io::Result<()> {
         if let Some(enc) = self.snapshot.as_mut() {
             let bytes = serde_json::to_vec(snap)
@@ -128,9 +139,15 @@ impl Recorder {
         Ok(())
     }
 
-    /// Flush both streams (keep files usable mid-run).
+    /// Flush all sinks (keep files usable mid-run; finalizes the open chunk
+    /// so its rows are queryable before the run ends).
     pub fn flush(&mut self) -> io::Result<()> {
-        self.telemetry.flush()?;
+        if let Some(chunks) = self.chunks.as_mut() {
+            chunks.flush()?;
+        }
+        if let Some(tel) = self.telemetry.as_mut() {
+            tel.flush()?;
+        }
         if let Some(enc) = self.snapshot.as_mut() {
             enc.flush()?;
         }
@@ -228,10 +245,19 @@ mod tests {
             }).unwrap();
             rec.flush().unwrap();
         }
-        let parsed = read_telemetry(&dir.join("telemetry.jsonl")).unwrap();
+        // v2 storage: read back through the chunk reader (chunks live in
+        // dir/telemetry/). Lossless for every payload field.
+        let reader = crate::chunks::TelemetryReader::open(&dir.join("telemetry")).unwrap();
+        let mut parsed = Vec::new();
+        for c in 0..reader.chunk_index().len() {
+            for row in reader.chunk_rows(c).unwrap() {
+                parsed.push(row.envelope("rt").unwrap());
+            }
+        }
         assert_eq!(parsed.len(), events.len());
         for (a, b) in parsed.iter().zip(events.iter()) {
-            assert_eq!(serde_json::to_string(a).unwrap(), serde_json::to_string(b).unwrap());
+            assert_eq!(serde_json::to_string(a).unwrap(), serde_json::to_string(b).unwrap(),
+                "stored exp_id comes from the written envelope; row.envelope arg is only a fallback");
         }
         let snaps = read_snapshots(&dir.join("snapshots.bin.zst")).unwrap();
         assert_eq!(snaps.len(), 2);

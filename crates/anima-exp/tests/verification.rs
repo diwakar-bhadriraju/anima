@@ -138,11 +138,30 @@ fn run_config(name: &str, toml: &str) -> std::path::PathBuf {
 fn determinism_two_runs_identical_telemetry() {
     let dir1 = run_config("d1", SHORT_CONFIG);
     let dir2 = run_config("d2", SHORT_CONFIG);
-    let h1 = sha256_file(&dir1.join("telemetry.jsonl"));
-    let h2 = sha256_file(&dir2.join("telemetry.jsonl"));
+    // v2 storage: telemetry lives in chunk files under telemetry/.
+    let h1 = sha256_dir(&dir1.join("telemetry"));
+    let h2 = sha256_dir(&dir2.join("telemetry"));
     assert_eq!(h1, h2, "same seed + same config must produce identical telemetry");
     let _ = std::fs::remove_dir_all(dir1.parent().unwrap());
     let _ = std::fs::remove_dir_all(dir2.parent().unwrap());
+}
+
+/// Deterministic hash over every chunk file's bytes (index.json is stable:
+/// chunk names/t-ranges derive from deterministic events).
+fn sha256_dir(dir: &std::path::Path) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .expect("telemetry dir")
+        .flatten()
+        .map(|e| e.path())
+        .collect();
+    files.sort();
+    for f in files {
+        h.update(f.file_name().unwrap().to_string_lossy().as_bytes());
+        h.update(&std::fs::read(&f).expect("read chunk"));
+    }
+    format!("{:x}", h.finalize())
 }
 
 #[test]
@@ -158,9 +177,19 @@ fn failure_path_crafted_config() {
         "birth_trigger = \"homeostatic-saturation\"\ntrigger_rate_hz = 0.5\ntrigger_sustained_ms = 500",
     );
     let dir = run_config("f1", &cfg);
-    let telemetry = std::fs::read_to_string(dir.join("telemetry.jsonl")).unwrap();
-    let has_failure = telemetry.contains("\"failure\"");
-    let has_run_ended = telemetry.contains("run-ended");
+    // v2: stream chunks and check event kinds.
+    let reader = anima_telemetry::TelemetryReader::open(&dir.join("telemetry")).unwrap();
+    let mut has_failure = false;
+    let mut has_run_ended = false;
+    for c in 0..reader.chunk_index().len() {
+        for row in reader.chunk_rows(c).unwrap() {
+            match row.kind {
+                17 => has_failure = true, // Failure
+                1 => has_run_ended = true, // RunEnded
+                _ => {}
+            }
+        }
+    }
     assert!(has_failure, "crafted config must produce a Failure event");
     assert!(has_run_ended, "failure must end the run");
     // files preserved

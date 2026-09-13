@@ -180,6 +180,56 @@ impl EventKind {
 }
 
 impl EventKind {
+    /// Numeric id used by the columnar store; stable ordering = declaration order.
+    pub fn from_id(id: i32) -> Option<EventKind> {
+        Some(match id {
+            0 => EventKind::RunStarted,
+            1 => EventKind::RunEnded,
+            2 => EventKind::TickStats,
+            3 => EventKind::Spike,
+            4 => EventKind::OutputActivity,
+            5 => EventKind::StimulusPresented,
+            6 => EventKind::SynapseCreated,
+            7 => EventKind::SynapsePruned,
+            8 => EventKind::SynapseStrengthened,
+            9 => EventKind::SynapseWeakened,
+            10 => EventKind::NeuronCreated,
+            11 => EventKind::NeuronDormant,
+            12 => EventKind::NeuronReactivated,
+            13 => EventKind::NeuronRetired,
+            14 => EventKind::PredictionError,
+            15 => EventKind::NoveltySignal,
+            16 => EventKind::ResourceUsage,
+            17 => EventKind::Failure,
+            _ => return None,
+        })
+    }
+
+    pub fn to_id(&self) -> i32 {
+        match self {
+            EventKind::RunStarted => 0,
+            EventKind::RunEnded => 1,
+            EventKind::TickStats => 2,
+            EventKind::Spike => 3,
+            EventKind::OutputActivity => 4,
+            EventKind::StimulusPresented => 5,
+            EventKind::SynapseCreated => 6,
+            EventKind::SynapsePruned => 7,
+            EventKind::SynapseStrengthened => 8,
+            EventKind::SynapseWeakened => 9,
+            EventKind::NeuronCreated => 10,
+            EventKind::NeuronDormant => 11,
+            EventKind::NeuronReactivated => 12,
+            EventKind::NeuronRetired => 13,
+            EventKind::PredictionError => 14,
+            EventKind::NoveltySignal => 15,
+            EventKind::ResourceUsage => 16,
+            EventKind::Failure => 17,
+        }
+    }
+}
+
+impl EventKind {
     pub fn kind_of(payload: &Payload) -> EventKind {
         match payload {
             Payload::RunStarted { .. } => EventKind::RunStarted,

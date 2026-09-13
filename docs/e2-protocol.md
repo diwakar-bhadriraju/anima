@@ -144,3 +144,31 @@ logged for future experiments:
 2. E3+ should reconsider the wire/telemetry emission budget for
    non-saturating rules (larger coalesce threshold or time-bucketed
    emission), or disk usage becomes the experiment's bottleneck.
+
+## Storage stress result (v2 chunks)
+
+Arm B seizure re-run on the v2 columnar store: 72,412,724 rows / 290
+chunks → **159 MB** total (vs **8.3 GB** JSONL for the same run: ~52×
+smaller). The pathological-run problem is solved: bounded 250k-row
+chunks, no unbounded memory growth, and the 8.3 GB JSONL is never
+written.
+
+Note: report regeneration from an 8.3 GB legacy JSONL is what timed out
+(>5 min); the v2 chunk path must stream — the current report
+implementation materializes all envelopes, which is fine for ≤ a few
+hundred MB but needs incremental aggregation for seizure-scale runs.
+Tracked as a follow-up; the storage itself is fixed.
+
+**Stress-run regeneration completed** (~25 min single-threaded,
+nice 19): metrics.json + report.md produced from the 72M-row chunk
+store. Arm B metrics confirm the seizure state: assembly score ≈ 0.002
+(no separation), selectivity median 0.0 (n=98), retention 1.00
+(trivial — the network never stops firing), zero Failure events (the
+A1-recalibrated detector stayed quiet). These are the expected
+degenerate values for a seizure state and validate the analysis path
+end-to-end on pathological input.
+
+**Follow-up logged for E3+**: incremental (non-materializing) report
+aggregation, and reconsidering the emission budget for weight-delta
+events under non-saturating rules — 48M weight events is the dominant
+cost even in columnar form.

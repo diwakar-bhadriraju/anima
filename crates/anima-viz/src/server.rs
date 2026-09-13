@@ -319,10 +319,25 @@ pub fn start(
     }
 }
 
-/// Replay driver: streams a recorded telemetry file through the same WS
-/// protocol at `speed` ticks/s (0 = max). Handles pause/step/speed/seek.
+/// Replay driver: streams a recorded run (v2 chunks or legacy JSONL)
+/// through the same WS protocol at `speed` ticks/s (0 = max). Handles
+/// pause/step/speed/seek.
 pub fn replay(telemetry_path: &std::path::Path, port: u16, mut speed: f32) -> std::io::Result<()> {
-    let events = anima_telemetry::read_telemetry(telemetry_path)?;
+    // v2 run dir layout: <run>/telemetry/ + snapshots; legacy: a JSONL file.
+    let chunk_dir = telemetry_path
+        .join("telemetry");
+    let events: Vec<Envelope> = if chunk_dir.is_dir() {
+        let reader = anima_telemetry::TelemetryReader::open(&chunk_dir)?;
+        let mut out = Vec::new();
+        for c in 0..reader.chunk_index().len() {
+            for row in reader.chunk_rows(c)? {
+                out.push(row.envelope("replay")?);
+            }
+        }
+        out
+    } else {
+        anima_telemetry::read_telemetry(telemetry_path)?
+    };
     let duration_ms = events.last().map(|e| e.t).unwrap_or(0);
     let exp_id = events
         .first()
