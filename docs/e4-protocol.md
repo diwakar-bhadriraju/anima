@@ -255,3 +255,103 @@ births over S1; verify on probe before the run, log as amendment).
 This tests the actual scientific question — does allocation away from
 the co-active pool separate representations — now that A8 proved the
 schedule can stabilize. All endpoints/guards unchanged.
+
+---
+
+## E4c — A10: cooldown recalibration (authorized, pre-registered)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before run.**
+
+User authorized the A10 rerun with the exact instruction: smallest
+probe-validated cooldown in 3–5 s producing ~15–40 S1 births, sole
+variable = cooldown, everything else identical to E4b.
+
+### Calibration sweep (logged, probe config S1 reps=40 ≈ 240 s S1,
+### S2/S3 reps=2, same seed)
+
+| cooldown | births in 240 s S1 | projected full S1 (720 s) |
+|---|---|---|
+| 3000 ms | 8 (ticks 19,29,33,41,45,73,179,247 s) | ≈ 24 |
+| 4000 ms | 8 (same set, ±30 ms) | ≈ 24 |
+| 5000 ms | 7 (19,29,34,41,46,73,179 s) | ≈ 21 |
+
+Cadence is episode-limited, not cooldown-limited, in this range
+(3000/4000 identical; 5000 drops one). Full-curriculum projection
+incl. S2/S3 contributions: ≈ 27–30 births, inside the registered
+15–40 band.
+
+### Frozen A10
+
+- `trigger_cooldown_ms = 3000` (smallest probe-validated value; all
+  other params identical to E4b: adaptation 200/0.05, homeostatic-
+  saturation 25 Hz/2 s, `wiring_avoid_coactive = true`, seed
+  20260912, additive STDP, curriculum, thresholds, caps, metrics,
+  stability guards).
+- New config `configs/e4c.toml`, exp_id `e4c`.
+- Decision branches: unchanged from the original E4 registration —
+  endpoints (1) cross < 0.60 + (2) selectivity > 0.50; guards (3)
+  within ≥ 0.80, (4) zero runaway + rates ≤ 250 Hz, (5) retention
+  ≥ 0.80, (6) births occurred. SUPPORTED / WEAK / WEAKENED /
+  INCONCLUSIVE / REGRESSION as written. An inert result (guard 6
+  breach) is INCONCLUSIVE, NOT evidence against the allocation
+  hypothesis (user instruction).
+
+---
+
+## E4c execution record (A10)
+
+### Artifact
+
+- `runs/e4c-20260913T170637Z` — full curriculum, seed 20260912,
+  cooldown **3000 ms** (frozen A10), everything else identical to
+  E4b. **35 real births** (t span 19,064 → 539,044 ms), all within
+  the registered 15–40 band — growth was ACTIVE, cadence controlled
+  (3 s minimum spacing, verified by tick gaps ≥ 3000 ms).
+
+### Outcome vs frozen endpoints
+
+| Guard | Result | Branch |
+|---|---|---|
+| (6) births occurred | PASS — 35 | — |
+| (4) zero runaway | **FAIL** — `runaway-activity` at t = 540,021 ms, mean 104.3 Hz > 50 Hz for 5 s | **REGRESSION** |
+
+Separation endpoints (1)/(2) not evaluable (S2/S3 never ran). Guards
+(3)/(5) not reached.
+
+### Interpretation (evidence-based)
+
+- E4c fails at **t = 540,021 ms — the same sim time as E4
+  (540,013 ms, 43 births)**. Combined with E4b (2 births, no
+  failure), the failure correlates with **cumulative birth count,
+  not cadence**: ~35 + births by t ≈ 540 s trips the guard regardless
+  of 3 s vs uncontrolled timing.
+- Mechanism: each birth adds **20 converged afferents** onto a fresh
+  internal neuron (amplitude 52 × w) with **no outgoing synapses and
+  no competition** → newborns are high-gain sinks. Burst-mean avg
+  rises 43.8 (E3b) → 62.9 Hz (E4c) and off-mean 15.5 → 22.4 Hz once
+  35 newborns join the pool; the population mean (which the trigger
+  AND the runaway detector read) crosses the 50 Hz / 5 s window
+  during S1's lengthening burst trains.
+- Therefore: **growth active at a controlled cadence still
+  destabilizes this organism via per-birth afferent gain — the
+  instability is allocation-shape-dependent (20:0 fan-in, zero
+  fan-out), not timing-dependent.** The registered question "does
+  allocation away from the co-active pool improve separation" remains
+  answerable only with a growth shape that does not itself inflate
+  the population mean.
+
+### Verdict: **REGRESSION** (frozen rule, guard 4)
+
+No re-run within this registration. The evidence (E4c = E4 failure
+point) closes the current mechanism shape: **homeostatic-
+saturation growth with 20-in / 0-out afferents cannot coexist with
+the 50 Hz stability guard regardless of cadence.** Next candidates
+for a NEW registration (deferred to user; gates still excluded):
+1. Growth-shape variant: fewer afferents per birth (e.g. 4–8) or
+   matched fan-out so newborns integrate into the circuit instead of
+   accumulating as sinks.
+2. Persistent-error trigger (U3 variant b) — births at the learnable
+   frontier, naturally rarer and load-coupled.
+3. Accept guard (4) re-calibration for growth arms (detector on the
+   original 40-neuron pool) — but that changes the frozen guard and
+   needs explicit user approval.
