@@ -137,6 +137,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
     structural.recovery_rate_hz = cfg.structural.recovery_rate_hz;
     structural.retirement_ms = cfg.structural.retirement_ms;
     structural.wiring_synapses = cfg.structural.wiring_synapses;
+    structural.wiring_avoid_coactive = cfg.structural.wiring_avoid_coactive;
     let mut trigger = make_trigger(
         &cfg.structural.birth_trigger,
         cfg.structural.trigger_rate_hz,
@@ -292,6 +293,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             stdp_tick(&params, &mut net, &traces, &step.spikes, 1.0)
         };
         for c in changes {
+            unemit.resize(c.synapse.idx() + 1, 0.0);
             unemit[c.synapse.idx()] += c.after - c.before;
         }
         // Coalesced emission when |Δw| > 0.01: telemetry keeps every event;

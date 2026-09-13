@@ -83,6 +83,11 @@ pub struct StructuralSection {
     pub recovery_rate_hz: f32,
     pub retirement_ms: u64,
     pub wiring_synapses: usize,
+    /// U3 (E4): newborn afferents target the LOWEST rate-EMA neurons
+    /// (away from the shared co-active pool) when true; Phase 0 keeps
+    /// highest-rate partners when false/absent.
+    #[serde(default)]
+    pub wiring_avoid_coactive: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

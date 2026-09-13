@@ -93,6 +93,10 @@ impl BirthTrigger for HomeostaticSaturation {
         if mean > self.rate_threshold_hz {
             let since = *self.over_since.get_or_insert(net.tick);
             if net.tick.0.saturating_sub(since.0) >= self.sustained_ms {
+                // Re-arm: fire once per sustained episode, not every tick
+                // while overloaded (otherwise admission windows exhaust
+                // and the run aborts with birth-rate-limit).
+                self.over_since = None;
                 return Some(
                     Reason::new("homeostatic-saturation")
                         .factor("region-mean-rate-hz", mean)
@@ -191,6 +195,9 @@ pub struct StructuralMonitor {
     pub recovery_rate_hz: f32,      // above ⇒ reactivated
     pub retirement_ms: u64,         // dormant longer than ⇒ retired
     pub wiring_synapses: usize,     // per birth
+    /// U3 (E4): when true, newborn afferents target the LOWEST rate-EMA
+    /// neurons (away from the co-active pool); false = Phase 0 behavior.
+    pub wiring_avoid_coactive: bool,
 }
 
 impl Default for StructuralMonitor {
@@ -201,6 +208,7 @@ impl Default for StructuralMonitor {
             recovery_rate_hz: 1.0,
             retirement_ms: 300_000,
             wiring_synapses: 20,
+            wiring_avoid_coactive: false,
         }
     }
 }
@@ -283,15 +291,21 @@ impl StructuralMonitor {
         });
         net.incoming.push(Vec::new());
         net.outgoing.push(Vec::new());
-        // Wire to most-recently-coactive partners: here, the highest-rate
-        // non-input neurons (rate EMA is our coactivity proxy), seeded.
+        // Wire to partners by coactivity preference. Default (Phase 0):
+        // highest-rate (most-recently-coactive) partners. U3/E4
+        // (`wiring_avoid_coactive`): lowest-rate — capacity allocated
+        // away from the shared co-active pool. Seeded weight draw.
         let mut partners: Vec<(NeuronId, f32)> = net
             .neurons
             .iter()
             .filter(|n| n.class != NeuronClass::Input && !n.retired && n.id != id)
             .map(|n| (n.id, n.rate_hz))
             .collect();
-        partners.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        if self.wiring_avoid_coactive {
+            partners.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        } else {
+            partners.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        }
         let take = self.wiring_synapses.min(partners.len());
         for &(partner, _) in &partners[..take] {
             let w = net.rng.gen::<f32>() * net.cfg.w_init + 0.05;
@@ -349,6 +363,40 @@ mod tests {
     }
 
     #[test]
+    fn saturation_trigger_latches_rearm_per_episode() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
+        for n in net.neurons.iter_mut() {
+            n.rate_hz = 40.0;
+        }
+        let mut trig = HomeostaticSaturation { rate_threshold_hz: 25.0, sustained_ms: 25, over_since: None };
+        // Continuous overload over 100 ticks with sustained 25 ms: must
+        // fire exactly 3× (t=+25, +50, +75), NOT once per tick.
+        let mut fire_ticks = Vec::new();
+        for d in 0..100u64 {
+            net.tick = Tick(1_000 + d);
+            if trig.should_birth(&net, &Signals::default()).is_some() {
+                fire_ticks.push(1_000 + d);
+            }
+        }
+        assert_eq!(fire_ticks, vec![1_025, 1_051, 1_077], "one fire per sustained window (re-arm next tick)");
+        // Episode ends: mean drops below threshold => re-arm allowed.
+        for n in net.neurons.iter_mut() {
+            n.rate_hz = 5.0;
+        }
+        net.tick = Tick(3_000);
+        assert!(trig.should_birth(&net, &Signals::default()).is_none());
+        // New episode fires again.
+        for n in net.neurons.iter_mut() {
+            n.rate_hz = 40.0;
+        }
+        net.tick = Tick(5_090);
+        let _ = trig.should_birth(&net, &Signals::default()); // arms the window
+        net.tick = Tick(5_115);
+        let r = trig.should_birth(&net, &Signals::default()).expect("second episode fires");
+        assert_eq!(r.trigger, "homeostatic-saturation");
+    }
+
+    #[test]
     fn persistent_error_trigger_fires() {
         let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
         let mut trig = PersistentError::new();
@@ -370,6 +418,11 @@ mod tests {
         assert_eq!(net.neurons.len(), before_n + 1);
         assert!(net.live_synapse_count() >= before_s);
         assert!(net.incoming[id.idx()].len() > 0);
+        // Parallel adjacency invariant: every neuron has incoming+outgoing
+        // slots (regression: outgoing.push was once missing, causing
+        // index-out-of-bounds when the newborn spiked).
+        assert_eq!(net.outgoing.len(), net.neurons.len());
+        assert_eq!(net.incoming.len(), net.neurons.len());
     }
 
     #[test]
@@ -401,5 +454,99 @@ mod tests {
         assert!(net.outgoing[victim.idx()].is_empty());
         assert!(net.incoming[victim.idx()].is_empty());
         assert!(had_out || net.incoming[victim.idx()].is_empty());
+    }
+
+    /// U3/E4: `wiring_avoid_coactive` must route the newborn's afferents
+    /// to the LOWEST-rate partners (away from the co-active pool).
+    #[test]
+    fn wiring_avoid_coactive_targets_lowest_rate() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 6, 2, 5);
+        // Paint rate gradient across internal neurons (co-active proxy).
+        let internals: Vec<NeuronId> = net
+            .neurons
+            .iter()
+            .filter(|n| n.class == NeuronClass::Internal)
+            .map(|n| n.id)
+            .collect();
+        for (k, id) in internals.iter().enumerate() {
+            net.neurons[id.idx()].rate_hz = k as f32; // 0, 1, ..., 5
+        }
+        let mut mon = StructuralMonitor {
+            wiring_synapses: 3,
+            wiring_avoid_coactive: true,
+            ..StructuralMonitor::default()
+        };
+        let id = mon.birth(&mut net);
+        let partners: Vec<u32> = net
+            .incoming[id.idx()]
+            .iter()
+            .map(|sid| net.synapses[sid.idx()].pre.0)
+            .collect();
+        assert_eq!(partners.len(), 3, "wiring_synapses afferents");
+        // Invariant of the ascending-prefix rule: every chosen partner
+        // must have rate <= every non-input neuron that was NOT chosen.
+        let rate_of = |n: u32| {
+            net.neurons
+                .iter()
+                .find(|x| x.id.0 == n)
+                .map(|x| x.rate_hz)
+                .unwrap_or(f32::INFINITY)
+        };
+        let unchosen: Vec<u32> = net
+            .neurons
+            .iter()
+            .filter(|n| {
+                n.class != NeuronClass::Input
+                    && !n.retired
+                    && n.id != id
+                    && !partners.contains(&n.id.0)
+            })
+            .map(|n| n.id.0)
+            .collect();
+        for p in &partners {
+            for q in &unchosen {
+                assert!(
+                    rate_of(*p) <= rate_of(*q),
+                    "partner {p} (r={}) must not outrank unchosen {q} (r={})",
+                    rate_of(*p),
+                    rate_of(*q)
+                );
+            }
+        }
+    }
+
+    /// U3/E4 identity guard: with wiring_avoid_coactive = false the wiring
+    /// must reproduce the Phase 0 behavior exactly (highest-rate partners).
+    #[test]
+    fn wiring_phase0_identity_when_not_avoiding() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 6, 2, 5);
+        let internals: Vec<NeuronId> = net
+            .neurons
+            .iter()
+            .filter(|n| n.class == NeuronClass::Internal)
+            .map(|n| n.id)
+            .collect();
+        for (k, id) in internals.iter().enumerate() {
+            net.neurons[id.idx()].rate_hz = k as f32;
+        }
+        let mut mon = StructuralMonitor {
+            wiring_synapses: 3,
+            wiring_avoid_coactive: false,
+            ..StructuralMonitor::default()
+        };
+        let id = mon.birth(&mut net);
+        let partners: Vec<u32> = net
+            .incoming[id.idx()]
+            .iter()
+            .map(|sid| net.synapses[sid.idx()].pre.0)
+            .collect();
+        assert_eq!(partners.len(), 3);
+        let highest: Vec<u32> = internals.iter().rev().take(3).map(|n| n.0).collect();
+        for p in &partners {
+            assert!(
+                highest.contains(p),
+                "Phase 0 must pick highest-rate partners, got {p} in {partners:?}"
+            );
+        }
     }
 }

@@ -274,6 +274,7 @@ mod tests {
                 recovery_rate_hz: 1.0,
                 retirement_ms: 300000,
                 wiring_synapses: 5,
+                wiring_avoid_coactive: false,
             },
             resources: ResourceSection {
                 max_neurons: 50,

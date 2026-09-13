@@ -44,6 +44,10 @@ impl Traces {
     /// One tick of trace dynamics: decay all, then bump on spikes.
     /// Called with the tick's spike set AFTER the network step.
     pub fn step(&mut self, net: &Network, spikes: &[NeuronId]) {
+        // Births may have added synapses since the last resize; the trace
+        // arrays must cover every SynapseId before bumping (E4 exposes
+        // this: prior to this fix a newborn's synapse id overflowed).
+        self.sync_len(net);
         for t in self.pre.iter_mut() {
             *t *= self.decay;
         }
@@ -624,5 +628,28 @@ mod tests {
         let n = &mut net.neurons[id.idx()];
         n.v = 100.0; // far over threshold; refractory check passes at t=0
         n.refractory_until = Tick(0);
+    }
+
+    /// E4 regression: a birth adds synapses with ids beyond the traces'
+    /// initial allocation; step() must not index out of bounds.
+    #[test]
+    fn traces_step_survives_synapse_growth() {
+        let mut net = small_net();
+        let mut traces = Traces::new(&net, 20.0);
+        // Simulate growth: append a live synapse (as structural birth does).
+        let before = net.synapses.len();
+        let pre = net.neurons.iter().find(|n| n.class != crate::network::NeuronClass::Input).unwrap().id;
+        let post = pre;
+        net.add_synapse(pre, post, 0.5, true, Tick(100));
+        assert_eq!(net.synapses.len(), before + 1);
+        // Spike the pre neuron; bump path touches the new synapse id.
+        let spike_ev = {
+            let mut n = &mut net.neurons[pre.idx()];
+            n.v = 100.0;
+            n.refractory_until = Tick(0);
+            net.step(&InputFrame { tick: Tick(150), spikes: vec![] })
+        };
+        traces.step(&net, &spike_ev.spikes); // must not panic
+        assert_eq!(traces.pre.len(), net.synapses.len());
     }
 }
