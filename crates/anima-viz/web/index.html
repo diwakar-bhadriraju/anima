@@ -793,22 +793,26 @@ function physics(dt) {
   const ns = [...S.neurons.values()];
   const inputs = ns.filter(n => n.cls === "input");
   const outputs = ns.filter(n => n.cls === "output");
-  // group-aware pinned columns: input left (grouped), output right
+  // Sensory: hard-pinned grouped columns, vertically centered.
+  // Motor: hard-pinned centered column. Hard pins keep the composition
+  // stable (columns can't be pushed apart by repulsion into a mess).
+  const internals = ns.filter(n => n.cls === "internal");
   const groupRows = {};
-  for (const n of inputs) {
-    (groupRows[n.group] = groupRows[n.group] || []).push(n);
-  }
+  for (const n of inputs) (groupRows[n.group] = groupRows[n.group] || []).push(n);
   const groups = Object.keys(groupRows);
+  const colGap = Math.min(64, W * 0.05);
+  const sensoryLeft = W * 0.09 - (groups.length - 1) * colGap / 2;
   groups.forEach((g, gi) => {
     const arr = groupRows[g];
+    const cx = sensoryLeft + gi * colGap;
     arr.forEach((n, i) => {
-      n.px = W * 0.075 + gi * W * 0.052;
-      n.py = H * (0.14 + 0.72 * (arr.length === 1 ? 0.5 : i / (arr.length - 1)));
+      n.px = cx;
+      n.py = H * 0.5 + (i - (arr.length - 1) / 2) * Math.min(58, H * 0.8 / Math.max(arr.length, 1));
     });
   });
   outputs.forEach((n, i) => {
-    n.px = W * 0.925;
-    n.py = H * (0.28 + 0.44 * (outputs.length === 1 ? 0.5 : i / (outputs.length - 1)));
+    n.px = W * 0.92;
+    n.py = H * 0.5 + (i - (outputs.length - 1) / 2) * Math.min(46, H * 0.6 / Math.max(outputs.length, 1));
   });
   const step = Math.min(ns.length, 400);
   for (let i = 0; i < step; i++) {
@@ -835,10 +839,14 @@ function physics(dt) {
     b.vx -= dx / d * f * d * 0.01; b.vy -= dy / d * f * d * 0.01;
   }
   for (const n of ns) {
-    if (n.px != null) {
-      n.vx += (n.px - n.x) * 0.08; n.vy += (n.py - n.y) * 0.08;
-      n.vx *= 0.5; n.vy *= 0.5;
+    if (n.px != null && n.cls !== "internal") {
+      // hard-ish pins: strong pull + damping, columns stay put
+      n.vx += (n.px - n.x) * 0.35; n.vy += (n.py - n.y) * 0.35;
+      n.vx *= 0.55; n.vy *= 0.55;
     } else {
+      // internal cluster: centering keeps the cloud composed between the columns
+      n.vx += (W * 0.5 - n.x) * 0.02;
+      n.vy += (H * 0.5 - n.y) * 0.03;
       n.vx *= 0.86; n.vy *= 0.86;
     }
     if (S.drag === n.id) { n.x = S.dragX; n.y = S.dragY; n.vx = n.vy = 0; continue; }
@@ -853,6 +861,15 @@ function physics(dt) {
 function s2w(x, y) {
   const W = canvas.width, H = canvas.height;
   return [(x - W / 2) / S.cam.z + W / 2 - S.cam.x, (y - H / 2) / S.cam.z + H / 2 - S.cam.y];
+}
+
+// keep the graph on screen: camera offset is capped so the organism can
+// never be panned out of view
+function clampCam() {
+  const W = canvas.width, H = canvas.height;
+  const spanX = W * 0.85, spanY = H * 0.85;
+  S.cam.x = Math.max(-spanX, Math.min(spanX, S.cam.x));
+  S.cam.y = Math.max(-spanY, Math.min(spanY, S.cam.y));
 }
 
 function draw() {
@@ -1292,19 +1309,21 @@ canvas.onmousedown = (e) => {
     renderInspector();
     return;
   }
-  // empty space: start pan
+  // empty space: start pan (CSS px, matching the move handler)
   S.panning = true;
-  S.panLastX = (e.clientX - rect.left) * devicePixelRatio;
-  S.panLastY = (e.clientY - rect.top) * devicePixelRatio;
+  S.panLastX = e.clientX - rect.left;
+  S.panLastY = e.clientY - rect.top;
 };
 canvas.onmousemove = (e) => {
   if (S.drag == null) {
     if (S.panning) {
+      // pan in CSS px: 1:1 hand movement (device px over-amplified)
       const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * devicePixelRatio, y = (e.clientY - rect.top) * devicePixelRatio;
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
       S.cam.x -= (x - S.panLastX) / S.cam.z; S.cam.y -= (y - S.panLastY) / S.cam.z;
       S.panLastX = x; S.panLastY = y;
       S.movedPan = true;
+      clampCam();
     }
     return;
   }
@@ -1331,7 +1350,8 @@ canvas.onmouseleave = () => {
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-  S.cam.z = Math.max(0.3, Math.min(6, S.cam.z * f));
+  S.cam.z = Math.max(0.55, Math.min(4, S.cam.z * f));
+  clampCam();
 }, { passive: false });
 
 function distSeg(px, py, x1, y1, x2, y2) {
@@ -1342,6 +1362,7 @@ function distSeg(px, py, x1, y1, x2, y2) {
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
+
 
 let inspPending = false;
 function renderInspectorThrottled() {
