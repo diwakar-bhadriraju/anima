@@ -295,6 +295,7 @@ mod tests {
                 StageSpec { id: "S1".into(), present: vec!["A".into()], reps: 3, order: "interleaved".into(), off_ms: 100, silence_ms: None },
                 StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None },
             ],
+            v2: None,
         }
     }
 

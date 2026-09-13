@@ -47,6 +47,8 @@ message row {
   optional BINARY pattern;
   optional BINARY stage;
   optional BINARY params_json;
+  optional INT64 live_exc;
+  optional INT64 live_inh;
 }
 ";
 
@@ -75,9 +77,11 @@ mod col {
     pub const PATTERN: usize = 20;
     pub const STAGE: usize = 21;
     pub const PARAMS_JSON: usize = 22;
+    pub const LIVE_EXC: usize = 23;
+    pub const LIVE_INH: usize = 24;
 }
 
-pub const N_COLUMNS: usize = 23;
+pub const N_COLUMNS: usize = 25;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ChunkMeta {
@@ -114,6 +118,8 @@ struct Buffers {
     pattern: Vec<Option<Vec<u8>>>,
     stage: Vec<Option<Vec<u8>>>,
     params_json: Vec<Option<Vec<u8>>>,
+    live_exc: Vec<Option<i64>>,
+    live_inh: Vec<Option<i64>>,
 }
 
 impl Buffers {
@@ -149,6 +155,8 @@ impl Buffers {
         self.pattern.push(None);
         self.stage.push(None);
         self.params_json.push(None);
+        self.live_exc.push(None);
+        self.live_inh.push(None);
         let last = self.len() - 1;
         match &env.payload {
             Payload::RunStarted { config_hash, seed, params } => {
@@ -213,11 +221,13 @@ impl Buffers {
             Payload::NoveltySignal { value } => {
                 self.value[last] = value.map(|v| v as f64);
             }
-            Payload::ResourceUsage { neurons, synapses, spikes_window, metabolic_cost } => {
+            Payload::ResourceUsage { neurons, synapses, spikes_window, metabolic_cost, live_exc, live_inh } => {
                 self.neurons[last] = Some(*neurons as i64);
                 self.synapses[last] = Some(*synapses as i64);
                 self.spikes_window[last] = Some(*spikes_window as i64);
                 self.value[last] = metabolic_cost.map(|v| v as f64);
+                self.live_exc[last] = live_exc.map(|v| v as i64);
+                self.live_inh[last] = live_inh.map(|v| v as i64);
             }
             Payload::Failure { kind, detail } => {
                 self.reason[last] = Some(kind.clone().into_bytes());
@@ -316,6 +326,8 @@ impl ChunkedTelemetry {
         write_col_opt_bytes(&mut rg, col::PATTERN, &self.buffers.pattern)?;
         write_col_opt_bytes(&mut rg, col::STAGE, &self.buffers.stage)?;
         write_col_opt_bytes(&mut rg, col::PARAMS_JSON, &self.buffers.params_json)?;
+        write_col_opt_i64(&mut rg, col::LIVE_EXC, &self.buffers.live_exc)?;
+        write_col_opt_i64(&mut rg, col::LIVE_INH, &self.buffers.live_inh)?;
         rg.close()?;
         writer.close()?;
         let meta = ChunkMeta {
@@ -450,6 +462,8 @@ fn read_chunk(path: &Path) -> io::Result<Vec<Row>> {
             pattern: get_str(col::PATTERN, &row),
             stage: get_str(col::STAGE, &row),
             params_json: get_str(col::PARAMS_JSON, &row),
+            live_exc: get_i64(col::LIVE_EXC, &row),
+            live_inh: get_i64(col::LIVE_INH, &row),
         });
     }
     Ok(rows)
@@ -481,6 +495,8 @@ pub struct Row {
     pub pattern: Option<Vec<u8>>,
     pub stage: Option<Vec<u8>>,
     pub params_json: Option<Vec<u8>>,
+    pub live_exc: Option<i64>,
+    pub live_inh: Option<i64>,
 }
 
 /// Streaming reader over a chunk directory. Yields envelopes in order.
@@ -604,6 +620,8 @@ impl Row {
                 synapses: self.synapses.unwrap_or(0) as u64,
                 spikes_window: self.spikes_window.unwrap_or(0) as u64,
                 metabolic_cost: self.value.map(|v| v as f32),
+                live_exc: self.live_exc.map(|v| v as u64),
+                live_inh: self.live_inh.map(|v| v as u64),
             },
             EventKind::Failure => Payload::Failure {
                 kind: s(&self.reason).unwrap_or_default(),
@@ -647,7 +665,7 @@ mod tests {
             b.build(6, Payload::PredictionError { value: Some(0.4) }),
             b.build(6, Payload::PredictionError { value: None }), // NaN → null
             b.build(10, Payload::ResourceUsage {
-                neurons: 76, synapses: 125, spikes_window: 210, metabolic_cost: Some(1.25),
+                neurons: 76, synapses: 125, spikes_window: 210, metabolic_cost: Some(1.25), live_exc: None, live_inh: None,
             }),
             b.build(20, Payload::Failure { kind: "runaway-activity".into(), detail: "test".into() }),
             b.build(30, Payload::RunEnded { reason: "curriculum-complete".into() }),

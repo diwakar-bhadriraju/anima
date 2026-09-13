@@ -244,7 +244,7 @@ mod tests {
         let mut b = EventBuilder::new("e1");
         let evs = vec![
             b.build(0, Payload::RunStarted { config_hash: "h".into(), seed: 1, params: serde_json::json!({}) }),
-            b.build(100, Payload::ResourceUsage { neurons: 10, synapses: 20, spikes_window: 5, metabolic_cost: Some(0.1) }),
+            b.build(100, Payload::ResourceUsage { neurons: 10, synapses: 20, spikes_window: 5, metabolic_cost: Some(0.1), live_exc: None, live_inh: None }),
             b.build(200, Payload::RunEnded { reason: "complete".into() }),
         ];
         let rep = generate_report("e1", &evs, "Hypothesis text.", "- setup line", "E2 next.");

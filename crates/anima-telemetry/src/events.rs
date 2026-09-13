@@ -98,6 +98,11 @@ pub enum Payload {
         synapses: u64,
         spikes_window: u64,
         metabolic_cost: Option<f32>,
+        /// ANIMA v2 M5 budget usage per window (additive, optional).
+        #[serde(default)]
+        live_exc: Option<u64>,
+        #[serde(default)]
+        live_inh: Option<u64>,
     },
     Failure {
         kind: String,

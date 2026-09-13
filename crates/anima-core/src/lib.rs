@@ -5,6 +5,9 @@ pub mod network;
 pub mod plasticity;
 pub mod resources;
 pub mod structural;
+pub mod structural_v2;
+#[cfg(test)]
+mod structural_v2_tests;
 
 pub use network::{
     InputChannel, InputChannelId, InputFrame, Neuron, NeuronClass, NeuronId, Network,

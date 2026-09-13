@@ -128,7 +128,7 @@ pub fn analyze(events: &[Envelope]) -> Metrics {
                 metrics.structure.reactivations.push((env.t, n.0))
             }
             Payload::NeuronRetired { n, .. } => metrics.structure.retirements.push((env.t, n.0)),
-            Payload::ResourceUsage { neurons, synapses, spikes_window, metabolic_cost } => {
+            Payload::ResourceUsage { neurons, synapses, spikes_window, metabolic_cost, .. } => {
                 metrics.resources.samples.push(ResourceSamplePoint {
                     t: env.t,
                     neurons: *neurons,

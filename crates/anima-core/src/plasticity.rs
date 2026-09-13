@@ -247,8 +247,8 @@ pub fn stdp_tick_multiplicative(
                 continue;
             }
             let s = &net.synapses[sid.idx()];
-            if !s.plastic {
-                continue;
+            if !s.plastic || s.inhibitory {
+                continue; // V2 M6: inhibitory owned by anti-Hebbian rule
             }
             if spikes.contains(&s.pre) {
                 continue;
@@ -274,8 +274,8 @@ pub fn stdp_tick_multiplicative(
                 continue;
             }
             let s = &net.synapses[sid.idx()];
-            if !s.plastic {
-                continue;
+            if !s.plastic || s.inhibitory {
+                continue; // V2 M6: inhibitory owned by anti-Hebbian rule
             }
             if spikes.contains(&s.post) {
                 continue;
@@ -315,8 +315,8 @@ pub fn stdp_tick(
                 continue;
             }
             let s = &net.synapses[sid.idx()];
-            if !s.plastic {
-                continue;
+            if !s.plastic || s.inhibitory {
+                continue; // V2 M6: inhibitory owned by anti-Hebbian rule
             }
             // Skip synapses whose pre ALSO fired this tick (coincident — net
             // zero, assigned neither sign).
@@ -343,8 +343,8 @@ pub fn stdp_tick(
                 continue;
             }
             let s = &net.synapses[sid.idx()];
-            if !s.plastic {
-                continue;
+            if !s.plastic || s.inhibitory {
+                continue; // V2 M6: inhibitory owned by anti-Hebbian rule
             }
             if spikes.contains(&s.post) {
                 continue;
@@ -378,6 +378,9 @@ pub fn silent_synapse_pass(
         let s = &mut net.synapses[i];
         if s.silent_ticks == u64::MAX {
             continue;
+        }
+        if s.inhibitory {
+            continue; // V2 M6: anti-Hebbian weights are not silence-pruned
         }
         if s.w < silence_w {
             s.silent_ticks += 1;

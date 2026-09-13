@@ -122,6 +122,10 @@ pub struct Synapse {
     pub silent_ticks: u64,
     /// Plastic (true) or fixed (false; structural rewiring creates these).
     pub plastic: bool,
+    /// V2 (M6): true = anti-Hebbian inhibitory synapse. Deliveries are
+    /// negative (depress post); STDP never touches these (M6 owns them).
+    #[serde(default)]
+    pub inhibitory: bool,
 }
 
 /// Pure spike source — the last deterministic stage of the organism's "body"
@@ -183,6 +187,54 @@ pub struct NetworkConfig {
     /// U1-inhibition (E3b): inhibitory current each non-input spiker
     /// deposits onto every OTHER same-tick non-input spiker (0 = E3).
     pub inhibition_gain: f32,
+    /// ANIMA v2 (docs/anima-v2-protocol.md): when Some, M1 dense-weak
+    /// initialization + the V2Plasticity mechanisms (M2–M6) are active.
+    #[serde(default)]
+    pub v2: Option<V2Params>,
+}
+
+/// Frozen ANIMA v2 parameters (docs/anima-v2-protocol.md §2–§8).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2Params {
+    // Ablation/control switches (protocol §13/14): false = mechanism ON.
+    pub disable_m2: bool,
+    pub disable_m3_m4: bool,
+    pub disable_m5: bool,
+    pub disable_m6: bool,
+    // M1 — dense-weak initialization
+    pub p_in: f32,
+    pub w_in_lo: f32,
+    pub w_in_hi: f32,
+    pub p_rec: f32,
+    pub w_rec_lo: f32,
+    pub w_rec_hi: f32,
+    // M2 — normalization
+    pub t_e: f32,
+    // M3 — candidates
+    pub c_slots: usize,
+    pub w_c_init: f32,
+    pub delta_perm: f32,
+    pub decay_c: f32,
+    pub theta_permanent: f32,
+    pub w_c_permanent: f32,
+    pub theta_die: f32,
+    pub p_cand_in: f32,
+    pub p_cand_rec: f32,
+    // M4 — pruning
+    pub theta_prune: f32,
+    pub prune_windows: u64,
+    // M5 — budgets
+    pub b_e: usize,
+    pub b_i: usize,
+    // M6 — anti-Hebbian inhibition
+    pub p_inh: f32,
+    pub w_inh_lo: f32,
+    pub w_inh_hi: f32,
+    pub a_inh: f32,
+    pub decay_inh: f32,
+    pub w_inh_max: f32,
+    // Structural window
+    pub window_ticks: u64,
 }
 
 impl Default for NetworkConfig {
@@ -200,6 +252,8 @@ impl Default for NetworkConfig {
             adaptation_gain: 0.0,
             // U1-inhibition default OFF: gain 0 must reproduce E3 exactly.
             inhibition_gain: 0.0,
+            // V2 default OFF: None must reproduce E1–E4f exactly.
+            v2: None,
         }
     }
 }
@@ -304,24 +358,72 @@ impl Network {
             seed,
         };
 
-        // Sparse wiring: every non-input neuron receives from all source
-        // classes (input + internal + earlier outputs) with prob p.
+        // Wiring (frozen order, docs/anima-v2-protocol.md §2):
+        // when cfg.v2 is set (ANIMA v2): M1 dense-weak initialization —
+        // for each non-input neuron in id order: (1) input afferents in
+        // channel-id order (Bernoulli p_in, w ~ U(w_in_lo, w_in_hi));
+        // (2) recurrent afferents in source-id order (Bernoulli p_rec,
+        // w ~ U(w_rec_lo, w_rec_hi)); (3) M6 inhibitory afferents
+        // (Bernoulli p_inh, w ~ U(w_inh_lo, w_inh_hi)); then (4)
+        // candidate pools in neuron-id order.
+        // Legacy: sparse wiring — every non-input neuron receives from all
+        // source classes with prob p (E1–E4f behavior, bit-identical).
         let targets: Vec<NeuronId> = net
             .neurons
             .iter()
             .filter(|n| n.class != NeuronClass::Input)
             .map(|n| n.id)
             .collect();
-        for &post in &targets {
-            let sources: Vec<NeuronId> = net.neurons.iter().map(|n| n.id).collect();
-            for src in sources {
-                if src == post {
-                    continue;
+        if let Some(v2) = net.cfg.v2.clone() {
+            let all_ids: Vec<NeuronId> = net.neurons.iter().map(|n| n.id).collect();
+            for &post in &targets {
+                // (1) input afferents, channel-id order.
+                for ch in 0..n_input_channels {
+                    let src = net.channels[ch].target;
+                    if net.rng.gen::<f32>() < v2.p_in {
+                        let w = v2.w_in_lo + net.rng.gen::<f32>() * (v2.w_in_hi - v2.w_in_lo);
+                        net.add_synapse(src, post, w, true, Tick(0));
+                    }
                 }
-                if net.rng.gen::<f32>() < net.cfg.connectivity {
-                    let w =
-                        (net.cfg.w_init * (0.5 + net.rng.gen::<f32>())).clamp(0.0, net.cfg.w_max);
-                    net.add_synapse(src, post, w, true, Tick(0));
+                // (2) recurrent afferents, source-id order (skip self).
+                for src in all_ids.iter().copied() {
+                    if src == post || net.neurons[src.idx()].class == NeuronClass::Input {
+                        continue;
+                    }
+                    if net.rng.gen::<f32>() < v2.p_rec {
+                        let w = v2.w_rec_lo + net.rng.gen::<f32>() * (v2.w_rec_hi - v2.w_rec_lo);
+                        net.add_synapse(src, post, w, true, Tick(0));
+                    }
+                }
+                // (3) M6 inhibitory afferents, source-id order (D8: never
+                // from input neurons, never to input neurons). M5 budget
+                // B_i is the binding constraint: at most B_i inhibitory
+                // afferents per neuron (frozen values unchanged; see
+                // protocol audit note A-1).
+                let mut inh_count = 0usize;
+                for src in all_ids.iter().copied() {
+                    if src == post || net.neurons[src.idx()].class == NeuronClass::Input {
+                        continue;
+                    }
+                    if net.rng.gen::<f32>() < v2.p_inh && inh_count < v2.b_i {
+                        let w = v2.w_inh_lo + net.rng.gen::<f32>() * (v2.w_inh_hi - v2.w_inh_lo);
+                        net.add_synapse_full(src, post, w, false, true, Tick(0));
+                        inh_count += 1;
+                    }
+                }
+            }
+        } else {
+            for &post in &targets {
+                let sources: Vec<NeuronId> = net.neurons.iter().map(|n| n.id).collect();
+                for src in sources {
+                    if src == post {
+                        continue;
+                    }
+                    if net.rng.gen::<f32>() < net.cfg.connectivity {
+                        let w = (net.cfg.w_init * (0.5 + net.rng.gen::<f32>()))
+                            .clamp(0.0, net.cfg.w_max);
+                        net.add_synapse(src, post, w, true, Tick(0));
+                    }
                 }
             }
         }
@@ -336,6 +438,18 @@ impl Network {
         plastic: bool,
         tick: Tick,
     ) -> SynapseId {
+        self.add_synapse_full(pre, post, w, plastic, false, tick)
+    }
+
+    pub fn add_synapse_full(
+        &mut self,
+        pre: NeuronId,
+        post: NeuronId,
+        w: f32,
+        plastic: bool,
+        inhibitory: bool,
+        tick: Tick,
+    ) -> SynapseId {
         let id = SynapseId(self.synapses.len() as u32);
         self.synapses.push(Synapse {
             id,
@@ -346,6 +460,7 @@ impl Network {
             created: tick,
             silent_ticks: 0,
             plastic,
+            inhibitory,
         });
         self.outgoing[pre.idx()].push(id);
         self.incoming[post.idx()].push(id);
@@ -464,7 +579,8 @@ impl Network {
                     continue;
                 }
                 let post = s.post;
-                let current = s.amplitude * s.w;
+                // V2 M6: inhibitory synapses deliver negative current.
+                let current = if s.inhibitory { -(s.amplitude * s.w) } else { s.amplitude * s.w };
                 self.neurons[post.idx()].i_syn += current;
             }
         }

@@ -9,6 +9,7 @@ use anima_core::network::{NeuronClass, Network, NetworkConfig};
 use anima_core::plasticity::{silent_synapse_pass, stdp_tick, StdpParams, Traces};
 use anima_core::resources::{ResourceConfig, ResourceMonitor};
 use anima_core::structural::{make_trigger, Signals, StructuralMonitor};
+use anima_core::structural_v2::V2Plasticity;
 use anima_telemetry::events::{EventBuilder, Payload, ReasonPayload};
 use anima_telemetry::recorder::{NeuronState, Recorder, SynapseState};
 use anima_viz::{ServerHandle, UiNeuron, UiSynapse};
@@ -101,6 +102,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             adaptation_tau_ms: cfg.organism.adaptation_tau_ms,
             adaptation_gain: cfg.organism.adaptation_gain,
             inhibition_gain: cfg.organism.inhibition_gain,
+            v2: v2_params(&cfg),
             ..NetworkConfig::default()
         },
         cfg.organism.n_input_channels,
@@ -117,6 +119,23 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
 
     let env = Environment::new(cfg.clone(), seed);
     let mut traces = Traces::new(&net, cfg.plasticity.tau_plus_ms);
+    // ANIMA v2 structural plasticity (M2–M6). None when the [v2] section
+    // is absent or disabled — behavior identical to E1–E4f.
+    let mut v2_enabled = false;
+    let mut v2 = cfg
+        .v2
+        .as_ref()
+        .filter(|v| v.enabled)
+        .map(|_| {
+            v2_enabled = true;
+            V2Plasticity::new(&mut net, v2_params(&cfg).expect("v2 enabled"))
+        });
+    let v2_window_ticks = cfg
+        .v2
+        .as_ref()
+        .filter(|v| v.enabled)
+        .map(|v| v.window_ticks)
+        .unwrap_or(100);
     let params = StdpParams {
         tau_plus: cfg.plasticity.tau_plus_ms,
         tau_minus: cfg.plasticity.tau_minus_ms,
@@ -284,6 +303,27 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
 
         // 2. network dynamics
         let step = net.step(&frame);
+
+        // ANIMA v2: per-tick firing accumulation; structural window at the
+        // frozen cadence (M4 → M3 → M2 → M6 → M5), events → telemetry.
+        if let Some(v2) = v2.as_mut() {
+            v2.tick(&step.spikes);
+            if net.tick.0 % v2_window_ticks == 0 && net.tick.0 > 0 {
+                let tick = net.tick;
+                for ev in v2.window(&mut net, tick) {
+                    let payload = match ev {
+                        anima_core::structural_v2::V2Event::SynapseCreated { syn, pre, post, w, reason } =>
+                            Payload::SynapseCreated { syn, pre, post, w: anima_telemetry::events::f32_json(w), reason: ReasonPayload::simple(reason) },
+                        anima_core::structural_v2::V2Event::SynapsePruned { syn, reason } =>
+                            Payload::SynapsePruned { syn, reason: ReasonPayload::simple(reason) },
+                    };
+                    let mut re = b.build(net.tick.0, payload);
+                    if let Err(e) = write_env(&mut recorder, &server, &mut re, &mut events) {
+                        recorder_error = Some(e);
+                    }
+                }
+            }
+        }
 
         // 3. traces + plasticity (STDP per tick, gate = 1.0 always-on, U4a)
         traces.step(&net, &step.spikes);
@@ -481,6 +521,8 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                     synapses: s.synapses as u64,
                     spikes_window: s.spikes_this_window,
                     metabolic_cost: anima_telemetry::events::f32_json(s.metabolic_cost),
+                    live_exc: if v2_enabled { Some(v2.as_ref().unwrap().report.live_exc) } else { None },
+                    live_inh: if v2_enabled { Some(v2.as_ref().unwrap().report.live_inh) } else { None },
                 },
             );
             if let Err(e) = write_env(&mut recorder, &server, &mut ev, &mut events) {
@@ -587,6 +629,47 @@ fn write_env(
         sv.broadcast_event(env);
     }
     Ok(())
+}
+
+/// Map the frozen [v2] config section onto the network's V2Params (M1–M6).
+fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
+    let v = cfg.v2.as_ref()?;
+    if !v.enabled {
+        return None;
+    }
+    Some(anima_core::network::V2Params {
+        disable_m2: v.disable_m2,
+        disable_m3_m4: v.disable_m3_m4,
+        disable_m5: v.disable_m5,
+        disable_m6: v.disable_m6,
+        p_in: v.p_in,
+        w_in_lo: v.w_in_lo,
+        w_in_hi: v.w_in_hi,
+        p_rec: v.p_rec,
+        w_rec_lo: v.w_rec_lo,
+        w_rec_hi: v.w_rec_hi,
+        t_e: v.t_e,
+        c_slots: v.c_slots,
+        w_c_init: v.w_c_init,
+        delta_perm: v.delta_perm,
+        decay_c: v.decay_c,
+        theta_permanent: v.theta_permanent,
+        w_c_permanent: v.w_c_permanent,
+        theta_die: v.theta_die,
+        p_cand_in: v.p_cand_in,
+        p_cand_rec: v.p_cand_rec,
+        theta_prune: v.theta_prune,
+        prune_windows: v.prune_windows,
+        b_e: v.b_e,
+        b_i: v.b_i,
+        p_inh: v.p_inh,
+        w_inh_lo: v.w_inh_lo,
+        w_inh_hi: v.w_inh_hi,
+        a_inh: v.a_inh,
+        decay_inh: v.decay_inh,
+        w_inh_max: v.w_inh_max,
+        window_ticks: v.window_ticks,
+    })
 }
 
 fn class_str(c: NeuronClass) -> &'static str {

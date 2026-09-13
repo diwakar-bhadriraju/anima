@@ -15,6 +15,61 @@ pub struct ExpConfig {
     /// Ordered curriculum stages.
     #[serde(default)]
     pub stage: Vec<StageSpec>,
+    /// ANIMA v2 (docs/anima-v2-protocol.md): structural plasticity
+    /// mechanisms M1–M6. Absent/false = E1–E4f behavior exactly.
+    #[serde(default)]
+    pub v2: Option<V2Section>,
+}
+
+/// Frozen ANIMA v2 protocol parameters (§2–§8 of the protocol).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2Section {
+    /// M1: dense-weak initialization + all v2 mechanisms.
+    pub enabled: bool,
+    /// Protocol §13/14 control + ablation arms. All default false
+    /// (= mechanism ON); each arm config sets exactly one of these.
+    #[serde(default)]
+    pub disable_m2: bool,
+    #[serde(default)]
+    pub disable_m3_m4: bool,
+    #[serde(default)]
+    pub disable_m5: bool,
+    #[serde(default)]
+    pub disable_m6: bool,
+    // M1
+    pub p_in: f32,
+    pub w_in_lo: f32,
+    pub w_in_hi: f32,
+    pub p_rec: f32,
+    pub w_rec_lo: f32,
+    pub w_rec_hi: f32,
+    // M2
+    pub t_e: f32,
+    // M3
+    pub c_slots: usize,
+    pub w_c_init: f32,
+    pub delta_perm: f32,
+    pub decay_c: f32,
+    pub theta_permanent: f32,
+    pub w_c_permanent: f32,
+    pub theta_die: f32,
+    pub p_cand_in: f32,
+    pub p_cand_rec: f32,
+    // M4
+    pub theta_prune: f32,
+    pub prune_windows: u64,
+    // M5
+    pub b_e: usize,
+    pub b_i: usize,
+    // M6
+    pub p_inh: f32,
+    pub w_inh_lo: f32,
+    pub w_inh_hi: f32,
+    pub a_inh: f32,
+    pub decay_inh: f32,
+    pub w_inh_max: f32,
+    // window
+    pub window_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
