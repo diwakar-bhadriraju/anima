@@ -38,6 +38,12 @@ pub struct OrganismSection {
     pub connectivity: f32,
     pub w_init: f32,
     pub amplitude: f32,
+    /// U1 (E3): spike-frequency adaptation current decay tau (ms).
+    #[serde(default = "default_adaptation_tau")]
+    pub adaptation_tau_ms: f32,
+    /// U1 (E3): adaptation current per spike; 0 = bare LIF (E1 semantics).
+    #[serde(default)]
+    pub adaptation_gain: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,6 +117,12 @@ pub struct StageSpec {
     /// Silence-probe stage: no pattern, just wait (e.g. S0).
     #[serde(default)]
     pub silence_ms: Option<u64>,
+}
+
+/// U1 default adaptation tau (ms): slow enough to integrate bursts,
+/// fast enough to recover between 500 ms presentations.
+fn default_adaptation_tau() -> f32 {
+    200.0
 }
 
 impl ExpConfig {

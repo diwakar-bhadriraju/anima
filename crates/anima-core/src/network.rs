@@ -98,6 +98,9 @@ pub struct Neuron {
     /// EMA firing rate in Hz (tau = 1 s) — cheap per-tick estimate for
     /// telemetry and homeostatic machinery. Updated every tick.
     pub rate_hz: f32,
+    /// U1: spike-frequency adaptation current (hyperpolarizing). Decays
+    /// with adaptation_tau_ms; injected per spike by adaptation_gain.
+    pub i_adapt: f32,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -173,6 +176,10 @@ pub struct NetworkConfig {
     pub amplitude: f32,
     /// EMA rate constant (Hz per spike-tick).
     pub rate_tau_ms: f32,
+    /// U1 (E3): spike-frequency adaptation current decay tau (ms).
+    pub adaptation_tau_ms: f32,
+    /// U1 (E3): adaptation current injected per spike (gain 0 = E1).
+    pub adaptation_gain: f32,
 }
 
 impl Default for NetworkConfig {
@@ -185,6 +192,9 @@ impl Default for NetworkConfig {
             w_max: 1.0,
             amplitude: 0.5,
             rate_tau_ms: 1000.0,
+            // U1 defaults: adaptation OFF — gain 0 must reproduce E1 exactly.
+            adaptation_tau_ms: 200.0,
+            adaptation_gain: 0.0,
         }
     }
 }
@@ -232,6 +242,7 @@ impl Network {
                 i_syn: 0.0,
                 i_ext: 0.0,
                 rate_hz: 0.0,
+                i_adapt: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -253,6 +264,7 @@ impl Network {
                 i_syn: 0.0,
                 i_ext: 0.0,
                 rate_hz: 0.0,
+                i_adapt: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -269,6 +281,7 @@ impl Network {
                 i_syn: 0.0,
                 i_ext: 0.0,
                 rate_hz: 0.0,
+                i_adapt: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -409,6 +422,7 @@ impl Network {
 
         // Integration pass over non-input, non-retired neurons.
         let n = self.neurons.len();
+        let decay_adapt = exp_approx(-dt / self.cfg.adaptation_tau_ms);
         for i in 0..n {
             if self.neurons[i].class == NeuronClass::Input || self.neurons[i].retired {
                 continue;
@@ -416,17 +430,19 @@ impl Network {
             let neur = &mut self.neurons[i];
             // decay i_syn first (exponential kernel, tau_syn)
             neur.i_syn *= decay_syn;
-            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext) * dt / p.tau_m;
+            // U1: adaptation current decays on the same exponential form.
+            neur.i_adapt *= decay_adapt;
+            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext - neur.i_adapt) * dt / p.tau_m;
             neur.v += dv;
             let spiked = self.tick.0 >= neur.refractory_until.0 && neur.v >= p.v_th;
             if spiked {
                 neur.v = p.v_reset;
                 neur.refractory_until = Tick(self.tick.0 + p.refractory);
+                // U1: hyperpolarizing kick per spike.
+                neur.i_adapt += self.cfg.adaptation_gain;
                 spikes.push(neur.id());
             }
         }
-
-        // Rate EMA (Hz): instantaneous 1000 Hz on spike ticks, 0 otherwise,
         // low-passed with tau = rate_tau_ms.
         let alpha = dt / self.cfg.rate_tau_ms;
         for neur in &mut self.neurons {
@@ -586,5 +602,93 @@ mod tests {
         assert!(!net.synapse_alive(sid));
         assert!(!net.outgoing[net.synapses[sid.idx()].pre.idx()].contains(&sid));
         assert!(!net.incoming[net.synapses[sid.idx()].post.idx()].contains(&sid));
+    }
+
+    /// U1: adaptation current decays exponentially with adaptation_tau_ms.
+    #[test]
+    fn adaptation_current_decays_with_tau() {
+        let mut net = Network::new(
+            NetworkConfig { adaptation_tau_ms: 200.0, ..NetworkConfig::default() },
+            2,
+            1,
+            0,
+            1,
+        );
+        let id = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+        net.neurons[id.idx()].i_adapt = 1.0;
+        // No drive: pure decay.
+        for _ in 0..200 {
+            let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+        }
+        let after = net.neuron(id).i_adapt;
+        let expected = 1.0f32 * exp_approx(-200.0 / 200.0);
+        assert!(
+            (after - expected).abs() < 0.02,
+            "i_adapt {after} must track exp(-t/tau) = {expected}"
+        );
+    }
+
+    /// U1: each spike injects adaptation_gain of hyperpolarizing current,
+    /// which raises the effective threshold crossable drive.
+    #[test]
+    fn adaptation_injected_per_spike_raises_spike_threshold() {
+        // Current strong enough for periodic spiking without adaptation.
+        let mk = |gain| {
+            let mut net = Network::new(
+                NetworkConfig {
+                    adaptation_tau_ms: 200.0,
+                    adaptation_gain: gain,
+                    ..NetworkConfig::default()
+                },
+                2,
+                1,
+                0,
+                1,
+            );
+            let id = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+            net.neurons[id.idx()].i_ext = 2.0;
+            let mut spikes = 0;
+            for t in 0..500u64 {
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+                if ev.spikes.contains(&id) {
+                    spikes += 1;
+                }
+            }
+            let adapt = net.neuron(id).i_adapt;
+            (spikes, adapt)
+        };
+        let (spikes0, adapt0) = mk(0.0);
+        let (spikes_pos, adapt_pos) = mk(0.5);
+        assert!(spikes0 > 5, "control must spike often (got {spikes0})");
+        assert!(spikes_pos < spikes0, "adaptation must reduce spike count");
+        assert!(adapt_pos > adapt0, "spiking must accumulate i_adapt");
+    }
+
+    /// U1 guard: gain 0 leaves the E1 trajectory bit-identical.
+    #[test]
+    fn adaptation_gain_zero_reproduces_bare_lif() {
+        let drive = |mut net: Network| {
+            let id = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+            net.neurons[id.idx()].i_ext = 1.5;
+            let mut log = String::new();
+            for t in 0..300u64 {
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+                log.push_str(&format!("{:?};", ev.spikes));
+            }
+            log
+        };
+        let plain = drive(Network::new(NetworkConfig::default(), 4, 6, 2, 42));
+        let with_adapt = drive(Network::new(
+            NetworkConfig {
+                adaptation_tau_ms: 200.0,
+                adaptation_gain: 0.0,
+                ..NetworkConfig::default()
+            },
+            4,
+            6,
+            2,
+            42,
+        ));
+        assert_eq!(plain, with_adapt, "gain 0 must not change dynamics");
     }
 }

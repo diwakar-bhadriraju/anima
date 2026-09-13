@@ -247,6 +247,8 @@ mod tests {
                 connectivity: 0.2,
                 w_init: 0.2,
                 amplitude: 3.0,
+                adaptation_tau_ms: 200.0,
+                adaptation_gain: 0.0,
             },
             plasticity: PlasticitySection {
                 rule: "stdp-pairwise".into(),

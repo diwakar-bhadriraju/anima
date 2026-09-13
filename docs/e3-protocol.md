@@ -1,7 +1,9 @@
 # E3 Protocol — Spike-Frequency Adaptation / Homeostasis (U1)
 
-**Status**: DRAFT — pre-registration to be finalized and frozen before
-execution. Storage v2 (T-CHUNK) is a prerequisite and is now in place.
+**Status**: EXECUTED 2026-09-13. Verdict: **adaptation stabilization
+supported; assembly separation inconclusive** (see Execution Record).
+Pre-registered sections below were frozen before execution; amendments
+A2 (calibration) logged under Scope guards.
 
 ## Motivation
 
@@ -74,3 +76,60 @@ from existing snapshots (no new wire events):
 2. Unit tests: adaptation decays with tau; injected per spike; gain 0 is
    exactly E1 behavior (regression guard).
 3. Probe grid for arm B gain (documented as amendments).
+
+---
+
+## Execution Record (2026-09-13)
+
+### Amendments
+
+- **A2 (calibration, logged pre-execution)**: arm B gain fixed at
+  **0.05** (`adaptation_tau_ms = 200` from protocol default). Calibration
+  sweep {0.05, 0.10, 0.20, 0.30} on a 10-rep probe: burst-peak internal
+  EMA ~148 Hz at 0.05, inside the pre-registered [100, 200] Hz band;
+  0.05 chosen as minimal sufficient intervention. (Probe at 0.15 first:
+  peak 146 Hz; sweep re-confirmed.)
+- **A3 (arm A reuse)**: arm A (gain = 0) reuses the E2a record
+  (`runs/e2a-20260913T082247Z`), justified by the unit-tested identity:
+  gain 0 leaves trajectories bit-identical
+  (`adaptation_gain_zero_reproduces_bare_lif`).
+
+### Artifacts
+
+- Arm B run: `runs/e3b-20260913T135736Z` (5,101,983 events, 21 chunks,
+  24 MB chunk telemetry; sim wall ~8 s; report regen 44 s).
+- Analysis helpers: `crates/anima-exp/examples/{read_rates,cross_cosine}.rs`.
+
+### Verdicts (auto-generated — review)
+
+1. **Adaptation stabilization: SUPPORTED.** Zero runaway failures in arm
+   B (E1-threshold detector never fired); S1 internal rates bounded
+   (snapshot EMA max 194.6 Hz, well under the 250 Hz ceiling; arm B
+   mean-rate variance 296.5 vs arm A 317.3 over S1 snapshots).
+2. **Assembly separation: INCONCLUSIVE.** Late-S1 cross-pattern cosine
+   arm B: A-B 0.753, A-C 0.603, B-C 0.670 (mean 0.675) vs arm A (E1):
+   0.746, 0.604, 0.667 (mean 0.673) — indistinguishable. Within-pattern:
+   0.846 vs 0.872. Selectivity median 0.455 (B) vs 0.428 (A) — below the
+   0.5 bar in both arms. Neither pre-registered branch crossed.
+3. **Retention preserved: SUPPORTED (trivially).** S3/late-S1 =
+   1.127/1.101/1.385 (A/B/C), ≥ 0.80 in all; baseline firing keeps
+   responses strong in both arms — retention is not diagnostic here.
+
+### Interpretation
+
+Adaptation does what U1 predicts mechanistically — bounds rates, no
+instability — but does NOT by itself separate assemblies. The binding
+problem E1 identified (cross-cosine ~0.67 driven by shared output-layer
+activity, not overlapping assemblies) persists identically with
+adaptation ON. This upgrades the working hypothesis: separation is
+limited by circuit-level integration (all patterns drive the same
+recurrent pool; no inhibition, U1-inhibition branch, or gating, U4),
+not by rate instability. E5 (learning gates) or the lateral-inhibition
+variant of U1 is the natural next intervention.
+
+### Follow-ups
+
+- Consider the lateral-inhibition candidate from U1 in a future E3b
+  variant if assembly separation is prioritized before gating.
+- Retention metric should be conditioned on matched response magnitude
+  to stay diagnostic under adaptation.

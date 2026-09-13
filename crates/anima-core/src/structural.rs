@@ -277,6 +277,7 @@ impl StructuralMonitor {
             i_syn: 0.0,
             i_ext: 0.0,
             rate_hz: 0.0,
+            i_adapt: 0.0,
             dormant_since: None,
             retired: false,
         });
