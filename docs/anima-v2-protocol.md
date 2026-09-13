@@ -350,3 +350,66 @@ determinism.
   will decide whether the candidate regime engages; per the frozen
   gate, a probe with < 3 established structural changes blocks the
   arm. No tuning performed or permitted.
+
+---
+
+## Gate execution record (frozen experiment, 2026-09-13)
+
+Gate probe shape: S1 reps=40 (240 s S1), S2/S3 reps=2, per §12.
+Gate bars per §12: (1) zero failures; (2) ≥ 3 established structural
+changes; (3) S1 internal mean rates within [20, 250] Hz.
+**Gate fail ⇒ arm blocked; amendment (user-approved) required.**
+
+| Arm | config sha256 | failures | established changes | S1 mean-rate (snap) | Gate |
+|---|---|---|---|---|---|
+| v2-full | 48624aa8… | 0 | **0** | 0–47 Hz | **FAIL (cadence)** |
+| v2-minus-m6 | 9943d04e… | 0 | **0** | 0–297.5 Hz | **FAIL (cadence + rates > 250)** |
+| v2-nom2 | 2522596e… | 0 | **0** | 0–49 Hz | **FAIL (cadence)** |
+| v2-nom3m4 | 953826d0… | 0 | **0** | 0–104.6 Hz | **FAIL (cadence)** |
+| v2-nom5 | 7f18b568… | 0 | **0** | 0–47 Hz | **FAIL (cadence)** |
+| v2-m1only | b9cb6599… | 1 runaway @ t=19.2 s (mean 234 Hz) | **0** | — | **FAIL (stability)** |
+
+All six arms FAIL the gate. **No full curriculum runs were executed;
+P1–P4 are not evaluable; cross-seed P4 runs are not authorized** (the
+protocol's P4 clause runs them "after the main arm", and the main arm
+is blocked). This is the registered endpoint, not a retunable result.
+
+### Structural-change statistics (gate probes)
+
+- All arms: candidate-permanence events = 0; established changes = 0.
+- M1 initial wiring: 1,622 synapses (v2-full; 1,108 in v2-minus-m6
+  because p_inh=0 removes ~514 inhibitory afferents — consistent).
+- Competitive prunes (M4): 848–1,018 per 240 s probe → M4 is live and
+  recycles; M3 permanence never engages.
+
+### Mechanism diagnosis (analysis only; no tuning permitted)
+
+M3 permanence is structurally unreachable under the frozen dynamics:
+candidate w starts 0.01, gains +0.005 per co-active window, decays
+×0.9 per non-co-active window. With 20 Hz Poisson channels and 1500
+ms off-periods (15 consecutive ×0.9 windows per presentation cycle),
+the candidate fixed point is ≈ 0.01–0.02 — far below θ_permanent =
+0.05. Zero permanence across ~25,500 windows of gate probing
+confirms a dynamics-level mismatch, not bad luck. The registered
+cadence bar (≥ 3 established changes) cannot be met by the frozen
+M3 in this curriculum.
+
+### Additional observations (recorded, not verdicts)
+
+- v2-minus-m6 shows S1 peak mean-rate 297.5 Hz (> 250 bar): within
+  this dense-weak regime, M6 inhibition contributes to rate bounding
+  (the opposite of E3b's sparse regime, where global inhibition
+  worsened separation). Not a verdict — the arm failed cadence first.
+- v2-m1only (all mechanisms off) is the only arm with a stability
+  failure (runaway at t ≈ 19 s): M2 normalization is load-bearing
+  for bounded rates in the dense-weak wiring. Again observation
+  only.
+
+### Receptive-field statistics observed at probe end (informational;
+### P1 is NOT evaluable without a full run — no verdict)
+
+v2-full gate probe RF snapshot (t = 259,000 ms, probe-S3):
+quasi-private 15/40 (fraction 0.375), mean H = 0.142
+per group [A,B,C,other] = [7, 3, 5, 0]. NB: with zero structural
+changes the RFs are pure M1-initial weights post-STDP; not evidence
+for P1.

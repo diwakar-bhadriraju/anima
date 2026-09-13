@@ -311,14 +311,22 @@ impl V2Plasticity {
             total_exc_budget: (n as u64) * (self.params.b_e as u64),
             total_inh_budget: (n as u64) * (self.params.b_i as u64),
         };
-        debug_assert!(
-            live_e.iter().all(|&x| x <= self.params.b_e),
-            "v2 budget invariant: excitatory count over B_e"
-        );
-        debug_assert!(
-            live_i.iter().all(|&x| x <= self.params.b_i),
-            "v2 budget invariant: inhibitory count over B_i"
-        );
+        // A-4 (implementation audit): the protocol's budget-invariant check
+        // is enforced as a hard assert every window (blocking runaway),
+        // except in the v2-m5 ablation arm where the budget is off by
+        // registration.
+        if !self.params.disable_m5 {
+            assert!(
+                live_e.iter().all(|&x| x <= self.params.b_e),
+                "v2 budget invariant violated: excitatory count over B_e (post={})",
+                live_e.iter().position(|&x| x > self.params.b_e).unwrap_or(0)
+            );
+            assert!(
+                live_i.iter().all(|&x| x <= self.params.b_i),
+                "v2 budget invariant violated: inhibitory count over B_i (post={})",
+                live_i.iter().position(|&x| x > self.params.b_i).unwrap_or(0)
+            );
+        }
     }
 }
 

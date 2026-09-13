@@ -108,6 +108,7 @@ off_ms = 1500
 [v2]
 enabled = true
 disable_m6 = true
+p_inh = 0.0
 
 # M1 — dense-weak initialization
 p_in = 0.5
@@ -140,7 +141,6 @@ b_e = 40
 b_i = 10
 
 # M6 — anti-Hebbian inhibition
-p_inh = 0.3
 w_inh_lo = 0.01
 w_inh_hi = 0.03
 a_inh = 0.005
