@@ -132,3 +132,15 @@ replicates E1. The next experiment targeting the binding problem must
 either introduce a stability mechanism first (E3 adaptation, U1 — the
 pre-registered roadmap already places it next) or compare bounds only
 after a stability mechanism exists.
+
+## Resource note (logged)
+
+Arm B telemetry reached 8.3 GB (vs arm A's ~0.6 GB): without saturation,
+every synapse emits continuous weight-delta events for the full run — the
+coalescing threshold (|Δw| > 0.01) fires constantly. Two consequences
+logged for future experiments:
+1. Report/metric regeneration must stream, not load, telemetry (the
+   snapshot stream alone suffices for all scientific metrics — used here).
+2. E3+ should reconsider the wire/telemetry emission budget for
+   non-saturating rules (larger coalesce threshold or time-bucketed
+   emission), or disk usage becomes the experiment's bottleneck.
