@@ -68,8 +68,9 @@ run; tuning targeted observability of the mechanism, not the verdict.
 
 ## Execution record
 
-- **Run**: `runs/e1-20260912T194732Z/` (headless-equivalent live run at max
-  speed; telemetry byte-identical to headless per determinism check).
+- **Run**: `runs/e1-20260912T215824Z/` (the canonical record; three
+  byte-identical runs of this seed existed — determinism confirmed by
+  sha256 — duplicates and partial probe runs deleted 2026-09-13).
 - **End**: `curriculum-complete`, no Failure events. 5,446,061 events.
 - **Results vs thresholds**: assembly score 0.123 → 0.165 (late ≥ 2× early
   NOT met; selectivity median 0.43 > 0.5 met ⇒ per-rule **inconclusive**);
@@ -79,6 +80,44 @@ run; tuning targeted observability of the mechanism, not the verdict.
 - Verdicts as printed in `report.md` are `auto-generated — review`.
   Phase 0 verifies the pipeline end-to-end; hypothesis interpretation is
   deferred to review.
+
+## Post-execution evidence pass (2026-09-13, snapshot trajectory)
+
+Recomputed from the 873-frame snapshot stream (100 ms-state every 1 s) and
+telemetry, beyond the two summary numbers in the report:
+
+- **Weights moved strongly, then stabilized**: mean w 0.215 → 0.79 by
+  late-S1 (init std 0.05 → 0.36); ~50% of synapses above 0.9 within 60 s
+  of S1 onset. Weight structure is *not* flat — the "all-dead" failure
+  mode is excluded.
+- **Saturation is the real story**: at end-of-run 73% of synapses sit at
+  w > 0.9 (ceiling), 18% below 0.05. Once saturated, Δw = 0, so the
+  additive rule stops adapting — pattern responses freeze, which explains
+  the flat 0.123 → 0.165 assembly score (it plateaued, it wasn't absent).
+  Median top-1 weight share per neuron = 0.57: moderately dominant, not
+  winner-take-all.
+- **Assemblies are stable, just not separated**: within-pattern response
+  profile correlation across S1 halves is 0.97–0.99 for A/B/C (the same
+  neurons respond consistently). But cross-pattern profile cosine stays
+  high (A·B 0.79→0.73, A·C 0.75→0.70, B·C 0.81→0.81 early→late S1): the
+  three assemblies overlap heavily instead of specializing. This is the
+  mechanism behind the failed 2× threshold — a *binding/specificity*
+  problem, not a *plasticity* problem.
+- **Retention confirmed at snapshot level**: mean internal rate during a
+  pattern's burst, S3 vs late-S1: A 0.92, B 0.92, C 0.77. The analyzer's
+  presentation-level ratios (1.04/1.04/1.26) run higher because they use
+  a different denominator; both agree memory persists.
+- **Novelty D** produced a distinct profile (D distance 497) but under the
+  2× bar partly because the learned patterns themselves are so similar to
+  each other — the pairwise-max baseline (967) is inflated by the same
+  overlap. A run with better-separated assemblies should improve both
+  verdicts at once.
+
+**Interpretation for E2 design**: the binding problem dominates. Pairwise
+additive STDP with a hard w ceiling saturates quickly, and saturated
+synapses cannot participate in competition, so co-active patterns pool
+onto the same internal neurons. E2's multiplicative bound (Δw ∝ w(1−w))
+is the pre-registered, mechanistically-targeted next step.
 
 ## Roadmap (each built only when reached)
 
