@@ -100,6 +100,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             amplitude: cfg.organism.amplitude,
             adaptation_tau_ms: cfg.organism.adaptation_tau_ms,
             adaptation_gain: cfg.organism.adaptation_gain,
+            inhibition_gain: cfg.organism.inhibition_gain,
             ..NetworkConfig::default()
         },
         cfg.organism.n_input_channels,
@@ -171,6 +172,8 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         "connectivity": cfg.organism.connectivity,
         "w_init": cfg.organism.w_init,
         "amplitude": cfg.organism.amplitude,
+        "adaptation_gain": cfg.organism.adaptation_gain,
+        "inhibition_gain": cfg.organism.inhibition_gain,
         "rule": cfg.plasticity.rule,
         "a_plus": cfg.plasticity.a_plus,
         "a_minus": cfg.plasticity.a_minus,

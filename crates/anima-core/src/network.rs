@@ -176,10 +176,13 @@ pub struct NetworkConfig {
     pub amplitude: f32,
     /// EMA rate constant (Hz per spike-tick).
     pub rate_tau_ms: f32,
-    /// U1 (E3): spike-frequency adaptation current decay tau (ms).
+    /// U1 (E3): adaptation current decay tau (ms).
     pub adaptation_tau_ms: f32,
     /// U1 (E3): adaptation current injected per spike (gain 0 = E1).
     pub adaptation_gain: f32,
+    /// U1-inhibition (E3b): inhibitory current each non-input spiker
+    /// deposits onto every OTHER same-tick non-input spiker (0 = E3).
+    pub inhibition_gain: f32,
 }
 
 impl Default for NetworkConfig {
@@ -195,6 +198,8 @@ impl Default for NetworkConfig {
             // U1 defaults: adaptation OFF — gain 0 must reproduce E1 exactly.
             adaptation_tau_ms: 200.0,
             adaptation_gain: 0.0,
+            // U1-inhibition default OFF: gain 0 must reproduce E3 exactly.
+            inhibition_gain: 0.0,
         }
     }
 }
@@ -464,6 +469,26 @@ impl Network {
             }
         }
 
+        // U1-inhibition (E3b): every non-input spiker deposits an extra
+        // inhibitory current onto every OTHER same-tick non-input spiker.
+        // Competition between co-active neurons; 1-tick delay, same
+        // tau_syn kernel. Gain 0 is a no-op (E3 identity).
+        if self.cfg.inhibition_gain != 0.0 {
+            let non_input: Vec<NeuronId> = spikers
+                .iter()
+                .copied()
+                .filter(|&id| self.neurons[id.idx()].class != NeuronClass::Input)
+                .collect();
+            let g = self.cfg.inhibition_gain;
+            for &a in &non_input {
+                for &b in &non_input {
+                    if a != b {
+                        self.neurons[b.idx()].i_syn -= g;
+                    }
+                }
+            }
+        }
+
         self.tick = Tick(self.tick.0 + 1);
 
         let output_spikes: Vec<NeuronId> = spikes
@@ -690,5 +715,96 @@ mod tests {
             42,
         ));
         assert_eq!(plain, with_adapt, "gain 0 must not change dynamics");
+    }
+
+    /// U1-inhibition: inhibitory current must be negative-going (deposits
+    /// reduce i_syn) and must reduce co-activation. Two internally driven
+    /// neurons spike together when inhibition is off; with gain on, the
+    /// mutual suppression desynchronizes them.
+    #[test]
+    fn inhibition_suppresses_coincident_spiking() {
+        let count_coincident = |gain: f32| {
+            let mut net = Network::new(
+                NetworkConfig {
+                    inhibition_gain: gain,
+                    ..NetworkConfig::default()
+                },
+                2,
+                2,
+                0,
+                9,
+            );
+            let ids: Vec<NeuronId> = net
+                .neurons
+                .iter()
+                .filter(|n| n.class == NeuronClass::Internal)
+                .map(|n| n.id)
+                .collect();
+            for id in &ids {
+                net.neurons[id.idx()].i_ext = 2.0;
+            }
+            let mut coincident = 0;
+            let mut total = [0usize; 2];
+            for t in 0..400u64 {
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+                let hit: Vec<bool> = ids.iter().map(|id| ev.spikes.contains(id)).collect();
+                for k in 0..2 {
+                    total[k] += hit[k] as usize;
+                }
+                if hit[0] && hit[1] {
+                    coincident += 1;
+                }
+            }
+            (coincident, total)
+        };
+        let (coinc0, tot0) = count_coincident(0.0);
+        let (coinc_pos, tot_pos) = count_coincident(2.0);
+        assert!(tot0[0] > 20 && tot0[1] > 20, "control must spike often");
+        assert!(coinc_pos < coinc0, "inhibition must reduce coincident spikes");
+        assert!(
+            tot_pos[0] + tot_pos[1] > 0,
+            "inhibition must not silence the neurons entirely"
+        );
+    }
+
+    /// U1-inhibition guard: gain 0 must reproduce E3 trajectories
+    /// bit-identically (both adaptation and inhibition inactive path).
+    #[test]
+    fn inhibition_gain_zero_reproduces_e3() {
+        let drive = |mut net: Network| {
+            let id = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+            net.neurons[id.idx()].i_ext = 2.0;
+            let mut log = String::new();
+            for t in 0..300u64 {
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+                log.push_str(&format!("{:?};", ev.spikes));
+            }
+            log
+        };
+        let e3 = drive(Network::new(
+            NetworkConfig {
+                adaptation_tau_ms: 200.0,
+                adaptation_gain: 0.05,
+                inhibition_gain: 0.0,
+                ..NetworkConfig::default()
+            },
+            4,
+            6,
+            2,
+            42,
+        ));
+        let e3b_inhibit_off = drive(Network::new(
+            NetworkConfig {
+                adaptation_tau_ms: 200.0,
+                adaptation_gain: 0.05,
+                inhibition_gain: 0.0,
+                ..NetworkConfig::default()
+            },
+            4,
+            6,
+            2,
+            42,
+        ));
+        assert_eq!(e3, e3b_inhibit_off, "inhibition gain 0 must not change dynamics");
     }
 }

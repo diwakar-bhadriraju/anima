@@ -44,6 +44,10 @@ pub struct OrganismSection {
     /// U1 (E3): adaptation current per spike; 0 = bare LIF (E1 semantics).
     #[serde(default)]
     pub adaptation_gain: f32,
+    /// U1-inhibition (E3b): inhibitory current deposited per co-active
+    /// spiker onto other same-tick spikers; 0 = E3 semantics.
+    #[serde(default)]
+    pub inhibition_gain: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

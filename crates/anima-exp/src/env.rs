@@ -249,6 +249,7 @@ mod tests {
                 amplitude: 3.0,
                 adaptation_tau_ms: 200.0,
                 adaptation_gain: 0.0,
+                inhibition_gain: 0.0,
             },
             plasticity: PlasticitySection {
                 rule: "stdp-pairwise".into(),
