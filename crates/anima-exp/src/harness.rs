@@ -138,6 +138,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
     structural.retirement_ms = cfg.structural.retirement_ms;
     structural.wiring_synapses = cfg.structural.wiring_synapses;
     structural.wiring_avoid_coactive = cfg.structural.wiring_avoid_coactive;
+    structural.wiring_bidirectional = cfg.structural.wiring_bidirectional;
     let mut trigger = make_trigger(
         &cfg.structural.birth_trigger,
         cfg.structural.trigger_rate_hz,

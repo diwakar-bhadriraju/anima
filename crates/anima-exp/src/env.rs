@@ -276,6 +276,7 @@ mod tests {
                 retirement_ms: 300000,
                 wiring_synapses: 5,
                 wiring_avoid_coactive: false,
+                wiring_bidirectional: false,
             },
             resources: ResourceSection {
                 max_neurons: 50,

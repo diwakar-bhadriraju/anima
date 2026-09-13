@@ -92,6 +92,10 @@ pub struct StructuralSection {
     /// highest-rate partners when false/absent.
     #[serde(default)]
     pub wiring_avoid_coactive: bool,
+    /// E4d: newborn also gets 20 outgoing efferents onto the SAME
+    /// allocated partners (fan-out-matched); false = E4c sink shape.
+    #[serde(default)]
+    pub wiring_bidirectional: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

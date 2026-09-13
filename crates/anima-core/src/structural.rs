@@ -224,6 +224,10 @@ pub struct StructuralMonitor {
     /// U3 (E4): when true, newborn afferents target the LOWEST rate-EMA
     /// neurons (away from the co-active pool); false = Phase 0 behavior.
     pub wiring_avoid_coactive: bool,
+    /// E4d: when true, the newborn ALSO gets outgoing efferents back
+    /// onto the SAME allocated partners (fan-out-matched, 20 in + 20
+    /// out); false = E4c/E4 sink shape (bit-identical).
+    pub wiring_bidirectional: bool,
 }
 
 impl Default for StructuralMonitor {
@@ -235,6 +239,7 @@ impl Default for StructuralMonitor {
             retirement_ms: 300_000,
             wiring_synapses: 20,
             wiring_avoid_coactive: false,
+            wiring_bidirectional: false,
         }
     }
 }
@@ -336,6 +341,14 @@ impl StructuralMonitor {
         for &(partner, _) in &partners[..take] {
             let w = net.rng.gen::<f32>() * net.cfg.w_init + 0.05;
             net.add_synapse(partner, id, w, true, net.tick);
+            // E4d: fan-out-matched — same partner gets an efferent back
+            // from the newborn (newborn → partner), same weight family.
+            // The newborn's firing now flows into the allocated pool
+            // instead of accumulating as a high-gain sink.
+            if self.wiring_bidirectional {
+                let w_out = net.rng.gen::<f32>() * net.cfg.w_init + 0.05;
+                net.add_synapse(id, partner, w_out, true, net.tick);
+            }
         }
         id
     }
@@ -627,5 +640,93 @@ mod tests {
                 "Phase 0 must pick highest-rate partners, got {p} in {partners:?}"
             );
         }
+    }
+
+    /// E4d: bidirectional birth creates 20 in + 20 out onto the SAME
+    /// partners (fan-out-matched).
+    #[test]
+    fn bidirectional_birth_creates_matched_fanout() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 6, 2, 5);
+        let internals: Vec<NeuronId> = net
+            .neurons
+            .iter()
+            .filter(|n| n.class == NeuronClass::Internal)
+            .map(|n| n.id)
+            .collect();
+        for (k, id) in internals.iter().enumerate() {
+            net.neurons[id.idx()].rate_hz = k as f32;
+        }
+        let mut mon = StructuralMonitor {
+            wiring_synapses: 3,
+            wiring_avoid_coactive: true,
+            wiring_bidirectional: true,
+            ..StructuralMonitor::default()
+        };
+        let id = mon.birth(&mut net);
+        let in_partners: Vec<u32> = net
+            .incoming[id.idx()]
+            .iter()
+            .map(|sid| net.synapses[sid.idx()].pre.0)
+            .collect();
+        let out_partners: Vec<u32> = net
+            .outgoing[id.idx()]
+            .iter()
+            .map(|sid| net.synapses[sid.idx()].post.0)
+            .collect();
+        assert_eq!(in_partners.len(), 3);
+        assert_eq!(out_partners.len(), 3, "fan-out must match fan-in count");
+        // Same partner SET both directions.
+        let mut a = in_partners.clone();
+        let mut b = out_partners.clone();
+        a.sort_unstable();
+        b.sort_unstable();
+        assert_eq!(a, b, "bidirectional wiring targets the same partners");
+        // All outgoing from the newborn, plastic.
+        for sid in &net.outgoing[id.idx()] {
+            assert_eq!(net.synapses[sid.idx()].pre, id);
+            assert!(net.synapses[sid.idx()].plastic);
+        }
+    }
+
+    /// E4d identity guard: wiring_bidirectional = false reproduces the
+    /// exact E4c sink shape (only incoming synapses, same partner sets).
+    #[test]
+    fn bidirectional_off_reproduces_ec_cadence_wiring() {
+        let mk = |bidirectional: bool| {
+            let mut net = Network::new(NetworkConfig::default(), 2, 6, 2, 5);
+            let internals: Vec<NeuronId> = net
+                .neurons
+                .iter()
+                .filter(|n| n.class == NeuronClass::Internal)
+                .map(|n| n.id)
+                .collect();
+            for (k, id) in internals.iter().enumerate() {
+                net.neurons[id.idx()].rate_hz = k as f32;
+            }
+            let mon = StructuralMonitor {
+                wiring_synapses: 3,
+                wiring_avoid_coactive: true,
+                wiring_bidirectional: bidirectional,
+                ..StructuralMonitor::default()
+            };
+            // Deterministic: drive the same RNG draw by using the same
+            // seed (id space identical), then record synapse topology.
+            let id = mon.birth(&mut net);
+            let inc: Vec<(u32, u32)> = net
+                .incoming[id.idx()]
+                .iter()
+                .map(|sid| {
+                    let s = &net.synapses[sid.idx()];
+                    (s.pre.0, s.post.0)
+                })
+                .collect();
+            (inc, net.outgoing[id.idx()].len())
+        };
+        let (inc_off, out_off) = mk(false);
+        let (inc_on, out_on) = mk(true);
+        // Fan-in identical; fan-out present iff bidirectional.
+        assert_eq!(inc_off, inc_on, "fan-in must be identical");
+        assert_eq!(out_off, 0, "E4c shape has no fan-out");
+        assert_eq!(out_on, 3, "bidirectional adds matched fan-out");
     }
 }

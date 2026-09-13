@@ -355,3 +355,121 @@ for a NEW registration (deferred to user; gates still excluded):
 3. Accept guard (4) re-calibration for growth arms (detector on the
    original 40-neuron pool) — but that changes the frozen guard and
    needs explicit user approval.
+
+---
+
+## E4d — fan-out-matched growth (authorized new registration)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before implementation.
+E5 learning gates remain excluded.**
+
+### Problem addressed
+
+E4/E4c demonstrated the 20-in/0-out newborn is a high-gain sink whose
+firing inflates the population mean (burst-mean 43.8 → 62.9 Hz with 35
+births), tripping the UNCHANGED 50 Hz / 5 s runaway guard at
+t ≈ 540 s in both active-cadence arms. The allocation direction
+(away from the co-active pool) was never the measured variable because
+the sink shape destabilized the run first.
+
+### Frozen E4d intervention (ONE delta vs E4c)
+
+Newborn wiring becomes **bidirectional / fan-out-matched**: in
+addition to the existing 20 incoming afferents, the newborn receives
+**20 outgoing efferent synapses back onto the SAME 20 allocated
+partners** (the lowest-rate, away-from-coactive set selected at
+birth). Exact rule:
+
+- Partner selection: unchanged (`wiring_avoid_coactive = true` —
+  lowest rate-EMA non-input, non-retired, non-self; seeded).
+- Incoming: unchanged — 20 afferents partner → newborn, weight
+  `U(0.05, 0.05 + w_init)` per existing seeded draw, plastic.
+- Outgoing (NEW): symmetric 20 efferents newborn → partner, same
+  weight draw family (continuing the same seeded RNG stream —
+  deterministic), plastic.
+- Total per birth: 40 synapses. The newborn's spikes now flow back
+  into the circuit through the same allocated pool (no more sink:
+  its firing drives exactly the partners that drive it).
+- Config knob: `wiring_bidirectional = true` (default false =
+  bit-identical E4c/E4 behavior; unit-tested).
+
+All other variables are E4c values (which are E3-baseline values):
+curriculum, seed 20260912, additive STDP, adaptation 200/0.05,
+homeostatic-saturation 25 Hz / 2 s, `trigger_cooldown_ms = 3000`
+(A10, frozen), runaway detector 50 Hz / 5 s UNCHANGED, thresholds,
+caps, metrics. **No tuning based on any full-run result.**
+
+### Endpoints & guards (identical to E4/E4b/E4c, frozen)
+
+- (1) late-S1 mean cross-pattern cosine < 0.60
+- (2) median selectivity > 0.50
+- (3) within-pattern late-S1 cosine ≥ 0.80
+- (4) zero runaway failures; S1 internal rates in [20, 250] Hz
+- (5) retention ≥ 0.80 for A/B/C
+- (6) births occurred (≥ 1)
+
+Branches: SUPPORTED = (1)+(2) + all guards; WEAK = exactly one of
+(1)/(2); WEAKENED = guards hold, both endpoints fail; INCONCLUSIVE =
+guard (6) fails (inert); REGRESSION = any guard (3)–(5) fails. The
+runaway detector is NOT reinterpreted; a guard-(4) failure is a
+REGRESSION regardless of mechanism.
+
+### Verification (pre-run)
+
+Unit tests: (a) bidirectional birth creates 20 in + 20 out to the same
+partners; (b) `wiring_bidirectional = false` reproduces E4 wiring
+exactly (partner sets identical between runs); (c) existing latch/
+cooldown tests still pass. Calibration probe (S1 reps=40) confirms
+growth is stable (no runaway in probe window) and synapse cap is safe
+(~40 births × 40 syn ≈ 1600 + ~150 initial < 2000). Then full run.
+
+---
+
+## E4d execution record
+
+### Calibration gate FAILED — full run NOT executed
+
+The pre-registered sequence is: "verify the growth mechanism is stable
+with unit/calibration tests, THEN run the full curriculum." The
+calibration probe (S1 reps=40, same shape as the A10 sweep) failed:
+
+- Probe run `runs/e4d-probe-20260913T171115Z`; **4 real births**
+  (t = 19,064 / 22,064 / 29,028 / 32,028 ms; cooldown 3000 ms
+  respected) then `runaway-activity` at **t = 32,089 ms** — mean
+  **179.0 Hz** > 50 Hz for 5 s.
+- Compare: E4c's same-shape probe (8 births in 240 s S1) recorded
+  zero failures. E4d with bidirectional wiring destabilizes ~17×
+  faster (32 s vs 540 s) with one-quarter the births.
+
+### Interpretation (evidence)
+
+The fan-out-matched shape converts the newborn from an inert sink
+into a **positive-feedback amplifier**: each newborn fires strongly
+(20 afferents), and its 20 efferents land on exactly the same
+partners that drive it → reciprocal excitation within the allocated
+clique. Mean 179 Hz after 4 births (vs 104 Hz after 35 births in
+E4c) shows the loop amplifies far faster than the sink's passive
+mean-inflation. The E4c hypothesis — "fan-out integrates the newborn
+so the pool regulates it" — is falsified at the probe stage: in this
+all-excitatory organism (no inhibitory synapses anywhere), ANY growth
+shape that returns the newborn's firing to the network feeds runaway.
+
+### Verdict: **REGRESSION (at the calibration gate — no full run)**
+
+Per the frozen guard (4) semantics and the user-directed sequencing.
+The structural-allocation hypothesis remains untested because BOTH
+growth shapes (20-in/0-out sink, 20-in/20-out reciprocal) destabilize
+the E3-stabilized baseline via the unchanged 50 Hz guard. Two
+independent failures now bound the mechanism class: growth that
+either accumulates or re-circulates excitatory drive is incompatible
+with the E3 baseline + unchanged detector.
+
+### Next candidates (deferred to user; gates still excluded)
+
+1. Drop the avoid-coactive partner ELECTRICITY claim and test pure
+   capacity allocation: growth with FEWER afferents (e.g. 4) and
+   NO feedback — bounds per-birth drive injection.
+2. Persistent-error trigger (U3b) — births at learnable frontier,
+   rare by construction.
+3. Accept the U3 class as closed in this organism and move to E5
+   learning gates when the user lifts the exclusion.
