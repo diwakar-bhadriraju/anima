@@ -123,7 +123,11 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         w_min: cfg.plasticity.w_min,
         w_max: cfg.plasticity.w_max,
     };
+    // E2: rule selection is the ONLY experimental variable. Both rules
+    // share StdpParams and the same trace/silence machinery.
+    let multiplicative = matches!(cfg.plasticity.rule.as_str(), "stdp-multiplicative");
     let stdp = anima_core::plasticity::PairwiseStdp::new(params);
+    let _ = &stdp; // silence-prune thresholds live on this type (either arm)
     let mut structural = StructuralMonitor::default();
     structural.dormancy_rate_hz = cfg.structural.dormancy_rate_hz;
     structural.dormancy_ms = cfg.structural.dormancy_ms;
@@ -275,7 +279,13 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
 
         // 3. traces + plasticity (STDP per tick, gate = 1.0 always-on, U4a)
         traces.step(&net, &step.spikes);
-        let changes = stdp_tick(&params, &mut net, &traces, &step.spikes, 1.0);
+        let changes = if multiplicative {
+            anima_core::plasticity::stdp_tick_multiplicative(
+                &params, &mut net, &traces, &step.spikes, 1.0,
+            )
+        } else {
+            stdp_tick(&params, &mut net, &traces, &step.spikes, 1.0)
+        };
         for c in changes {
             unemit[c.synapse.idx()] += c.after - c.before;
         }

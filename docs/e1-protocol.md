@@ -121,6 +121,6 @@ is the pre-registered, mechanistically-targeted next step.
 
 ## Roadmap (each built only when reached)
 
-E2 STDP bounds A/B (U2) · E3 adaptation (U1) · E4 birth triggers (U3) ·
+E3 adaptation (U1) — now prerequisite for rule comparisons (D11) · E2 bound re-visit (U2, after stability exists) · E4 birth triggers (U3) ·
 E5 learning gates (U4) · E6 reward modulation (U7) · E7 memory (U5) ·
 E8 output decoder · E9 retina encoder · E10 cochlea encoder.

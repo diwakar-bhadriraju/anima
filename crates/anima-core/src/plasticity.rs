@@ -205,6 +205,93 @@ impl PlasticityRule for PairwiseStdp {
     }
 }
 
+/// Pairwise trace-based STDP with **multiplicative** (soft) bounds — E2
+/// arm B. Identical timing structure to [`PairwiseStdp`]/[`stdp_tick`];
+/// the weight update is scaled by the synapse's own state:
+///   LTP: Δw = +a_plus  · pre_trace · (1 − w)   (far from ceiling learns fast)
+///   LTD: Δw = −a_minus · post_trace · w        (near floor barely depresses)
+/// Saturated synapses stay plastic, sustaining competition between patterns.
+pub struct MultiplicativeStdp;
+
+impl MultiplicativeStdp {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for MultiplicativeStdp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multiplicative per-spike STDP: same walk as [`stdp_tick`] with the
+/// weight-dependent scaling applied to both signs.
+pub fn stdp_tick_multiplicative(
+    params: &StdpParams,
+    net: &mut Network,
+    traces: &Traces,
+    spikes: &[NeuronId],
+    gate: f32,
+) -> Vec<WeightChange> {
+    let mut changes = Vec::new();
+    // LTP pass: for each post neuron that fired, potentiate its incoming.
+    for &post in spikes {
+        let incoming: Vec<SynapseId> = net.incoming[post.idx()].clone();
+        for sid in incoming {
+            if !net.synapse_alive(sid) {
+                continue;
+            }
+            let s = &net.synapses[sid.idx()];
+            if !s.plastic {
+                continue;
+            }
+            if spikes.contains(&s.pre) {
+                continue;
+            }
+            let pre_t = traces.pre(sid);
+            if pre_t <= 0.0 {
+                continue;
+            }
+            let s = &mut net.synapses[sid.idx()];
+            let before = s.w;
+            let room = (params.w_max - s.w).max(0.0);
+            s.w = (s.w + params.a_plus * pre_t * gate * room).min(params.w_max);
+            if s.w != before {
+                changes.push(WeightChange { synapse: sid, before, after: s.w });
+            }
+        }
+    }
+    // LTD pass: for each pre neuron that fired, depress its outgoing.
+    for &pre in spikes {
+        let outgoing: Vec<SynapseId> = net.outgoing[pre.idx()].clone();
+        for sid in outgoing {
+            if !net.synapse_alive(sid) {
+                continue;
+            }
+            let s = &net.synapses[sid.idx()];
+            if !s.plastic {
+                continue;
+            }
+            if spikes.contains(&s.post) {
+                continue;
+            }
+            let post_t = traces.post(sid);
+            if post_t <= 0.0 {
+                continue;
+            }
+            let s = &mut net.synapses[sid.idx()];
+            let before = s.w;
+            let mass = (s.w - params.w_min).max(0.0);
+            s.w = (s.w - params.a_minus * post_t * gate * mass).max(params.w_min);
+            if s.w != before {
+                changes.push(WeightChange { synapse: sid, before, after: s.w });
+            }
+        }
+    }
+    changes
+}
+
 /// Extension used by the harness: per-spike STDP given the tick's spike set.
 /// pre-before-post ⇒ LTP: when post fires, potentiate by a_plus × pre-trace.
 /// post-before-pre ⇒ LTD: when pre fires, depress by a_minus × post-trace.
@@ -430,6 +517,107 @@ mod tests {
         }
         assert!(!flagged.is_empty());
         assert_eq!(flagged[0].1, "silent-synapse");
+    }
+
+    /// Multiplicative LTP is scaled by (1 − w): at w near ceiling Δw → 0.
+    #[test]
+    fn multiplicative_ltp_scales_with_room() {
+        let params = StdpParams::default();
+        let mut cases = vec![(0.2_f32, 0.0_f32), (0.8, 0.0)];
+        for (w_set, expected) in cases.iter_mut() {
+            let mut net = small_net();
+            let sid = sid_of(&net); net.synapses[sid.idx()].w = *w_set;
+            let sid = sid_of(&net);
+            let pre = net.synapses[sid.idx()].pre;
+            let post = net.synapses[sid.idx()].post;
+            let mut traces = Traces::new(&net, 20.0);
+            force_spike(&mut net, pre);
+            let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            force_spike(&mut net, post);
+            let ev = net.step(&InputFrame { tick: Tick(1), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            let changes = stdp_tick_multiplicative(&params, &mut net, &traces, &ev.spikes, 1.0);
+            *expected = changes
+                .iter()
+                .find(|c| c.synapse == sid)
+                .map(|c| c.after - c.before)
+                .unwrap_or(0.0);
+        }
+        let (dw_low_w, dw_high_w) = (cases[0].1, cases[1].1);
+        assert!(
+            dw_low_w > dw_high_w + 1e-9,
+            "multiplicative LTP must shrink as w grows: dw(w=0.2)={dw_low_w} vs dw(w=0.8)={dw_high_w}"
+        );
+    }
+
+    /// Multiplicative LTD is scaled by w: at w near floor Δw → 0.
+    #[test]
+    fn multiplicative_ltd_scales_with_weight() {
+        let params = StdpParams::default();
+        let mut cases = vec![(0.9_f32, 0.0_f32), (0.1, 0.0)];
+        for (w_set, expected) in cases.iter_mut() {
+            let mut net = small_net();
+            let sid = sid_of(&net); net.synapses[sid.idx()].w = *w_set;
+            let sid = sid_of(&net);
+            let pre = net.synapses[sid.idx()].pre;
+            let post = net.synapses[sid.idx()].post;
+            let mut traces = Traces::new(&net, 20.0);
+            // post fires first (builds post trace), then pre ⇒ LTD
+            force_spike(&mut net, post);
+            let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            force_spike(&mut net, pre);
+            let ev = net.step(&InputFrame { tick: Tick(1), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            let changes = stdp_tick_multiplicative(&params, &mut net, &traces, &ev.spikes, 1.0);
+            *expected = changes
+                .iter()
+                .find(|c| c.synapse == sid)
+                .map(|c| c.after - c.before)
+                .unwrap_or(0.0);
+        }
+        let (dw_high_w, dw_low_w) = (cases[0].1, cases[1].1);
+        assert!(
+            dw_high_w < dw_low_w - 1e-9,
+            "multiplicative LTD must shrink as w → floor: dw(w=0.9)={dw_high_w} vs dw(w=0.1)={dw_low_w}"
+        );
+    }
+
+    /// Multiplicative LTP at w = w_max must be exactly zero (soft ceiling).
+    #[test]
+    fn multiplicative_ltp_vanishes_at_ceiling() {
+        let params = StdpParams { a_plus: 0.05, ..StdpParams::default() };
+        let mut net = small_net();
+        let sid = sid_of(&net); net.synapses[sid.idx()].w = params.w_max;
+        let sid = sid_of(&net);
+        let pre = net.synapses[sid.idx()].pre;
+        let post = net.synapses[sid.idx()].post;
+        let mut traces = Traces::new(&net, 20.0);
+        force_spike(&mut net, pre);
+        let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+        traces.step(&net, &ev.spikes);
+        force_spike(&mut net, post);
+        let ev = net.step(&InputFrame { tick: Tick(1), spikes: vec![] });
+        traces.step(&net, &ev.spikes);
+        let changes = stdp_tick_multiplicative(&params, &mut net, &traces, &ev.spikes, 1.0);
+        let d = changes
+            .iter()
+            .find(|c| c.synapse == sid)
+            .map(|c| c.after - c.before)
+            .unwrap_or(0.0);
+        assert!(d <= 1e-9, "no LTP at ceiling: Δw = {d}");
+    }
+
+    fn sid_of(net: &Network) -> SynapseId {
+        net.synapses
+            .iter()
+            .find(|s| {
+                net.neurons[s.pre.idx()].class != crate::network::NeuronClass::Input
+                    && net.neurons[s.post.idx()].class != crate::network::NeuronClass::Input
+            })
+            .map(|s| s.id)
+            .expect("internal→internal synapse")
     }
 
     fn force_spike(net: &mut Network, id: NeuronId) {
