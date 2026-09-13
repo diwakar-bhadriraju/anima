@@ -127,3 +127,24 @@ claim).
   weight change to stimulus is exact. An encoder between stimulus and network
   would confound "organism learned" with "retina encoded it that way".
 - **Remaining uncertainty**: none for E1–E5; encoder design enters at E9.
+
+## D10 — E2 rule isolation design
+
+- **Question**: Do additive hard bounds explain E1's near-threshold assembly
+  separation (inconclusive verdicts)?
+- **Alternatives**: change curriculum/organism; add homeostatic renorm;
+  test multiplicative bounds; multi-seed sweep.
+- **Evidence class**: TEAL (intervention, pre-registered).
+- **Experiment**: E2.
+- **Decision**: 2-arm A/B with the plasticity rule as the ONLY variable.
+  Arm A = E1 additive (control, existing result reusable); Arm B = classic
+  multiplicative STDP (Δw⁺ ∝ a⁺·(1−w), Δw⁻ ∝ a⁻·w). Same seed 20260912,
+  identical E1 curriculum/morphology/thresholds. Between-arm comparison is
+  a secondary descriptive analysis, not a pass/fail rule.
+- **Rationale**: E1 evidence pass showed 73% saturation at ceiling with
+  frozen Δw — the additive bound shape is the mechanism hypothesis with the
+  cheapest, cleanest intervention. Changing anything else (neurons,
+  curriculum, overlap) would confound the attribution.
+- **Remaining uncertainty**: multiplicative rules can decay memories faster
+  (retention is the risk to watch); single-seed design has no error bars —
+  if verdicts are near thresholds, escalate to multi-seed before concluding.

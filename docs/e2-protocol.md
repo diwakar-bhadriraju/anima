@@ -1,0 +1,82 @@
+# E2 Protocol — STDP Bound Variants: Additive vs Multiplicative
+
+**Status**: pre-registered before execution. Thresholds below are the ONLY
+rules the auto-comparison uses; verdicts are labeled `auto-generated —
+review` and humans own final interpretation.
+
+## Hypothesis
+
+The near-threshold assembly-formation and novelty results in E1 are
+caused by the **plasticity rule's** hard additive bounds: with
+Δw independent of w, synapses saturate at w_max, stop adapting, and
+co-active patterns pool onto the same internal neurons instead of
+specializing. A multiplicative rule (Δw ∝ w for depression, Δw ∝ (1−w)
+for potentiation) keeps synapses in an adaptable range, sustaining
+competition — predicted to yield **higher assembly separation (higher
+assembly score, higher selectivity) and stronger novelty discrimination
+than Arm A, with retention still ≥ 80%**.
+
+**The only experimental variable is the plasticity rule.** Organism
+morphology, connectivity, curriculum, pattern structure/overlap, seed,
+caps, and all other parameters are identical to E1 and identical between
+arms.
+
+## Design
+
+Clean 2-arm A/B, identical initial conditions (same seed 20260912,
+same config hash base, same E1 curriculum):
+
+| | Arm A (control) | Arm B (treatment) |
+|---|---|---|
+| Rule | pairwise additive STDP (E1, D7) | pairwise multiplicative STDP |
+| LTP | Δw = +a_plus · pre_trace | Δw = +a_plus · pre_trace · **(1 − w)** |
+| LTD | Δw = −a_minus · post_trace | Δw = −a_minus · post_trace · **w** |
+| Bounds | hard clip [w_min, w_max] | soft (the w(w−1) factors are the bound) |
+
+All other parameters = `configs/e1.toml` exactly: 24 input / 40 internal /
+12 output, p=0.038, amplitude 52.0, a± = 0.005/0.0053, tau± = 20 ms,
+decay 1e-6/tick, silence/prune thresholds unchanged, seed 20260912,
+curriculum S0/S1/S2/S3 unchanged (patterns A, B, C; novel D = A+C).
+
+Configs: `configs/e2-armA.toml` (rule = "stdp-pairwise") and
+`configs/e2-armB.toml` (rule = "stdp-multiplicative"). The configs differ
+in `exp_id` (e2a / e2b) and `rule` — nothing else.
+
+## Metrics (identical machinery as E1)
+
+Per arm, from full telemetry + snapshots:
+- **Assembly score** (within − cross pattern cosine, early vs late S1)
+- **Selectivity** (median (r_best − r_2nd)/r_best over internal neurons)
+- **Novelty** (D response-profile distance to nearest learned pattern vs
+  learned pairwise max)
+- **Retention** (S3 vs late-S1 response ratio per pattern)
+- **Saturation fraction** (share of synapses with w > 0.9 over time —
+  the diagnostic this experiment targets)
+
+## Verdict thresholds (pre-registered, unchanged from E1)
+
+Per arm:
+- **Assembly formation supported**: late-S1 assembly score ≥ 2× early-S1
+  AND median selectivity > 0.5. One of the two ⇒ weakly supported; else
+  inconclusive.
+- **Novelty discrimination supported**: D-to-nearest-learned distance
+  ≥ 2× learned pairwise max; else inconclusive.
+- **Retention supported**: S3 ≥ 80% of late-S1 for all of A/B/C;
+  50–80% weakly supported; < 50% inconsistent.
+
+Secondary analysis (between-arm, explicitly NOT a pre-registered pass/fail
+rule — descriptive comparison):
+- Arm B vs Arm A on assembly score, selectivity median, novelty ratio
+  (D-distance / learned pairwise max), saturation fraction trajectory.
+- Interpretation guidance: if Arm B shows higher separation metrics with
+  retention ≥ 80%, the E1 inconclusives are attributable to the additive
+  bound shape. If both arms saturate or both fail identically, the binding
+  problem lies elsewhere (e.g. morphology/inhibition absence) — feed E3+.
+
+## Scope guards
+
+- No neuron-count, curriculum, pattern-overlap, threshold, or cap changes.
+- No analyzer changes (same code path for both arms; the only new code is
+  the multiplicative rule itself, unit-tested against hand-computed Δw).
+- Determinism: each arm's telemetry must be byte-identical across re-runs
+  of the same seed.
