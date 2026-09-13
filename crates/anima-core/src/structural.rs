@@ -729,4 +729,68 @@ mod tests {
         assert_eq!(out_off, 0, "E4c shape has no fan-out");
         assert_eq!(out_on, 3, "bidirectional adds matched fan-out");
     }
+
+    /// E4e: low fan-in birth (wiring_synapses = 4) creates exactly 4
+    /// afferents from the lowest-rate set and ZERO outgoing (no feedback).
+    #[test]
+    fn low_fanin_birth_creates_four_afferents_only() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 6, 2, 5);
+        let internals: Vec<NeuronId> = net
+            .neurons
+            .iter()
+            .filter(|n| n.class == NeuronClass::Internal)
+            .map(|n| n.id)
+            .collect();
+        for (k, id) in internals.iter().enumerate() {
+            net.neurons[id.idx()].rate_hz = k as f32;
+        }
+        let mon = StructuralMonitor {
+            wiring_synapses: 4,
+            wiring_avoid_coactive: true,
+            wiring_bidirectional: false,
+            ..StructuralMonitor::default()
+        };
+        let id = mon.birth(&mut net);
+        assert_eq!(net.incoming[id.idx()].len(), 4, "exactly 4 afferents");
+        assert!(net.outgoing[id.idx()].is_empty(), "no outgoing feedback");
+        // Prefix invariant of the ascending rule: every chosen partner
+        // must have rate <= every non-input neuron that was NOT chosen.
+        let partners: Vec<u32> = net
+            .incoming[id.idx()]
+            .iter()
+            .map(|sid| net.synapses[sid.idx()].pre.0)
+            .collect();
+        let rate_of = |n: u32| {
+            net.neurons
+                .iter()
+                .find(|x| x.id.0 == n)
+                .map(|x| x.rate_hz)
+                .unwrap_or(f32::INFINITY)
+        };
+        let unchosen: Vec<u32> = net
+            .neurons
+            .iter()
+            .filter(|n| {
+                n.class != NeuronClass::Input
+                    && !n.retired
+                    && n.id != id
+                    && !partners.contains(&n.id.0)
+            })
+            .map(|n| n.id.0)
+            .collect();
+        for p in &partners {
+            for q in &unchosen {
+                assert!(
+                    rate_of(*p) <= rate_of(*q),
+                    "partner {p} (r={}) must not outrank unchosen {q} (r={})",
+                    rate_of(*p),
+                    rate_of(*q)
+                );
+            }
+        }
+        // All plastic (same allocation semantics as E4).
+        for sid in &net.incoming[id.idx()] {
+            assert!(net.synapses[sid.idx()].plastic);
+        }
+    }
 }

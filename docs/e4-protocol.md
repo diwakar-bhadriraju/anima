@@ -473,3 +473,113 @@ with the E3 baseline + unchanged detector.
    rare by construction.
 3. Accept the U3 class as closed in this organism and move to E5
    learning gates when the user lifts the exclusion.
+
+---
+
+## E4e — low-fan-in capacity growth (authorized new registration)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before implementation.
+E5 learning gates and all other mechanisms remain excluded.**
+
+### Problem addressed
+
+E4/E4c (20-in/0-out sink) and E4d (20-in/20-out reciprocal) both
+regressed: the first passively inflated the population mean (~63 Hz
+burst-avg with 35 births, runaway at t ≈ 540 s), the second formed a
+positive-feedback amplifier (179 Hz after 4 births, runaway at
+t ≈ 32 s). Both injected or re-circulated large excitatory drive per
+birth. This arm tests whether the U3 allocation hypothesis becomes
+evaluable when **each birth injects substantially less drive**:
+fan-in 4, no fan-out.
+
+### Frozen E4e parameters (ONE delta vs E4c)
+
+- Newborn incoming connectivity: `wiring_synapses = 4` (was 20).
+  Selection rule unchanged: newest LOWEST rate-EMA non-input,
+  non-retired, non-self partners (`wiring_avoid_coactive = true`),
+  seeded, weight `U(0.05, 0.05 + w_init)`, plastic.
+- `wiring_bidirectional = false` (no outgoing synapses; no feedback).
+- Trigger framework unchanged: homeostatic-saturation 25 Hz / 2 s,
+  `trigger_cooldown_ms = 3000` (frozen A10 cadence floor).
+- Everything else identical to E3/E4 baseline: curriculum, seed
+  20260912, additive STDP, adaptation 200/0.05, thresholds, caps,
+  runaway detector 50 Hz / 5 s UNCHANGED, metrics.
+- Per-birth synapse count 4 ⇒ ~40 births × 4 = 160 synapses added —
+  trivially under the 2000 cap (no resource confound).
+
+### Pre-registered decision branches
+
+Endpoints (late S1): (1) mean cross-cosine < 0.60, (2) median
+selectivity > 0.50.
+Guards: (3) within ≥ 0.80, (4) zero runaway + S1 rates in [20, 250]
+Hz, (5) retention ≥ 0.80, (6) births occurred.
+
+- SUPPORTED: (1)+(2) and guards (3)–(6) hold.
+- WEAK: exactly one of (1)/(2), guards hold.
+- WEAKENED: guards hold, both (1)/(2) fail.
+- **INCONCLUSIVE (inert)**: fewer than **15 real births by S1 end**
+  (informativeness bar, pre-registered to match the A10 band and the
+  E4b precedent) or zero births — endpoints uninterpretable either
+  way; NOT evidence against the allocation hypothesis.
+- REGRESSION: any guard (3)–(5) fails (runaway detector not
+  reinterpreted).
+
+### Sequence
+
+1. Implementation (config-only change; wiring machinery already
+   parameterized by `wiring_synapses`) + unit tests.
+2. Full suite green, zero warnings.
+3. Calibration gate: probe (S1 reps=40, same shape as prior sweeps)
+   must complete with zero failures AND ≥ 3 births in 240 s S1
+   (≈ cadence check). If the probe regresses or is inert, the full
+   run does NOT execute (this registration closes with the gate
+   outcome).
+4. If gate passes: full curriculum run, metrics, verdict per the
+   branches above. No tuning on any full-run result.
+
+---
+
+## E4e execution record — calibration gate outcome
+
+### Gate probe
+
+- `runs/e4e-probe-20260913T171550Z`, S1 reps=40 (240 s S1), fan-in 4,
+  no fan-out, cooldown 3000 (all frozen params).
+- **Stability: PASS** — zero failures; the first growth shape without
+  any regression signal (E4: runaway 540 s; E4d: 32 s; E4e: none).
+- **Cadence: FAIL** — **2 births** (t = 19,064 / 41,077 ms) vs the
+  frozen gate bar of ≥ 3 per 240 s. Projected full-run birth count
+  ≈ 6 by S1 end — below the pre-registered 15-birth informativeness
+  floor, so any full run would be INCONCLUSIVE by the frozen branches.
+
+### Verdict per the frozen registration: **INCONCLUSIVE (inert) — no
+### full run executed**
+
+The frozen sequence ("stable AND ≥ 3 births, else the full run does
+NOT execute; this registration closes with the gate outcome") binds.
+The E4e arm closes at the gate.
+
+### Scientific content (not a null result — a mechanism bound)
+
+- Fan-in 4 **eliminates the instability** produced by fan-in 20
+  (sink) and 20+20 (reciprocal): per-birth drive injection is now
+  small enough that the population mean never inflates toward the
+  50 Hz guard. Stability is restored by reducing per-birth drive —
+  confirming the drive-injection mechanism behind E4/E4c/E4d.
+- But the same reduction makes births self-limiting: the trigger's
+  sustained episodes are driven by population mean, and at fan-in 4
+  each birth contributes too little to sustain the next episode.
+  Low fan-in ⇒ growth peters out ⇒ can't reach the informative band.
+- The allocation hypothesis remains **unevaluated**: no arm has yet
+  produced 15–40 births while holding the network stable. The drive
+  budget is now bracketed: fan-in 4 is inert, fan-in 20 regresses.
+  A mid value (e.g. 8) would be the natural next probe, but E4e's
+  registration forbids tuning on results and closes here.
+
+### Roadmap (unchanged constraints; gates still excluded)
+
+1. E4f-style sweep of fan-in ∈ {8, 12, 16} with the SAME gate bars
+   (requires a new registration; each value is a pre-registered arm).
+2. Persistent-error trigger (U3b) — decoupled from population-mean
+   episodes entirely.
+3. E5 learning gates once the user lifts the exclusion.
