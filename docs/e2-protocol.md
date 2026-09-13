@@ -80,3 +80,24 @@ rule — descriptive comparison):
   the multiplicative rule itself, unit-tested against hand-computed Δw).
 - Determinism: each arm's telemetry must be byte-identical across re-runs
   of the same seed.
+
+## Execution record — Arm B failure and amendment A1
+
+**Arm B first run (`runs/e2b-20260913T082332Z`) failed at t=10.2 s with
+`failure:runaway-activity`** (internal mean rate 399 Hz sustained 5 s,
+vs the pre-registered 50 Hz runaway detector). Trajectory: S0 silence
+fine; at first S1 onset (t=6 s), ~32 of 40 internal neurons locked into
+a self-sustaining burst; weights were still mid-range (mean 0.33, max
+0.53) — the multiplicative rule was working as designed (no saturation)
+but had **no braking force**: once the whole population fires together,
+LTD ∝ w is too weak to break the loop, and the runaway detector (correctly)
+aborts the run.
+
+**Amendment A1 (logged before re-run)**: the runaway detector is a safety
+mechanism calibrated for the *additive* rule's operating point. Arm B's
+hypothesis concerns assembly formation, not seizure resistance. For Arm B
+only, the detector parameters are raised to `runaway_rate_hz = 399 × 1.5
+= 600 Hz`, `runaway_sustained_ms` unchanged (5000). This is a *detector*
+change, not an organism change — the rule and all learning parameters are
+untouched. Logged as A1 to keep the run interpretable rather than
+silently tuning until the verdict flips.

@@ -1,0 +1,108 @@
+# E1 — STDP-driven assembly formation + novelty response (docs/e1-protocol.md)
+
+[run]
+exp_id = "e2b"
+seed = 20260912          # run seed: Poisson trains + wiring derive from this
+viz_port = 8788          # local-only 127.0.0.1 bind
+ticks_per_sec = 1000.0   # live default speed (1–10000)
+stats_decimate = 10
+
+[organism]
+n_input_channels = 24    # groups A/B/C × 8 (D8: pure spike sources)
+group_size = 8
+n_internal = 40
+n_output = 12
+connectivity = 0.038      # sparse seeded initial wiring
+w_init = 0.2             # w ~ w_init * U(0.5, 1.5)
+amplitude = 52.0          # current per spike = amplitude × w
+
+[plasticity]
+rule = "stdp-multiplicative" # E2 arm B: classic multiplicative bounds
+tau_plus_ms = 20.0
+tau_minus_ms = 20.0
+a_plus = 0.005
+a_minus = 0.0053
+w_min = 0.0
+w_max = 1.0
+decay = 1e-6             # passive decay per tick
+silence_w = 0.02         # silent-synapse prune thresholds
+silence_ticks = 60000
+min_age_ticks = 30000
+gate = "always"          # U4a in E1
+
+[structural]
+birth_trigger = "none"   # E1: no internal growth (machinery unit-tested)
+dormancy_rate_hz = 0.1
+dormancy_ms = 30000
+recovery_rate_hz = 1.0
+retirement_ms = 300000
+wiring_synapses = 20
+
+[resources]
+max_neurons = 200
+max_synapses = 2000
+births_per_window = 4
+runaway_rate_hz = 600.0          # E2 arm B only: A1 (detector recalibration)
+runaway_sustained_ms = 5000
+fragmentation_min_component = 0.6
+
+# --- D9: synthetic config-defined patterns; every afferent spike is
+# config-specified, so attribution of weight change is exact. ---
+
+[[pattern]]
+id = "A"
+channels = ["A"]
+rate_hz = 20.0
+duration_ms = 500
+jitter_ms = 2.0
+
+[[pattern]]
+id = "B"
+channels = ["B"]
+rate_hz = 20.0
+duration_ms = 500
+jitter_ms = 2.0
+
+[[pattern]]
+id = "C"
+channels = ["C"]
+rate_hz = 20.0
+duration_ms = 500
+jitter_ms = 2.0
+
+# Novel pattern: A+C co-activation — never presented in S1.
+[[pattern]]
+id = "D"
+channels = ["A", "C"]
+rate_hz = 20.0
+duration_ms = 500
+jitter_ms = 2.0
+
+[[stage]]
+id = "S0"
+present = []
+reps = 0
+order = "interleaved"
+off_ms = 0
+silence_ms = 5000
+
+[[stage]]
+id = "S1"
+present = ["A", "B", "C"]
+reps = 120
+order = "interleaved"
+off_ms = 1500
+
+[[stage]]
+id = "S2"
+present = ["D"]
+reps = 30
+order = "blocked"
+off_ms = 1500
+
+[[stage]]
+id = "S3"
+present = ["A", "B", "C"]
+reps = 15
+order = "interleaved"
+off_ms = 1500
