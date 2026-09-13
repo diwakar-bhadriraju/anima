@@ -148,3 +148,23 @@ claim).
 - **Remaining uncertainty**: multiplicative rules can decay memories faster
   (retention is the risk to watch); single-seed design has no error bars —
   if verdicts are near thresholds, escalate to multi-seed before concluding.
+
+## D11 — E2 outcome and roadmap implication
+
+- **Question**: does the multiplicative bound variant form separated
+  assemblies where additive could not? (D10 hypothesis)
+- **Evidence class**: TEAL (intervention executed; arm B invalid by
+  instability).
+- **Result**: Arm A replicated E1 (inconclusive separation, retention
+  supported). Arm B collapsed into permanent population-wide seizure
+  (≈400 Hz) at first S1 onset — multiplicative LTD (∝ w) cannot suppress
+  a recurrent loop at low weights. No assembly metrics exist for arm B;
+  verdicts: inconclusive-by-instability.
+- **Decision**: adaptation/homeostasis (E3, U1) is now a *prerequisite*
+  for any further bound-variant comparison. A stability mechanism must
+  exist before rule-shape differences are measurable. Roadmap order E3 →
+  then re-visit bound variants.
+- **Also logged**: non-saturating rules emit continuous weight events —
+  telemetry budget needs time-bucketing before E3.
+- **Remaining uncertainty**: whether a stability mechanism alone enables
+  separation, or whether bound shape matters at all in this regime.
