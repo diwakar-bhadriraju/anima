@@ -583,3 +583,203 @@ The E4e arm closes at the gate.
 2. Persistent-error trigger (U3b) — decoupled from population-mean
    episodes entirely.
 3. E5 learning gates once the user lifts the exclusion.
+
+---
+
+## E4f — mid-fan-in sweep {8, 12, 16} (authorized; each arm pre-registered)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before any per-arm
+execution. E5 gates remain excluded.**
+
+### Purpose
+
+E4e bracketed the per-birth drive budget: fan-in 4 → stable but inert
+(2 births / 240 s probe, projections < 15 floor); fan-in 20 (E4/E4c)
+and 20+20 (E4d) → REGRESSION. This sweep seeks a stable AND
+informative regime in which the allocation hypothesis (wiring newborn
+afferents away from the co-active pool improves separation) can be
+measured. Per-birth drive scales with fan-in, and birth episodes are
+sustained by the population mean the births themselves raise — so
+higher fan-in should both stabilize the cadence and risk the runaway
+guard. The sweep maps the boundary.
+
+### Frozen parameters (identical to E4e for every arm; ONE variable)
+
+- Arm **E4f-8**: `wiring_synapses = 8`
+- Arm **E4f-12**: `wiring_synapses = 12`
+- Arm **E4f-16**: `wiring_synapses = 16`
+
+All other variables fixed: `wiring_avoid_coactive = true`,
+`wiring_bidirectional = false`, homeostatic-saturation 25 Hz / 2 s,
+`trigger_cooldown_ms = 3000` (A10), adaptation 200/0.05, additive
+STDP, seed 20260912, curriculum, thresholds, caps, runaway detector
+50 Hz / 5 s UNCHANGED, metrics.
+
+### Frozen gate (identical bar for every arm, pre-registered)
+
+Calibration probe = S1 reps 40 (240 s S1), S2/S3 reps 2 (per E4e
+probe shape).
+
+- **Stability**: zero failures in the probe.
+- **Cadence**: ≥ 3 births in 240 s.
+- **Informativeness projection**: births ≥ 5 in 240 s ⇒ projected
+  full-run births = 240 s count × (full S1 + S2 + S3 presentations
+  ratio ≈ 3.35) ≈ ≥ 15 → **full run executes**.
+- Probe births 3–4: gate passed for stability but the arm is
+  projected under-informative — classification: **INCONCLUSIVE
+  (inert)** per the frozen 15-birth floor; no full run (E4e
+  precedent, no tuning after results).
+- Probe < 3 births or any failure: arm **closes at the gate**
+  (INCONCLUSIVE-inert or REGRESSION respectively).
+- **No per-arm tuning after seeing probe results.**
+
+### Frozen endpoints/verdict (only for arms whose full run executes)
+
+(1) late-S1 mean cross-cosine < 0.60; (2) median selectivity > 0.50;
+guards (3) within ≥ 0.80, (4) zero runaway + S1 rates [20, 250] Hz,
+(5) retention ≥ 0.80, (6) births ≥ 1 (and ≥ 15 for informativeness).
+SUPPORTED / WEAK / WEAKENED / INCONCLUSIVE / REGRESSION as in E4e —
+the 15-birth floor applies post-run too (an executed run that yields
+< 15 births is INCONCLUSIVE regardless of endpoint values).
+
+### Decision rule for the sweep
+
+Run probes in order 8 → 12 → 16. For each: execute the full curriculum
+iff the frozen gate's full-run condition is met (stability + births
+≥ 5). If NO arm reaches the full run **or** no executed arm reaches an
+informative verdict: close U3 (homeostatic-saturation framework) as
+untestable for the allocation hypothesis and proceed to U3b
+(persistent-error triggering) as the direct next registration, per
+user instruction.
+
+---
+
+## E4f execution record
+
+### Gate probes (all three arms, frozen shape, 240 s S1)
+
+| Arm | births / 240 s | failures | Gate bar (≥3) | Full run |
+|---|---|---|---|---|
+| E4f-8 | **2** (19,064 / 41,077) | 0 | FAIL | no |
+| E4f-12 | **2** (19,064 / 41,076) | 0 | FAIL | no |
+| E4f-16 | **2** (19,064 / 41,072) | 0 | FAIL | no |
+
+All three arms are failure-free but under-informative (2 < 3 bar;
+projected ~7 < 15 floor). **No arm reaches the full run.**
+
+### Finding
+
+Birth cadence is fan-in-insensitive in {4, 8, 12, 16}: identical
+2-birth pattern (t ≈ 19 s, 41 s — the trigger's initial-conditions
+episodes). Fan-in 20 (E4c probe) produced 8 births — the episodes
+that sustain the trigger require enough drive that only fan-in ≥ 20
+provides; below that, growth peters out; at 20, it eventually
+regresses. **There is no stable-non-inert homeostatic-saturation
+regime in this fan-in range** — the drive budget gap is real and
+unbridged: growth that sustains the trigger destabilizes the guard;
+growth that doesn't destabilize never informs.
+
+### Decision per the pre-registered rule
+
+Close **U3 (homeostatic-saturation + co-active-avoidance wiring) as
+untestable for the allocation hypothesis** under the current
+framework, and proceed to **U3b (persistent-error triggering)** as
+the next registration — per the E4f registration's decision rule and
+the user's instruction.
+
+---
+
+## U3b — persistent-error triggering (authorized by E4f decision rule)
+
+**Status: PRE-REGISTERED 2026-09-13, frozen before implementation.
+E5 gates remain excluded.**
+
+### Rationale
+
+The E4f sweep closed U3 (homeostatic-saturation) as untestable: its
+episodes are sustained by the population mean, which births
+themselves raise — fan-in ≤ 16 peters out (2 births/240 s), fan-in 20
+regresses. Persistent-error triggering decouples birth episodes from
+the population mean entirely: a birth is caused by sustained input-
+mismatch prediction error (μ + 2σ for 5 s), the organism's own
+"learnable-frontier" signal. This is U3 variant (b) from the
+registry.
+
+### Machinery amendments (pre-registered; dead-code defects, no
+### behavior change elsewhere)
+
+The shipped `persistent-error` trigger cannot fire in any real run
+(first config use; identical situation to E4's A5/A6):
+
+- **A11**: `PersistentError::should_birth` arms via
+  `get_or_insert` and clears `over_since` below the bound — the
+  shipped `self.over_since?` returns None on the first call without
+  arming, so `should_birth` is structurally always-None (the unit
+  test passed only because it pre-set `over_since`). Also re-arm on
+  fire (one fire per sustained episode) and apply the frozen
+  `trigger_cooldown_ms = 3000` cadence floor, identical to
+  homeostatic-saturation.
+- **A12**: harness `Signals` feeds the trigger the ACTUAL mismatch
+  `prediction_error: instr.last_error` (the shipped wiring passes
+  `instr.pe_mean`, making `error > μ + 2σ` structurally false).
+
+### Frozen U3b parameters (delta vs E4 base)
+
+- `birth_trigger = "persistent-error"` (sigma 2.0, sustained 5000 ms;
+  cooldown 3000 ms via A11).
+- `wiring_synapses = 20`, `wiring_avoid_coactive = true`,
+  `wiring_bidirectional = false` (E4 base wiring — the trigger is the
+  ONLY mechanism change).
+- All E3/E4 baseline variables unchanged: curriculum, seed 20260912,
+  additive STDP, adaptation 200/0.05, thresholds, caps, runaway
+  detector UNCHANGED, metrics.
+
+### Frozen gate + branches (identical bars to E4f)
+
+Probe = S1 reps 40 (240 s S1): stability (zero failures) AND
+births ≥ 3 / 240 s AND projection ≥ 15 (births ≥ 5) ⇒ full run;
+else the arm closes at the gate (INCONCLUSIVE-inert / REGRESSION).
+Executed runs: endpoints (1) mean cross < 0.60, (2) selectivity
+> 0.50; guards (3) within ≥ 0.80, (4) zero runaway + rates [20, 250]
+Hz, (5) retention ≥ 0.80, (6) births ≥ 1 and ≥ 15 for
+informativeness. Verdicts: SUPPORTED / WEAK / WEAKENED /
+INCONCLUSIVE / REGRESSION. **No tuning after results.**
+
+---
+
+## U3b execution record — calibration gate failed (0 births)
+
+### Gate probe
+
+- `runs/u3b-probe-20260913T172256Z` (240 s S1, persistent-error
+  trigger, sigma 2.0 / sustained 5000 ms / cooldown 3000, E4 base
+  wiring 20-in avoid-coactive).
+- **Stability: PASS** (zero failures); **cadence: FAIL — 0 births**
+  (gate bar ≥ 3). Arm closes at the gate per the frozen decision
+  rule; **no full run**.
+
+### Root cause (structural, not random)
+
+The PE bound is set by simulation-internal EWMA with α = 0.02 updated
+every 100 ticks ⇒ adaptation horizon ≈ **5000 ms — exactly equal to
+the trigger's sustained_ms**. The bound chases the error on the same
+timescale that must be exceeded, so `last_error > μ + 2σ` can never
+persist 5 s. Evidence: telemetry shows 2,595 pred-err events (min 0,
+max 15.3); a recomputed EWMA flags 568 over-bound samples, but none
+form a 5 s contiguous run. The trigger fired **zero** times with the
+registered parameters — the second dead-parameterization discovered
+at first real use (after A11/A12 fixed the dead-code latch and the
+`instr.pe_mean` wiring).
+
+### Verdict: **INCONCLUSIVE (inert) — closes at the gate**
+
+U3b as registered is un-fireable; the allocation hypothesis remains
+unevaluated. A re-parameterization is required for any U3b-2 rerun
+(e.g. sustained_ms = 1000–2000 ms, well below the 5000 ms adaptation
+horizon) — a NEW registration, no tuning on these results.
+
+### U3 status: closed as untestable under BOTH registered trigger
+### frameworks (homeostatic-saturation: 6 arms, all inert or
+### regressive; persistent-error: structurally un-fireable as
+### registered). Roadmap: E5 learning gates remain excluded by the
+### user; the next decision is the user's.

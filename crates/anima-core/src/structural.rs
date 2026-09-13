@@ -137,15 +137,19 @@ impl BirthTrigger for HomeostaticSaturation {
 }
 
 /// Running prediction error > μ+2σ sustained 5 s.
+/// A11: previously dead code — `over_since?` could never arm. Same
+/// latch/cooldown semantics as HomeostaticSaturation.
 pub struct PersistentError {
     pub sigma: f32,
     pub sustained_ms: u64,
+    pub cooldown_ms: u64,
     over_since: Option<Tick>,
+    last_birth: Option<Tick>,
 }
 
 impl PersistentError {
     pub fn new() -> Self {
-        Self { sigma: 2.0, sustained_ms: 5_000, over_since: None }
+        Self { sigma: 2.0, sustained_ms: 5_000, cooldown_ms: 0, over_since: None, last_birth: None }
     }
 }
 
@@ -159,8 +163,16 @@ impl BirthTrigger for PersistentError {
     fn should_birth(&mut self, net: &Network, signals: &Signals) -> Option<Reason> {
         let bound = signals.pe_mean + self.sigma * signals.pe_std;
         if signals.prediction_error > bound {
-            let since = self.over_since?;
+            let since = *self.over_since.get_or_insert(net.tick);
             if net.tick.0.saturating_sub(since.0) >= self.sustained_ms {
+                // A11: cooldown floor + re-arm (same as homeostatic-saturation).
+                if let Some(lb) = self.last_birth {
+                    if net.tick.0.saturating_sub(lb.0) < self.cooldown_ms {
+                        return None;
+                    }
+                }
+                self.over_since = None;
+                self.last_birth = Some(net.tick);
                 return Some(
                     Reason::new("persistent-error")
                         .factor("prediction-error", signals.prediction_error)
@@ -169,6 +181,8 @@ impl BirthTrigger for PersistentError {
                         .threshold("sustained-ms", self.sustained_ms as f32),
                 );
             }
+        } else {
+            self.over_since = None;
         }
         None
     }
@@ -200,7 +214,13 @@ pub fn make_trigger(
             }
             Box::new(t)
         }
-        "persistent-error" => Box::new(PersistentError::new()),
+        "persistent-error" => {
+            let mut t = PersistentError::new();
+            if let Some(c) = cooldown_ms {
+                t.cooldown_ms = c;
+            }
+            Box::new(t)
+        }
         other => panic!("unknown birth trigger: {other}"),
     }
 }
@@ -492,11 +512,56 @@ mod tests {
     fn persistent_error_trigger_fires() {
         let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
         let mut trig = PersistentError::new();
-        trig.over_since = Some(Tick(0));
-        net.tick = Tick(6_000);
+        net.tick = Tick(1_000);
         let sig = Signals { prediction_error: 1.0, pe_mean: 0.0, pe_std: 0.1, novelty: 0.0 };
-        let r = trig.should_birth(&net, &sig).expect("err=1.0 >> mu+2sigma=0.2 for 6s");
+        // Sustained: arms at t=1000, sustained 5000 ⇒ fires at t=6000.
+        assert!(trig.should_birth(&net, &sig).is_none(), "arms first");
+        net.tick = Tick(6_000);
+        let r = trig.should_birth(&net, &sig).expect("err=1.0 >> mu+2sigma=0.2 for 5s");
         assert_eq!(r.trigger, "persistent-error");
+        assert!(!r.contributing.is_empty());
+        assert!(!r.thresholds.is_empty());
+    }
+
+    #[test]
+    fn persistent_error_clears_below_bound_and_reacts() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
+        let mut trig = PersistentError { sigma: 2.0, sustained_ms: 25, cooldown_ms: 0, over_since: None, last_birth: None };
+        let hi = Signals { prediction_error: 1.0, pe_mean: 0.0, pe_std: 0.1, novelty: 0.0 };
+        let lo = Signals { prediction_error: 0.0, pe_mean: 0.0, pe_std: 0.1, novelty: 0.0 };
+        // Below bound: no arming.
+        net.tick = Tick(100);
+        assert!(trig.should_birth(&net, &lo).is_none());
+        // Above bound: arms and fires after sustained_ms.
+        net.tick = Tick(200);
+        assert!(trig.should_birth(&net, &hi).is_none(), "armed at 200");
+        net.tick = Tick(225);
+        assert!(trig.should_birth(&net, &hi).is_some(), "fire at 200+25");
+        // Drops below bound: re-arm allowed, fires again on next episode.
+        net.tick = Tick(300);
+        assert!(trig.should_birth(&net, &lo).is_none(), "cleared");
+        net.tick = Tick(400);
+        assert!(trig.should_birth(&net, &hi).is_none(), "re-armed at 400");
+        net.tick = Tick(425);
+        assert!(trig.should_birth(&net, &hi).is_some(), "second episode fires");
+    }
+
+    #[test]
+    fn persistent_error_cooldown_limits_cadence() {
+        let mut net = Network::new(NetworkConfig::default(), 2, 4, 1, 3);
+        let mut trig = PersistentError { sigma: 2.0, sustained_ms: 25, cooldown_ms: 100, over_since: None, last_birth: None };
+        let sig = Signals { prediction_error: 1.0, pe_mean: 0.0, pe_std: 0.1, novelty: 0.0 };
+        let mut fire_ticks = Vec::new();
+        for d in 0..300u64 {
+            net.tick = Tick(1_000 + d);
+            if trig.should_birth(&net, &sig).is_some() {
+                fire_ticks.push(1_000 + d);
+            }
+        }
+        assert!(fire_ticks.len() >= 3, "cooldown must not silence: {fire_ticks:?}");
+        for w in fire_ticks.windows(2) {
+            assert!(w[1] - w[0] >= 100, "fires must be >= cooldown apart");
+        }
     }
 
     #[test]
@@ -791,6 +856,33 @@ mod tests {
         // All plastic (same allocation semantics as E4).
         for sid in &net.incoming[id.idx()] {
             assert!(net.synapses[sid.idx()].plastic);
+        }
+    }
+
+    /// E4f: any pre-registered fan-in value {8, 12, 16} yields exactly
+    /// that many afferents and zero outgoing.
+    #[test]
+    fn mid_fanin_values_create_exact_afferent_counts() {
+        for fan_in in [8usize, 12, 16] {
+            let mut net = Network::new(NetworkConfig::default(), 2, 20, 2, 11);
+            let n_candidates = net
+                .neurons
+                .iter()
+                .filter(|n| n.class != NeuronClass::Input && !n.retired)
+                .count();
+            assert!(
+                n_candidates >= fan_in,
+                "test net must have enough candidates for fan-in {fan_in}"
+            );
+            let mon = StructuralMonitor {
+                wiring_synapses: fan_in,
+                wiring_avoid_coactive: true,
+                wiring_bidirectional: false,
+                ..StructuralMonitor::default()
+            };
+            let id = mon.birth(&mut net);
+            assert_eq!(net.incoming[id.idx()].len(), fan_in, "fan-in {fan_in}");
+            assert!(net.outgoing[id.idx()].is_empty(), "no fan-out for {fan_in}");
         }
     }
 }

@@ -325,9 +325,9 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
 
         // 4. structural pass (dormancy lifecycle; birth via trigger)
         let sig = Signals {
-            prediction_error: instr.pe_mean,
+            prediction_error: instr.last_error,
             pe_mean: instr.pe_mean,
-            pe_std: instr.pe_std.sqrt(),
+            pe_std: instr.pe_std,
             novelty: 0.0,
         };
         let se = structural.step(&mut net, trigger.as_mut(), &sig);
