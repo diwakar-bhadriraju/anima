@@ -101,3 +101,34 @@ only, the detector parameters are raised to `runaway_rate_hz = 399 × 1.5
 change, not an organism change — the rule and all learning parameters are
 untouched. Logged as A1 to keep the run interpretable rather than
 silently tuning until the verdict flips.
+
+## Execution record — final (2026-09-13)
+
+**Arm A** (`runs/e2a-20260913T082247Z`): completed, metrics in
+`report.md` — serves as the additive-rule replication of E1.
+
+**Arm B** (`runs/e2b-20260913T082426Z`): completed the curriculum but is
+**scientifically invalid as an assembly test**. After amendment A1 raised
+the runaway detector to 600 Hz, arm B entered a permanent population-wide
+seizure at the first S1 onset: internal mean rate ≈ 400 Hz sustained for
+the entire run, every internal neuron firing at every opportunity.
+Snapshot analysis: cross-pattern cosine = 1.000 for all pairs (no response
+profiles exist to separate), selectivity median = 0.0, retention ratio
+1.00 (trivially — the network never stops firing). The multiplicative
+LTD term (Δw⁻ ∝ a⁻·w) provides too little inhibition at low weights to
+break the recurrent loop this organism's wiring produces.
+
+**Verdict**: hypothesis NOT answered by this arm — the experiment is
+dominated by network stability, not assembly specificity. Per the
+protocol's scope guards, no further detector tuning was applied to force
+a verdict. The finding itself is recorded: classic multiplicative STDP
+without an inhibition/homeostasis mechanism is unstable in this organism
+regime, which is itself evidence relevant to U2 and future experiment
+design (an inhibition term or homeostatic mechanism becomes a
+prerequisite for bound-variant comparisons).
+
+**Status**: E2 closes as *inconclusive-by-instability* for Arm B; Arm A
+replicates E1. The next experiment targeting the binding problem must
+either introduce a stability mechanism first (E3 adaptation, U1 — the
+pre-registered roadmap already places it next) or compare bounds only
+after a stability mechanism exists.
