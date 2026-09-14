@@ -591,3 +591,81 @@ Gate-row detail: v2-nom2 permanence 2063 events / 901 established;
 v2-full 1991 / 768; v2-nom5 identical to v2-full (expected — M5
 disable only changes eviction among already-established synapses at
 this probe scale).
+
+---
+
+## v2-full execution record — MAIN ARM (2026-09-14)
+
+Run: `runs/v2-20260914T093312Z`, seed 20260912, curriculum-complete,
+0 failures, config `configs/v2-full.toml` (sha `2a4d1c7b…`, M3-1).
+
+### Structural-change statistics (full run)
+
+- candidate-permanence events: **4,532**; established at t+10 s:
+  **2,272**; competitive prunes: 5,425. M3 search is continuously
+  active; M4 recycles; budget invariant held every window (hard
+  assert, no abort).
+
+### P1 — Receptive-field specialization: **SUPPORTED**
+
+RF snapshot t = 715,000 ms: mean entropy H = 1.029; **23/40 internal
+neurons quasi-private (fraction 0.575)**; per group [A=2, B=12, C=9]
+— all three channel groups represented. Bar: ≥ 10 quasi-private AND
+every group present. ✓✓
+
+### P2 — Stability: **SUPPORTED**
+
+- Zero runaway failures (unchanged 50 Hz/5 s detector).
+- S1 internal mean rates: snapshot range 0.0–46.8 Hz (bursts in the
+  [20,250] band; floor is off-period silence).
+- Budget invariant (live_e ≤ 40, live_i ≤ 10 per neuron) held every
+  structural window.
+
+### P3 — Separation/selectivity: **SUPPORTED**
+
+- Late-S1 mean cross-pattern cosine = **(0.000 + 0.013 + 0.000)/3 =
+  0.0043** < 0.60 ✓
+- Median selectivity = **0.991** > 0.50 ✓ (n = 104)
+- Within-pattern mean 0.958; assembly late-S1 = 0.9495.
+- Retention (measured, not a pre-registered endpoint): A 0.823,
+  B 0.955, C 0.690.
+
+### Comparison vs E1/E3/E3b (identical instruments)
+
+| metric (late S1) | E1/armA | E3 | E3b | **v2** |
+|---|---|---|---|---|
+| cross A-B | 0.746 | 0.753 | 0.768 | **0.000** |
+| cross A-C | 0.604 | 0.603 | 0.695 | **0.013** |
+| cross B-C | 0.667 | 0.670 | 0.758 | **0.000** |
+| mean cross | 0.672 | 0.675 | 0.740 | **0.004** |
+| selectivity median | 0.428 | 0.455 | 0.366 | **0.991** |
+| within-pattern | 0.872 | 0.846 | 0.876 | **0.958** |
+
+### P4 — Cross-seed self-organization: **SUPPORTED**
+
+Runs: `runs/v2-seed9001-20260914T093702Z` (seed 9001),
+`runs/v2-seed424242-20260914T093702Z` (seed 424242), both
+curriculum-complete, 0 failures.
+
+| seed | mean H | QP fraction | established |
+|---|---|---|---|
+| 20260912 | 1.029 | 0.575 | 2,272 |
+| 9001 | 1.142 | 0.400 | 3,184 |
+| 424242 | 1.169 | 0.500 | 3,617 |
+
+(i) |Δmean H| ≤ 0.14 < 0.20 all pairs; |Δfrac| ≤ 0.175 < 0.20 all
+pairs ✓. (ii) Jaccard agreement of {neuron → top channel} maps:
+J(2026,9001) = 0.000, J(2026,424242) = 0.025, J(9001,424242) = 0.075
+— all < 0.50 ✓. The statistics are experience-selected (reproducible
+across seeds); the assignments are not pre-wired (near-disjoint).
+
+### Interpretation (recorded, per protocol)
+
+Every pre-registered primary prediction of the v2 architecture is
+supported. The organism self-organized input-specific receptive
+fields from experience alone under local laws M1–M6; separation
+moved from cross-cosine ~0.67 (E1–E3b) to ~0.004 with the identical
+evaluation instruments. Remaining registered items: the other arms'
+full runs (control/ablations) — v2−M6 and v2−M3/M4, v2-M1-only
+blocked at gate by registration; v2−M2 and v2−M5 passed their gates
+and their full runs are the registered next step.
