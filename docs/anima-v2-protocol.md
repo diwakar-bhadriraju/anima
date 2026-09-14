@@ -413,3 +413,112 @@ quasi-private 15/40 (fraction 0.375), mean H = 0.142
 per group [A,B,C,other] = [7, 3, 5, 0]. NB: with zero structural
 changes the RFs are pure M1-initial weights post-STDP; not evidence
 for P1.
+
+---
+
+## Amendment M3-1 — Candidate accumulation reachability correction
+
+**Status: PROPOSED — NOT APPROVED. No code changed, no run executed.
+Approval required before implementation.**
+
+### 1. Problem (from gate evidence)
+
+All six gate probes produced **zero** candidate-permanence events. The
+mechanism diagnosis: under the frozen stimulus statistics, the M3
+candidate fixed point lies *below* θ_die, so candidates die and
+redraw forever and permanence is structurally unreachable.
+
+### 2. Mathematical derivation (frozen stimulus statistics only)
+
+Window W = 100 ms; channel Poisson λ = 0.02/ms (20 Hz):
+P(pre fires in an ON window) = 1 − e^(−λW) = 1 − e^(−2) ≈ **0.8647**.
+Presentation: 5 ON windows (500 ms); off: 15 windows (1500 ms).
+
+Per cycle, weight recurrence (gain on co-active windows, decay on all
+non-co-active windows after it):
+
+- Max gain/cycle = Δ_perm · d^(15) · Σ_{j=0..4} d^j  (all 5 ON windows
+  co-active, every gain then decays through the remaining windows).
+- Fixed point w* = gain_max/(1 − d^15).
+
+| | d (decay_c) | Δ_perm | max gain/cycle | w* (max p) | θ_die | θ_perm |
+|---|---|---|---|---|---|---|
+| **frozen** | 0.9 | 0.005 | 0.00422 | **0.00531** | 0.005 | 0.05 |
+| **proposed** | 0.99 | 0.01 | 0.04215 | **0.301** | 0.005 | 0.05 |
+
+Frozen: even with p_co = 1, w* ≈ θ_die → permanence impossible by a
+factor of ~10. This is the reachability failure, not luck.
+
+### 3. Exact new M3 parameters (the ONLY changes)
+
+- `decay_c`: 0.9 → **0.99** (candidate retains evidence across
+  off-periods: 0.99^15 = 0.860 survival vs 0.206 frozen).
+- `delta_perm`: 0.005 → **0.01** (per co-active window).
+
+All other M3 parameters unchanged: c_slots 6, w_c_init 0.01,
+theta_permanent 0.05, w_c_permanent 0.02, theta_die 0.005,
+p_cand_in 0.5, p_cand_rec 0.5. M1/M2/M4/M5/M6, curriculum, STDP,
+adaptation, seeds, gates: **unchanged** (M1 wiring, M2 t_e, M4
+pruning, M5 budgets, M6 p_inh etc. all keep frozen values).
+
+### 4. Expected candidate dynamics under the proposal
+
+- **Single-presentation reachability (p_co = 1)**: starting w_c_init
+  = 0.01, five co-active ON windows give 0.01 + 5×0.01 = 0.06 →
+  permanence triggers at the **4th co-active window of one
+  presentation** (0.05 reached within 500 ms).
+- **Typical co-activity**: with p_co ≈ 0.61 (0.8647 × p_post_on ≈
+  0.7), expected accumulation ≈ 0.0255/cycle and ~**1.6
+  presentations** to permanence for a candidate whose channel is
+  being presented.
+- **Candidate lifetime when silent**: 0.01 → θ_die (0.005) in
+  0.99^n = 0.5 ⇒ n ≈ 69 windows ≈ **6.9 s** — a silent candidate
+  still dies and redraws within ~3–4 presentation cycles, preserving
+  the search semantics (structural exploration continues; no
+  permanent stuck sites).
+- **Predicted permanence volume in the gate probe** (240 s S1, 40
+  presentations per pattern): a candidate on a presented channel
+  accumulates ≈ 0.006/co-active-window over ~40 presentations ⇒
+  near-certain permanence; with 40 internal × 6 candidate slots ≈
+  240 candidate sites, expected established changes ≫ 3 gate bar if
+  channels of all three patterns are represented. (Candidates whose
+  channels never present — none here: every channel belongs to A/B/C
+  — stay silent and recycle.)
+- Conservative failure mode: if p_post_on is much lower in practice
+  (post rarely fires in ON windows), permanence slows to ~4–8
+  presentations but remains reachable (fixed point 0.30 ≫ θ_perm).
+
+### 5. Why this is a reachability correction, not outcome tuning
+
+- It restores the *defined* function of M3 — a reinforced candidate
+  becomes a synapse — which the frozen parameters provably prevent
+  (w* < θ_die for any p_co). The lifecycle (accumulate → permanence /
+  die → redraw), thresholds, and the resulting synapse
+  (w_c_permanent 0.02, plastic, M5-budgeted, M4-prunable) are
+  untouched.
+- The choice is derived **only** from the frozen stimulus statistics
+  and the mechanism's own constants; no gate probe result beyond the
+  zero-permanence observation (which is itself a reachability fact,
+  not an outcome) and **no full-run result** of any kind was used.
+- The amendment changes *whether* the structural-search event can
+  occur, not what it does to P1/P3 — those endpoints remain exactly
+  as registered, and the gates remain the arbiter.
+
+### 6. Updated gate expectations (unchanged gate bars)
+
+- **v2-full, v2−M2, v2−M5, v2−M6**: cadence bar (≥ 3 established
+  changes) expected to PASS — M3 now engages; stability/rates bars
+  as probed before (v2-full 0–47 Hz in band; v2−M6 rates bar
+  previously over 250 Hz — that arm's rates issue is unchanged by
+  this amendment and would still FAIL the rates bar if it recurs;
+  recorded, not tuned).
+- **v2−M3/M4, v2-M1-only**: cadence bar still FAILS by registration
+  (M3 disabled) — unchanged.
+- P1–P4: unchanged endpoints; full runs still gated.
+
+### 7. Scope check
+
+No curriculum/stimulus change; no gate change; no other mechanism
+change. This amendment is exclusively the two M3 constants above.
+
+**Awaiting approval.**
