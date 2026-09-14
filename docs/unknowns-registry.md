@@ -52,3 +52,19 @@ open (placeholder E7).
 
 E6 designation reassigned (see above); reward-modulated STDP
 placeholder re-deferred to a future E7. No mechanism work done.
+
+### U9 update (2026-09-14, E6 result)
+
+E6 (plasticity-event rate balancing, construction B) executed:
+exclusive-evidence feature selection RESTORED on the overlap
+curriculum (7/40 exclusive users, pure {A}/{C} signatures; A-B
+cross 0.697→0.078; C1 control proves the mechanism preserves the
+disjoint regime, selectivity 0.993). Primary separation hypothesis
+H6b/H6c NOT supported: B (⊆ A∪C, no private channels) cannot
+separate from C via rate balancing alone — B-C cross 0.792;
+selectivity 0.116; P4 seed-variable in magnitude. Conclusion:
+per-event rate balancing is necessary-but-insufficient for
+separation under overlap; the residual requirement is
+absence-gating (a veto for shared evidence when exclusive evidence
+is absent) — registered as an open mechanism question, no
+amendment proposed.

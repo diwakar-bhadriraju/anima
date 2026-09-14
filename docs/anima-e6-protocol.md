@@ -270,3 +270,70 @@ run dirs. Any observability failure stops the run and is diagnosed.
 - Commit (implementation): `(recorded at run time)`.
 - Permanence reachability check (recorded at run time): established
   ≥ 1 by S1 end (else INCONCLUSIVE per §7).
+---
+
+## E6 execution record (2026-09-14)
+
+Implementation commit `563bc10` (17 new tests; 100 total green, 0
+warnings). All four config hashes recorded above. Run dirs:
+e6-full `runs/e6-20260914T204947Z`, C1 `runs/e6-v2cur-20260914T205517Z`,
+cross-seed `runs/e6-seed9001-20260914T205517Z`,
+`runs/e6-seed424242-20260914T205517Z` — all curriculum-complete,
+telemetry intact, zero failures.
+
+### E6-full (v3 overlap curriculum, seed 20260912) — H6a–H6e
+
+| Endpoint | Bar | Result | Verdict |
+|---|---|---|---|
+| H6a exclusive-evidence RFs | ≥ 5/40 specialized users | **7/40** (0.35 of specialized; v3-full: 0) | **SUPPORTED** |
+| H6b selectivity | > 0.50 | median **0.116** (v3: 0.168) | **NOT SUPPORTED** |
+| H6c cross-pattern | mean < 0.60 AND every pair < 0.60 | mean **0.305**; A-B **0.078** (v3: 0.697), A-C 0.046, B-C **0.792** (v3: 0.645) | **NOT SUPPORTED** (B-C pair) |
+| H6d P1-v3 fraction | ≥ 0.25 | **0.500** (20/40) | **SUPPORTED** |
+| H6e P2 | verbatim v2 | 0 failures; late-S1 11.9 mean / 98.0 max Hz; budget held | **SUPPORTED** |
+
+Structural: 15,159 permanence events, 5,332 established (v3-full:
+20,873 / 7,517 — lower turnover: β slows shared-channel permanence
+as registered §3.5). Signatures: {A}×1, {C}×6 (pure exclusive —
+absent in v3), {B+C}×13, BROAD×20; per-channel participation now
+spreads over 0-3 and 12-15 (top-frac 0.03–0.10 each; v3: 0.00).
+φ readout matches v3-full exactly (input statistics identical —
+readout verified). D-condition: cosine(A-D) 0.349 (v3: 0.711),
+B-D 0.882, C-D 0.929; S2/S1 ratio 1.067. Retention A 2.414
+(post-S2 potentiation), B 0.900, C 0.795.
+
+### C1 — disjoint v2 curriculum + E6 (registered control): **PASS**
+
+P2 supported (0 failures; 9.4 mean / 114.3 max Hz); P3 supported
+verbatim (mean cross **0.083**: A-B 0.000, A-C 0.047, B-C 0.201;
+selectivity median **0.993** ≈ v2's 0.991); P1-v3 fraction 0.375 ≥
+0.25. E6 does NOT damage the known-good regime — and on the
+disjoint curriculum it preserves near-orthogonality while still
+recruiting exclusive evidence (7/40, incl. pure-{C}×7).
+
+### P4 — cross-seed: **NOT SUPPORTED**
+
+(i) |ΔH| = 0.216 / 0.093 / 0.123 — the 20260912–9001 pair exceeds
+0.20 (marginal); |Δfrac| = 0.200 / 0.100 / 0.100 (0.200 = boundary
+FAIL under the strict < 0.20 bar). (ii) Jaccard 0.075 / 0.150 /
+0.100 < 0.50 ✓. (iii) signature-type stability within ±0.20:
+B+C fraction differs by 0.325 / 0.325, C by 0.225 — **FAIL**. The
+mechanism's exclusive-evidence recruitment is seed-dependent in
+magnitude even though it never vanishes (0.350–0.467 of specialized
+vs 0.000 in every v3 seed).
+
+### Frozen verdict (protocol §10)
+
+**Outcome C — construction insufficient for full separation under
+overlap, with a registered partial recovery.** H6a/H6d/H6e
+supported: β-balancing re-opened the discriminative channels
+(pure-{A}/{C} RFs, A-B entanglement 0.697 → 0.078, turnover slowed
+as registered). H6b and H6c fail on exactly the registered
+expected axis: **B has no private evidence** (B ⊆ A∪C), so
+B-representations must share channels 8-11 with C; separation of B
+from C requires absence-gating, which no frozen mechanism
+provides. P4 fails on statistical (not assignment) stability. The
+U9 hypothesis is PARTIALLY validated: per-event rate balancing is
+necessary and sufficient for exclusive-feature recruitment, but it
+is not sufficient for full category separation under overlap.
+Negative-on-the-primary-result is a valid outcome; no tuning, no
+amendment proposed.
