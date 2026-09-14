@@ -10,6 +10,7 @@
 //! iteration is over Vec index order; tie-breaks by lowest SynapseId.
 
 use crate::network::{NeuronClass, NeuronId, Network, SynapseId, Tick, V2Params};
+use crate::rate_balance::{E6Params, RateBalance};
 
 /// One candidate afferent (M3): a contact with a weight that can become a
 /// real synapse upon reinforcement.
@@ -58,12 +59,14 @@ pub struct V2Plasticity {
     live_i: Vec<usize>,
     /// Budget usage snapshot for telemetry.
     pub report: V2Report,
+    /// E6 rate balancing (docs/anima-e6-protocol.md §3); None = inert.
+    pub rate_balance: Option<RateBalance>,
 }
 
 impl V2Plasticity {
     /// Build candidate pools in the frozen order (neuron-id order, partners
     /// channel-id then neuron-id; D8: no candidates onto input neurons).
-    pub fn new(net: &mut Network, params: V2Params) -> Self {
+    pub fn new(net: &mut Network, params: V2Params, e6: Option<E6Params>) -> Self {
         let n = net.neurons.len();
         let mut candidates = vec![Vec::new(); n];
         for post in 0..n {
@@ -88,21 +91,41 @@ impl V2Plasticity {
             live_e,
             live_i,
             report: V2Report::default(),
+            rate_balance: e6.map(RateBalance::new),
         }
     }
 
-    /// Fast-path hook: record which neurons fired this tick (no mutation).
+    /// Fast-path hook: record which neurons fired this tick (no mutation),
+    /// plus E6 input-channel event counts (§3.1).
     pub fn tick(&mut self, spikes: &[NeuronId]) {
         for &n in spikes {
             if let Some(f) = self.fired.get_mut(n.idx()) {
                 *f = true;
             }
+            if let Some(rb) = self.rate_balance.as_mut() {
+                rb.tick(n);
+            }
+        }
+    }
+
+    /// β for one (pre → post) contact: 1.0 when E6 is disabled (exact v2
+    /// path); the E6 balance factor otherwise. Applied at the M3 co-active
+    /// accumulation and the STDP a⁺ branch — nowhere else.
+    pub fn beta(&self, net: &Network, post: NeuronId, pre: NeuronId) -> f32 {
+        match &self.rate_balance {
+            Some(rb) => rb.beta(net, post, pre),
+            None => 1.0,
         }
     }
 
     /// One structural window. Frozen order; returns events for telemetry.
     pub fn window(&mut self, net: &mut Network, tick: Tick) -> Vec<V2Event> {
         let mut events = Vec::new();
+
+        // --- E6 step 0 (frozen §3.1): φ ← EMA(previous window counts) ---
+        if let Some(rb) = self.rate_balance.as_mut() {
+            rb.window_start();
+        }
 
         // --- M4: competitive pruning (excitatory only; frees slots) ---
         if !self.params.disable_m3_m4 {
@@ -182,7 +205,9 @@ impl V2Plasticity {
             let pre = pool[i].pre;
             let coactive = self.fired[post] && self.fired[pre.idx()];
             if coactive {
-                pool[i].w += self.params.delta_perm;
+                // E6 (frozen §3.3.2): co-active accumulation × β_pre. When
+                // E6 is disabled β ≡ 1, exact v2 increment.
+                pool[i].w += self.params.delta_perm * self.beta(net, post_id, pre);
             } else {
                 pool[i].w *= self.params.decay_c;
             }

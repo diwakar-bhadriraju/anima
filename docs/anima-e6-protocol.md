@@ -262,8 +262,11 @@ run dirs. Any observability failure stops the run and is diagnosed.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e6-full `…`; e6-v2curriculum `…`; e6-seed9001 `…`;
-  e6-seed424242 `…` (recorded at creation, before runs).
-- Commit: `…` (recorded at run time).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e6-full `2cdc8beef39913a3e25c9be9c9043917422756ae79eccd9b855b583f789e0ecc`;
+  e6-v2curriculum `359403470b716c322333e053caad0436e9090ebcb8c597151269f3abf2845204`;
+  e6-seed9001 `0aaeec2757118d824eed265b8e44e70b57a2e567ca6189f10903aa8026ea8955`;
+  e6-seed424242 `3c882b1763738959b25e607a17863427d3b381b81352850641c8083bb2e8eee0`.
+- Commit (implementation): `(recorded at run time)`.
 - Permanence reachability check (recorded at run time): established
   ≥ 1 by S1 end (else INCONCLUSIVE per §7).

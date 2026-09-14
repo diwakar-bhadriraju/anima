@@ -221,3 +221,191 @@ fn pipeline_metrics_and_report() {
     }
     let _ = std::fs::remove_dir_all(dir.parent().unwrap());
 }
+
+// ---- ANIMA E6 integration tests (docs/anima-e6-protocol.md §7 / C0) ----
+
+/// Short v2-enabled config with a rate-skewed curriculum (ch0 in both A
+/// and B ⇒ 2:1 duty cycle vs ch1-only) — exactly the regime that makes
+/// β ≠ 1. `e6` controls the [e6] section text.
+const E6_TOML: &str = r#"
+[run]
+exp_id = "e6it"
+seed = 20260912
+viz_port = 8793
+ticks_per_sec = 1000.0
+stats_decimate = 10
+
+[organism]
+n_input_channels = 4
+group_size = 2
+n_internal = 12
+n_output = 4
+connectivity = 0.038
+w_init = 0.2
+amplitude = 52.0
+adaptation_tau_ms = 200.0
+adaptation_gain = 0.05
+
+[plasticity]
+rule = "stdp-pairwise"
+tau_plus_ms = 20.0
+tau_minus_ms = 20.0
+a_plus = 0.005
+a_minus = 0.0053
+w_min = 0.0
+w_max = 1.0
+decay = 1e-6
+silence_w = 0.02
+silence_ticks = 60000
+min_age_ticks = 30000
+gate = "always"
+
+[structural]
+birth_trigger = "none"
+dormancy_rate_hz = 0.1
+dormancy_ms = 30000
+recovery_rate_hz = 1.0
+retirement_ms = 300000
+wiring_synapses = 5
+
+[resources]
+max_neurons = 200
+max_synapses = 2000
+births_per_window = 4
+runaway_rate_hz = 50.0
+runaway_sustained_ms = 5000
+fragmentation_min_component = 0.6
+
+[v2]
+enabled = true
+p_in = 0.5
+w_in_lo = 0.02
+w_in_hi = 0.06
+p_rec = 0.2
+w_rec_lo = 0.005
+w_rec_hi = 0.02
+t_e = 0.8
+c_slots = 6
+w_c_init = 0.01
+delta_perm = 0.01
+decay_c = 0.99
+theta_permanent = 0.05
+w_c_permanent = 0.02
+theta_die = 0.005
+p_cand_in = 0.5
+p_cand_rec = 0.5
+theta_prune = 0.005
+prune_windows = 10
+b_e = 40
+b_i = 10
+p_inh = 0.3
+w_inh_lo = 0.01
+w_inh_hi = 0.03
+a_inh = 0.005
+decay_inh = 0.98
+w_inh_max = 0.10
+window_ticks = 100
+__E6__
+
+[[pattern]]
+id = "A"
+channels = []
+channel_ids = [0, 1]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[pattern]]
+id = "B"
+channels = []
+channel_ids = [1, 2]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[stage]]
+id = "S0"
+present = []
+reps = 0
+order = "interleaved"
+off_ms = 0
+silence_ms = 300
+
+[[stage]]
+id = "S1"
+present = ["A", "B"]
+reps = 8
+order = "interleaved"
+off_ms = 300
+
+[[stage]]
+id = "S2"
+present = ["B"]
+reps = 2
+order = "blocked"
+off_ms = 300
+"#;
+
+const E6_DISABLED: &str = "[e6]\nenable = false\n";
+const E6_ENABLED: &str = "[e6]\nenable = true\nalpha = 0.04\nphi_init = 0.02\nphi_min = 0.001\nbeta_min = 0.1\nbeta_max = 10.0\n";
+
+/// C0: [e6] present-but-disabled must be behaviorally byte-identical to
+/// the same config without the [e6] section: identical telemetry event
+/// stream, EXCLUDING the RunStarted record (which by design carries the
+/// raw config hash — different file text, same behavior).
+#[test]
+fn e6_disabled_byte_identical_short_run() {
+    let with = E6_TOML.replace("__E6__", E6_DISABLED);
+    let without = E6_TOML.replace("__E6__", "");
+    let d1 = run_config("e6off", &with);
+    let d2 = run_config("e6no", &without);
+    let stream = |dir: &std::path::Path| -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let reader = anima_telemetry::TelemetryReader::open(&dir.join("telemetry")).unwrap();
+        let idx = reader.chunk_index();
+        let mut h = DefaultHasher::new();
+        for c in 0..idx.len() {
+            for row in reader.chunk_rows(c).unwrap() {
+                let env = row.envelope("e6").unwrap();
+                if env.kind == anima_telemetry::events::EventKind::RunStarted {
+                    continue; // config identity metadata, not behavior
+                }
+                serde_json::to_string(&env).unwrap().hash(&mut h);
+            }
+        }
+        format!("{:x}", h.finish())
+    };
+    assert_eq!(stream(&d1), stream(&d2), "e6 disabled must be behaviorally identical to no-e6");
+    let _ = std::fs::remove_dir_all(d1.parent().unwrap());
+    let _ = std::fs::remove_dir_all(d2.parent().unwrap());
+}
+
+/// Determinism: two identical e6-ENABLED runs ⇒ identical telemetry sha256.
+#[test]
+fn e6_deterministic_repeated_run() {
+    let toml = E6_TOML.replace("__E6__", E6_ENABLED);
+    let d1 = run_config("e6d1", &toml);
+    let d2 = run_config("e6d2", &toml);
+    let h1 = sha256_dir(&d1.join("telemetry"));
+    let h2 = sha256_dir(&d2.join("telemetry"));
+    assert_eq!(h1, h2, "same seed + e6 => byte-identical telemetry");
+    let _ = std::fs::remove_dir_all(d1.parent().unwrap());
+    let _ = std::fs::remove_dir_all(d2.parent().unwrap());
+}
+
+/// Engagement: under a rate-skewed curriculum (ch1 in both patterns),
+/// e6-enabled must NOT be byte-identical to e6-disabled — the mechanism
+/// must actually alter plasticity (β ≠ 1).
+#[test]
+fn e6_enabled_changes_telemetry_under_rate_skew() {
+    let on = E6_TOML.replace("__E6__", E6_ENABLED);
+    let off = E6_TOML.replace("__E6__", E6_DISABLED);
+    let d1 = run_config("e6on", &on);
+    let d2 = run_config("e6of2", &off);
+    let h1 = sha256_dir(&d1.join("telemetry"));
+    let h2 = sha256_dir(&d2.join("telemetry"));
+    assert_ne!(h1, h2, "rate-skewed curriculum must engage E6 (β ≠ 1)");
+    let _ = std::fs::remove_dir_all(d1.parent().unwrap());
+    let _ = std::fs::remove_dir_all(d2.parent().unwrap());
+}

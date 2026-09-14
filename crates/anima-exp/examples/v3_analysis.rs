@@ -234,6 +234,41 @@ fn main() {
         println!("{name}: mean={mean:.1} max={max:.1} Hz (n={})", rates.len() / 40);
     }
 
+    // ---- E6 engagement readout (docs/anima-e6-protocol.md §3.4/§9) ----
+    // φ is mechanism-internal; this RE-COMPUTES it deterministically from
+    // the recorded input spike stream with the frozen EMA (α=1/25, init
+    // 0.02, floor 0.001, W=100, one-window lag) — a measurement print,
+    // no metric redefinition.
+    {
+        const E6_ALPHA: f32 = 1.0 / 25.0;
+        const E6_INIT: f32 = 0.02;
+        const E6_MIN: f32 = 0.001;
+        const W: u64 = 100;
+        let last_t = spikes.iter().map(|s| s.0).max().unwrap_or(0);
+        let n_windows = (last_t / W) as usize + 1;
+        let mut cnt: Vec<Vec<u32>> = vec![vec![0; N_IN]; n_windows];
+        for &(t, n) in &spikes {
+            if (n as usize) < N_IN {
+                cnt[(t / W) as usize][n as usize] += 1;
+            }
+        }
+        let mut phi: Vec<f32> = vec![E6_INIT; N_IN];
+        for w in 0..n_windows {
+            for i in 0..N_IN {
+                phi[i] = ((1.0 - E6_ALPHA) * phi[i]
+                    + E6_ALPHA * (cnt[w][i] as f32 / W as f32))
+                    .max(E6_MIN);
+            }
+        }
+        println!("== E6 φ readout (frozen EMA recomputed from input stream) ==");
+        println!("final φ per channel: {}", phi.iter().map(|p| format!("{p:.4}")).collect::<Vec<_>>().join(" "));
+        let excl: Vec<f32> = (0..4).chain(12..16).map(|c| phi[c]).collect();
+        let shared: Vec<f32> = (4..12).map(|c| phi[c]).collect();
+        let mean = |v: &[f32]| v.iter().sum::<f32>() / v.len().max(1) as f32;
+        println!("mean φ exclusive {{0-3,12-15}}: {:.4} Hz-equiv, shared {{4-11}}: {:.4} (ratio {:.2})",
+            mean(&excl) * 1000.0, mean(&shared) * 1000.0, mean(&shared) / mean(&excl).max(1e-6));
+    }
+
     // ---- D-condition cosines (mean S1 A/B/C vectors vs mean S2 D) ----
     pres.sort_by_key(|p| p.2);
     let s1: Vec<_> = pres.iter().filter(|p| p.1 == "S1").collect();

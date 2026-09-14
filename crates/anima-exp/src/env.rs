@@ -309,6 +309,7 @@ mod tests {
                 StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None },
             ],
             v2: None,
+            e6: None,
         }
     }
 
@@ -525,4 +526,36 @@ mod tests {
         let _ = std::fs::remove_file(&tmp);
         let _ = std::fs::remove_file(&tmp2);
     }
+
+    // ---- ANIMA E6 pre-registered tests (docs/anima-e6-protocol.md §4/§7) ----
+
+/// §4: e6-full = v3-full + [e6] (nothing else differs); e6-v2curriculum =
+/// v2-full + [e6]; cross-seed configs = e6-full with frozen seeds only.
+#[test]
+fn e6_configs_freeze_source_with_e6_only() {
+    let strip = |s: String| -> String {
+        s.lines()
+            .filter(|l| !l.is_empty() && !l.starts_with("exp_id") && !l.starts_with("seed") && *l != "[e6]" && !l.starts_with("enable") && !l.starts_with("alpha") && !l.starts_with("phi_") && !l.starts_with("beta_"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let f3 = strip(toml::to_string(&v3_config("v3-full.toml")).unwrap());
+    let e6f = strip(toml::to_string(&v3_config("e6-full.toml")).unwrap());
+    assert_eq!(e6f, f3, "e6-full must differ from v3-full ONLY by [e6] + exp_id");
+    let f2 = strip(toml::to_string(&v3_config("v2-full.toml")).unwrap());
+    let e6c = strip(toml::to_string(&v3_config("e6-v2curriculum.toml")).unwrap());
+    assert_eq!(e6c, f2, "e6-v2curriculum must differ from v2-full ONLY by [e6] + exp_id");
+
+    let e6 = v3_config("e6-full.toml").e6.expect("[e6] present");
+    assert!(e6.enable);
+    assert_eq!((e6.alpha, e6.phi_init, e6.phi_min, e6.beta_min, e6.beta_max),
+               (1.0 / 25.0, 0.02, 0.001, 0.1, 10.0), "frozen E6 params");
+    for (name, seed) in [("e6-seed9001.toml", 9001u64), ("e6-seed424242.toml", 424242)] {
+        let c = v3_config(name);
+        assert_eq!(c.run.seed, seed, "{name} seed");
+        assert_eq!(c.e6.as_ref().map(|e| e.enable), Some(true), "{name} e6 on");
+        let s = strip(toml::to_string(&c).unwrap());
+        assert_eq!(s, f3, "{name} must equal v3-full + [e6] + seed");
+    }
+}
 }

@@ -19,6 +19,47 @@ pub struct ExpConfig {
     /// mechanisms M1–M6. Absent/false = E1–E4f behavior exactly.
     #[serde(default)]
     pub v2: Option<V2Section>,
+    /// ANIMA E6 (docs/anima-e6-protocol.md §3): rate balancing.
+    /// Absent or enable=false ⇒ exact v2/v3 behavior.
+    #[serde(default)]
+    pub e6: Option<E6Section>,
+}
+
+/// Frozen ANIMA E6 parameters (docs/anima-e6-protocol.md §3).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct E6Section {
+    #[serde(default)]
+    pub enable: bool,
+    /// EMA smoothing α (frozen 1/25).
+    #[serde(default = "default_e6_alpha")]
+    pub alpha: f32,
+    /// Initial φ per channel (frozen 0.02 events/tick).
+    #[serde(default = "default_e6_phi_init")]
+    pub phi_init: f32,
+    /// Floor for φ (frozen 0.001 events/tick).
+    #[serde(default = "default_e6_phi_min")]
+    pub phi_min: f32,
+    /// β clamp bounds (frozen [0.1, 10]).
+    #[serde(default = "default_e6_beta_min")]
+    pub beta_min: f32,
+    #[serde(default = "default_e6_beta_max")]
+    pub beta_max: f32,
+}
+
+fn default_e6_alpha() -> f32 {
+    1.0 / 25.0
+}
+fn default_e6_phi_init() -> f32 {
+    0.02
+}
+fn default_e6_phi_min() -> f32 {
+    0.001
+}
+fn default_e6_beta_min() -> f32 {
+    0.1
+}
+fn default_e6_beta_max() -> f32 {
+    10.0
 }
 
 /// Frozen ANIMA v2 protocol parameters (§2–§8 of the protocol).
@@ -225,6 +266,24 @@ impl ExpConfig {
                             p.id, c, cfg.organism.n_input_channels
                         ));
                     }
+                }
+            }
+        }
+        // E6 (docs/anima-e6-protocol.md §3): requires the v2 layer; frozen
+        // param sanity — values must be inside the registered regimes.
+        if let Some(e) = &cfg.e6 {
+            if e.enable {
+                if !cfg.v2.as_ref().is_some_and(|v| v.enabled) {
+                    return Err("E6 requires [v2] enabled".into());
+                }
+                if !(e.alpha > 0.0 && e.alpha <= 1.0) {
+                    return Err("E6 alpha must be in (0, 1]".into());
+                }
+                if e.phi_min >= e.phi_init || e.phi_min < 0.0 {
+                    return Err("E6 phi_min must be < phi_init".into());
+                }
+                if e.beta_min > 1.0 || e.beta_max < 1.0 || e.beta_min >= e.beta_max {
+                    return Err("E6 beta clamp must bracket 1.0".into());
                 }
             }
         }

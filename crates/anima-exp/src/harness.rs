@@ -128,7 +128,10 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         .filter(|v| v.enabled)
         .map(|_| {
             v2_enabled = true;
-            V2Plasticity::new(&mut net, v2_params(&cfg).expect("v2 enabled"))
+            // E6 (docs/anima-e6-protocol.md §3): optional rate balancing,
+            // wired through V2Plasticity; None when disabled — exact v2 path.
+            let e6 = cfg.e6.as_ref().filter(|e| e.enable).map(|e| e6_params(e, &cfg));
+            V2Plasticity::new(&mut net, v2_params(&cfg).expect("v2 enabled"), e6)
         });
     let v2_window_ticks = cfg
         .v2
@@ -332,7 +335,14 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                 &params, &mut net, &traces, &step.spikes, 1.0,
             )
         } else {
-            stdp_tick(&params, &mut net, &traces, &step.spikes, 1.0)
+            stdp_tick(
+                &params,
+                &mut net,
+                &traces,
+                &step.spikes,
+                1.0,
+                v2.as_ref().and_then(|v| v.rate_balance.as_ref()),
+            )
         };
         for c in changes {
             unemit.resize(c.synapse.idx() + 1, 0.0);
@@ -670,6 +680,20 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         w_inh_max: v.w_inh_max,
         window_ticks: v.window_ticks,
     })
+}
+
+/// Map the frozen [e6] config section onto E6Params
+/// (docs/anima-e6-protocol.md §3; caller guarantees enable == true).
+fn e6_params(e: &crate::config::E6Section, cfg: &ExpConfig) -> anima_core::rate_balance::E6Params {
+    anima_core::rate_balance::E6Params::new(
+        e.alpha,
+        e.phi_init,
+        e.phi_min,
+        e.beta_min,
+        e.beta_max,
+        cfg.v2.as_ref().map(|v| v.window_ticks as u32).unwrap_or(100),
+        cfg.organism.n_input_channels,
+    )
 }
 
 fn class_str(c: NeuronClass) -> &'static str {

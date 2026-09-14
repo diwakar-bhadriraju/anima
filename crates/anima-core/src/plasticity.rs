@@ -299,12 +299,18 @@ pub fn stdp_tick_multiplicative(
 /// Extension used by the harness: per-spike STDP given the tick's spike set.
 /// pre-before-post ⇒ LTP: when post fires, potentiate by a_plus × pre-trace.
 /// post-before-pre ⇒ LTD: when pre fires, depress by a_minus × post-trace.
+///
+/// E6 (docs/anima-e6-protocol.md §3.3.1): when `rate_balance` is Some, the
+/// LTP increment for input-channel afferents is additionally multiplied by
+/// β_pre. LTD and every other term are never scaled; `None` is the exact
+/// v2/v3 path.
 pub fn stdp_tick(
     params: &StdpParams,
     net: &mut Network,
     traces: &Traces,
     spikes: &[NeuronId],
     gate: f32,
+    rate_balance: Option<&crate::rate_balance::RateBalance>,
 ) -> Vec<WeightChange> {
     let mut changes = Vec::new();
     // LTP pass: for each post neuron that fired, potentiate its incoming.
@@ -327,9 +333,11 @@ pub fn stdp_tick(
             if pre_t <= 0.0 {
                 continue;
             }
+            // E6: β scales the a⁺ increment only (input-channel afferents).
+            let beta = rate_balance.map(|rb| rb.beta(net, post, s.pre)).unwrap_or(1.0);
             let s = &mut net.synapses[sid.idx()];
             let before = s.w;
-            s.w = (s.w + params.a_plus * pre_t * gate).min(params.w_max);
+            s.w = (s.w + params.a_plus * pre_t * gate * beta).min(params.w_max);
             if s.w != before {
                 changes.push(WeightChange { synapse: sid, before, after: s.w });
             }
@@ -437,7 +445,7 @@ mod tests {
         force_spike(&mut net, post);
         let ev = net.step(&InputFrame { tick: Tick(5), spikes: vec![] });
         traces.step(&net, &ev.spikes);
-        let changes = stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0);
+        let changes = stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
         let w1 = net.synapses[sid.idx()].w;
         let delta = changes.iter().find(|c| c.synapse == sid).map(|c| c.after - c.before);
         // Either picked up in changes (bounded at w_max) or w rose.
@@ -474,7 +482,7 @@ mod tests {
         force_spike(&mut net, pre);
         let ev = net.step(&InputFrame { tick: Tick(5), spikes: vec![] });
         traces.step(&net, &ev.spikes);
-        let changes = stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0);
+        let changes = stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
         let w1 = net.synapses[sid.idx()].w;
         let fell = w1 < w0 - 1e-6
             || changes
@@ -498,7 +506,7 @@ mod tests {
                 spikes: vec![crate::network::InputChannelId(0)],
             });
             traces.step(&net, &ev.spikes);
-            stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0);
+            stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
         }
         for s in net.live_synapses() {
             assert!(s.w <= params.w_max + 1e-6, "w={} > w_max", s.w);
@@ -627,7 +635,7 @@ mod tests {
             .expect("internal→internal synapse")
     }
 
-    fn force_spike(net: &mut Network, id: NeuronId) {
+    pub(crate) fn force_spike(net: &mut Network, id: NeuronId) {
         let n = &mut net.neurons[id.idx()];
         n.v = 100.0; // far over threshold; refractory check passes at t=0
         n.refractory_until = Tick(0);
@@ -654,5 +662,106 @@ mod tests {
         };
         traces.step(&net, &spike_ev.spikes); // must not panic
         assert_eq!(traces.pre.len(), net.synapses.len());
+    }
+}
+
+
+#[cfg(test)]
+mod e6_tests {
+    use super::*;
+    use crate::network::{InputChannelId, InputFrame, Network, NetworkConfig, Tick};
+    use crate::rate_balance::{E6Params, RateBalance};
+    use super::tests::force_spike;
+
+    fn rb_skewed() -> RateBalance {
+        let mut r = RateBalance::new(E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 2));
+        r.phi[0] = 0.01; // half rate
+        r.phi[1] = 0.03;
+        r
+    }
+
+    /// Returns the first input-afferent synapse (channel -> post) and its
+    /// post neuron, driving ch at t=0 and post at t=5 (LTP event).
+    fn ltp_probe(balance: bool) -> (f32, f32) {
+        let mut net = Network::new(NetworkConfig::default(), 2, 3, 1, 7);
+        let mut traces = Traces::new(&net, 20.0);
+        let ch = 0u32;
+        let pre = net.channels[ch as usize].target;
+        let sid = net.outgoing[pre.idx()].first().copied().expect("input afferent");
+        let post = net.synapses[sid.idx()].post;
+        // Second live input afferent on the same post so that φ̄ = (φ0+φ1)/2
+        // and β(ch0) = 2 under the skewed φ (0.01 / 0.03).
+        net.add_synapse(NeuronId(1), post, 0.2, true, Tick(0));
+        let w0 = net.synapses[sid.idx()].w;
+
+        let rb = balance.then(rb_skewed);
+        let beta = rb
+            .as_ref()
+            .map(|r| r.beta(&net, post, pre))
+            .unwrap_or(1.0);
+        // Drive: ch fires at t=0 (LTP requires pre trace), post at t=5.
+        let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![InputChannelId(ch)] });
+        traces.step(&net, &ev.spikes);
+        for t in 1..5 {
+            let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+        }
+        force_spike(&mut net, post);
+        let ev = net.step(&InputFrame { tick: Tick(5), spikes: vec![] });
+        traces.step(&net, &ev.spikes);
+        let changes = stdp_tick(&StdpParams::default(), &mut net, &traces, &ev.spikes, 1.0, rb.as_ref());
+        let delta = changes
+            .iter()
+            .find(|c| c.synapse == sid)
+            .map(|c| c.after - c.before)
+            .unwrap_or_else(|| net.synapses[sid.idx()].w - w0);
+        (delta, beta)
+    }
+
+    /// §3.3.1: the LTP increment on an input afferent is exactly a⁺·trace·β;
+    /// β = 1 reproduces the no-E6 increment.
+    #[test]
+    fn e6_ltp_scaled_by_beta_exactly() {
+        let (d_base, b_base) = ltp_probe(false);
+        let (d_bal, b_bal) = ltp_probe(true);
+        assert_eq!(b_base, 1.0);
+        assert!((b_bal - 2.0).abs() < 1e-4, "beta for half-rate ch must be ~2, got {b_bal}");
+        assert!(d_base > 0.0, "LTP must potentiate");
+        assert!(
+            (d_bal - d_base * b_bal).abs() < 1e-5,
+            "balanced LTP delta {d_bal} != base {d_base} * beta {b_bal}"
+        );
+    }
+
+    /// §3.3.1: LTD is NEVER scaled — identical depression with and without
+    /// rate balance (post fires before pre).
+    #[test]
+    fn e6_ltd_untouched_by_beta() {
+        let mut run = |balance: bool| -> f32 {
+            let mut net = Network::new(NetworkConfig::default(), 2, 3, 1, 7);
+            let mut traces = Traces::new(&net, 20.0);
+            let ch = 0u32;
+            let pre = net.channels[ch as usize].target;
+            let sid = net.outgoing[pre.idx()].first().copied().expect("input afferent");
+            let post = net.synapses[sid.idx()].post;
+            let w0 = net.synapses[sid.idx()].w;
+            let rb = balance.then(rb_skewed);
+            // Post fires at t=0, ch at t=5: LTD on the input afferent.
+            force_spike(&mut net, post);
+            let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            for t in 1..5 {
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+                traces.step(&net, &ev.spikes);
+            }
+            let ev = net.step(&InputFrame { tick: Tick(5), spikes: vec![InputChannelId(ch)] });
+            traces.step(&net, &ev.spikes);
+            stdp_tick(&StdpParams::default(), &mut net, &traces, &ev.spikes, 1.0, rb.as_ref());
+            net.synapses[sid.idx()].w - w0
+        };
+        let d0 = run(false);
+        let d1 = run(true);
+        assert!(d0 < 0.0, "LTD must depress");
+        assert!((d0 - d1).abs() < 1e-7, "LTD must be identical with E6 on: {d0} vs {d1}");
     }
 }

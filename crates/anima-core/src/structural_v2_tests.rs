@@ -45,7 +45,7 @@ pub fn v2_params() -> V2Params {
 fn v2_net(seed: u64) -> (Network, V2Plasticity) {
     let cfg = NetworkConfig { v2: Some(v2_params()), ..NetworkConfig::default() };
     let mut net = Network::new(cfg, 8, 12, 4, seed);
-    let v2 = V2Plasticity::new(&mut net, v2_params());
+    let v2 = V2Plasticity::new(&mut net, v2_params(), None);
     (net, v2)
 }
 
@@ -204,7 +204,7 @@ fn m5_eviction_removes_lowest_weight_when_budget_full() {
     };
     assert_eq!(live_e, 40, "manual fill reached budget exactly");
     // Now drive a permanence on `post` via a candidate and check eviction.
-    let mut v2 = V2Plasticity::new(&mut net, v2_params());
+    let mut v2 = V2Plasticity::new(&mut net, v2_params(), None);
     // v2.live_e now recounts real counts (40 on post = full).
     let pre23: Vec<NeuronId> = net
         .neurons
@@ -427,6 +427,7 @@ fn m6_stdp_does_not_touch_inhibitory_weights() {
         &traces,
         &spikes,
         1.0,
+        None,
     );
     let w1 = net.synapses[sid.idx()].w;
     assert_eq!(w0, w1, "STDP must not modify inhibitory weight");
@@ -601,4 +602,201 @@ fn m3_1_many_windows_with_growth_no_oob() {
     // Arena grew and stayed within budget invariants (hard asserts inside
     // window() already fired on violation — reaching here means stable).
     assert!(net.synapses.len() > 0);
+}
+
+// ---- ANIMA E6 pre-registered mechanism tests (docs/anima-e6-protocol.md
+// ---- §3 + §7): β at exactly two sites; identity; determinism.
+
+use crate::rate_balance::{E6Params, RateBalance};
+
+fn e6_params() -> E6Params {
+    E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 8)
+}
+
+fn v2_net_e6(seed: u64, e6: bool) -> (Network, V2Plasticity) {
+    let cfg = NetworkConfig { v2: Some(v2_params()), ..NetworkConfig::default() };
+    let mut net = Network::new(cfg, 8, 12, 4, seed);
+    let v2 = V2Plasticity::new(&mut net, v2_params(), e6.then(e6_params));
+    (net, v2)
+}
+
+fn state_fingerprint(net: &Network, v2: &V2Plasticity) -> String {
+    let mut s = String::new();
+    for syn in net.synapses.iter() {
+        s.push_str(&format!(
+            "{}:{}->{}:w{:.6}:i{}:t{};",
+            syn.id.0, syn.pre.0, syn.post.0, syn.w, syn.inhibitory as u8, syn.silent_ticks
+        ));
+    }
+    for (i, pool) in v2.candidates.iter().enumerate() {
+        for c in pool {
+            s.push_str(&format!("c{}:{}:{:.6};", i, c.pre.0, c.w));
+        }
+    }
+    s
+}
+
+/// §3.3.2: M3 co-active accumulation is × β_pre exactly (post-hoc β since
+/// φ updates at window start, before candidate_pass — same value inside).
+#[test]
+fn e6_m3_coactive_accumulation_scaled_by_beta() {
+    let (mut net, mut v2) = v2_net_e6(3, true);
+    // Skew φ: the candidate's pre channel at half rate (β ≈ 2 for it).
+    let post = net
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    // Pick a candidate whose pre is an input channel.
+    let (index, pre) = v2.candidates[post.idx()]
+        .iter()
+        .enumerate()
+        .find(|(_, c)| c.pre.idx() < 8)
+        .map(|(i, c)| (i, c.pre))
+        .expect("input-channel candidate");
+    // Force φ: all channels at 0.02 except the candidate's pre at 0.01.
+    {
+        let rb = v2.rate_balance.as_mut().unwrap();
+        for p in rb.phi.iter_mut() {
+            *p = 0.02;
+        }
+        rb.phi[pre.idx()] = 0.01;
+    }
+    // One co-active window: post + candidate pre fire throughout.
+    for _ in 0..100 {
+        v2.tick(&[post, pre]);
+    }
+    let events = v2.window(&mut net, Tick(100));
+    assert!(!events.iter().any(|e| matches!(e, V2Event::SynapseCreated { .. })), "no permanence after one window");
+    let beta = v2.beta(&net, post, pre);
+    let w = v2.candidates[post.idx()][index].w;
+    let want = 0.01 + v2_params().delta_perm * beta;
+    assert!(
+        (w - want).abs() < 1e-5,
+        "M3 co-active increment must be Δ·β: got {w}, want {want} (β={beta})"
+    );
+
+    // Twin without E6: exact Δ.
+    let (mut net0, mut v20) = v2_net_e6(3, false);
+    let post0 = net0
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    let (index0, pre0) = v20.candidates[post0.idx()]
+        .iter()
+        .enumerate()
+        .find(|(_, c)| c.pre.idx() < 8)
+        .map(|(i, c)| (i, c.pre))
+        .expect("input-channel candidate");
+    for _ in 0..100 {
+        v20.tick(&[post0, pre0]);
+    }
+    v20.window(&mut net0, Tick(100));
+    let w0 = v20.candidates[post0.idx()][index0].w;
+    assert!((w0 - 0.02).abs() < 1e-6, "no-E6 twin: exact Δ, got {w0}");
+}
+
+/// §3.4/§7: when φ is constant, β ≡ 1 and the FULL structural window is
+/// byte-identical to the E6-disabled path (identity test). φ-stasis is
+/// realized with the α = 0 identity construction (E6Params::disabled):
+/// the EMA never moves φ off init, so φ̄/φ_pre ≡ 1 throughout.
+#[test]
+fn e6_window_identical_to_v2_when_phi_constant() {
+    let (mut net_on, mut v2_on) = {
+        let cfg = NetworkConfig { v2: Some(v2_params()), ..NetworkConfig::default() };
+        let mut net = Network::new(cfg, 8, 12, 4, 11);
+        let v2 = V2Plasticity::new(&mut net, v2_params(), Some(E6Params::disabled(8)));
+        (net, v2)
+    };
+    let (mut net_off, mut v2_off) = v2_net_e6(11, false);
+    let mut rng = 12345u64;
+    for w in 1..=6u64 {
+        assert_eq!(v2_on.rate_balance.as_ref().unwrap().phi[0], 0.02, "φ frozen at init (α=0)");
+        // Deterministic pseudo-random spike set (mix of inputs + internals).
+        let mut spikes = Vec::new();
+        for _ in 0..5 {
+            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let id = (rng >> 33) as usize % net_on.neurons.len();
+            spikes.push(NeuronId(id as u32));
+        }
+        v2_on.tick(&spikes);
+        v2_off.tick(&spikes);
+        let e_on = v2_on.window(&mut net_on, Tick(w * 100));
+        let e_off = v2_off.window(&mut net_off, Tick(w * 100));
+        assert_eq!(
+            state_fingerprint(&net_on, &v2_on),
+            state_fingerprint(&net_off, &v2_off),
+            "window {w}: E6 with constant φ must be byte-identical to v2"
+        );
+        let fmt = |ev: &Vec<V2Event>| -> String {
+            ev.iter().map(|e| format!("{:?}", e)).collect::<Vec<_>>().join("|")
+        };
+        assert_eq!(fmt(&e_on), fmt(&e_off), "window {w}: identical events");
+    }
+}
+
+/// §3.3.3: nothing else is β-scaled — with skewed φ (β ≠ 1) but no
+/// co-active candidate events and no STDP in window(), M3/M4/M5/M6 run
+/// identically to the E6-disabled twin (β must not leak into M2/M4/M5/M6).
+#[test]
+fn e6_only_two_sites_scale_beta() {
+    let (mut net_on, mut v2_on) = v2_net_e6(5, true);
+    let (mut net_off, mut v2_off) = v2_net_e6(5, false);
+    // Skew φ strongly (β ≠ 1 wherever live afferents mix rates).
+    {
+        let rb = v2_on.rate_balance.as_mut().unwrap();
+        for (i, p) in rb.phi.iter_mut().enumerate() {
+            *p = if i % 2 == 0 { 0.01 } else { 0.03 };
+        }
+    }
+    // Fire only NON-input neurons (no candidate co-activity with channels,
+    // no STDP here; window() runs M4 → M3 → M2 → M6 → M5 in both twins).
+    let internals: Vec<NeuronId> = net_on
+        .neurons
+        .iter()
+        .filter(|n| n.class != NeuronClass::Input)
+        .map(|n| n.id)
+        .collect();
+    let mut rng = 999u64;
+    for w in 1..=15u64 {
+        let mut spikes = Vec::new();
+        for _ in 0..6 {
+            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            spikes.push(internals[(rng >> 33) as usize % internals.len()]);
+        }
+        v2_on.tick(&spikes);
+        v2_off.tick(&spikes);
+        let _ = v2_on.window(&mut net_on, Tick(w * 100));
+        let _ = v2_off.window(&mut net_off, Tick(w * 100));
+    }
+    assert_eq!(
+        state_fingerprint(&net_on, &v2_on),
+        state_fingerprint(&net_off, &v2_off),
+        "skewed φ must not change M2/M4/M5/M6 (β applies at exactly two sites)"
+    );
+}
+
+/// §7: deterministic repeated execution — same seed, same driving, same
+/// E6 state byte-for-byte.
+#[test]
+fn e6_deterministic_repeated_execution() {
+    let run = |seed: u64| -> String {
+        let (mut net, mut v2) = v2_net_e6(seed, true);
+        let mut rng = 777u64;
+        for w in 1..=10u64 {
+            let mut spikes = Vec::new();
+            for _ in 0..8 {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let id = (rng >> 33) as usize % net.neurons.len();
+                spikes.push(NeuronId(id as u32));
+            }
+            v2.tick(&spikes);
+            let _ = v2.window(&mut net, Tick(w * 100));
+        }
+        state_fingerprint(&net, &v2)
+    };
+    assert_eq!(run(21), run(21), "identical seed -> identical E6 state");
 }

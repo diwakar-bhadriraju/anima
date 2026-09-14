@@ -3,6 +3,7 @@
 
 pub mod network;
 pub mod plasticity;
+pub mod rate_balance;
 pub mod resources;
 pub mod structural;
 pub mod structural_v2;
