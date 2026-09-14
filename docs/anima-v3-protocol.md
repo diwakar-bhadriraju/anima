@@ -295,3 +295,75 @@ fails, the run is stopped and diagnosed.
   v3-seed9001 `6502147d51b0f2156accdfeb9658a6507d5f078c4d405676a94c804a11b9b61a`;
   v3-seed424242 `d503714ffc9a36579aabd21ddb425baa0b82752002075959a5c521e87aa44c8f`.
 - Commit: `(to be recorded at run time)`.
+---
+
+## v3 execution record (2026-09-14; commit 1bd9770 registration, runs below)
+
+### v3-full (`runs/v3-20260914T164140Z`, seed 20260912, config
+### sha `5854a191…`)
+
+| Endpoint | Result | Bar | Verdict |
+|---|---|---|---|
+| P1-v3 | specialized 21/40 (0.525); presence A=7 B=21 C=14 | ≥10/40, all cats | **SUPPORTED** |
+| P2 | 0 failures; late-S1 mean 12.8 / max 79.5 Hz; budget held | all three | **SUPPORTED** |
+| P3 | mean cross 0.450; selectivity median **0.168** | cross<0.60 AND sel>0.50 | **WEAK → NOT SUPPORTED** |
+| Structural | 20,873 permanence, **7,517 established** (v2: 4,532 / 2,272) | ≥1 (defined) | engaged |
+
+P3 detail: cross A-B 0.697, A-C 0.009, B-C 0.645, within 0.954. The
+mean-cross pass is carried entirely by A-C, the only pair sharing no
+channels; both entangled pairs fail. Selectivity collapse (0.168 vs
+v2's 0.991) is the decisive signal.
+
+Overlap statistics (RF snapshot): signatures {A+B: 7, B+C: 14,
+BROAD: 19} — **no pure {A}/{B}/{C} neurons at all**; exclusive-
+evidence users 0/21 (no neuron uses channels 0-3 or 12-15, the only
+discriminative evidence); per-channel participation concentrates on
+channels 10 (53%) and 5 (25%) — the shared zones. Mean H 1.438.
+
+D condition: cosine(D-mean, B-mean) = **0.979** vs A 0.711 / C 0.672
+— the everything-on combination is absorbed by B's representation;
+S2/S1 rate ratio 1.001 (no novelty differentiation); S3 retention A
+0.939 / B 0.957 / C 0.947 (uniform, high).
+
+### Cross-seed P4 (gate: v3-full P2 supported → authorized)
+
+| seed | mean H | specialized frac | established | signatures |
+|---|---|---|---|---|
+| 20260912 | 1.438 | 0.525 | 7,517 | A+B 7, B+C 14, BROAD 19 |
+| 9001 | 1.910 | 0.300 | 7,428 | B+C 12, BROAD 28 |
+| 424242 | 1.772 | 0.225 | 6,813 | A+B 2, B+C 5, C 2, BROAD 31 |
+
+**P4 NOT SUPPORTED**: (i) |ΔH| = 0.472 / 0.334 / 0.138 and |Δfrac| =
+0.225 / 0.300 / 0.075 — canonical-seed pairs exceed 0.20; (ii)
+Jaccard top-channel agreement 0.100 / 0.025 / 0.050 < 0.50 holds.
+The outcome statistics themselves are seed-dependent under overlap —
+the opposite of v2, where statistics reproduced and only assignments
+differed.
+
+### Registered ablation attribution (outcome C ⇒ §8.3)
+
+| Arm | failures | established | specialized | sel. median | mean cross | verdict |
+|---|---|---|---|---|---|---|
+| v3-nom6 (M6 off) | 0 | 6,722 | **0/40** (BROAD 40) | 0.306 | 0.87 (A-B 0.927, A-C 0.807) | stable, no concentration |
+| v3-nom2 (M2 off) | **1 runaway** (t=872,061, S3) | 2,670 | 7/40 | 0.078 | 0.97 | **REGRESSION** |
+
+Attribution: M2 remains essential (off ⇒ total separation collapse
+AND destabilization); M6 is load-bearing for concentration and rate
+bounding (off ⇒ all-BROAD, H 2.51, D/S1 ratio 1.478 — the 16-channel
+D drive is no longer checked). Neither mechanism, frozen as-is,
+recovers the discriminative evidence channels under overlap.
+
+### Frozen verdict (docs/anima-v3-protocol.md §10)
+
+**Outcome C — separation collapses under overlap, revealing a
+limitation of the v2 mechanism.** P2 stable; P3 not supported
+(selectivity 0.168); P4 not supported; P1-v3 "supported" only as
+concentration onto the SHARED evidence with zero exclusive-evidence
+usage — i.e., mixed representations. Self-organization persists
+(massive structural turnover, stability, concentration), but the v2
+organism cannot exploit the category-exclusive channels (0-3,
+12-15): under additive STDP + per-neuron T_e conservation, shared
+channels co-activate twice as often and win every synapse budget,
+and no frozen mechanism vetoes them. The failure is information-
+theoretic (shared-channel frequency dominates) and no registered
+mechanism addresses it. Not tuned; no amendment proposed.

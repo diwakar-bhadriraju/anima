@@ -21,3 +21,20 @@ partial; RED = restricted in biology / our invention.
 ## Unknown unknowns
 
 (empty — appended as discovered, with the experiment that exposed them)
+
+## v3 addition (2026-09-14, exposed by the overlap curriculum)
+
+**Newly-discovered unknown — U9: feature-selection under overlapping
+evidence.** With shared channels dominating co-activation statistics,
+additive STDP + M2 conservation (T_e) allocate every neuron's budget
+to the shared evidence and the organism NEVER recruits the
+category-exclusive channels (v3-full: 0/21 specialized neurons use
+channels 0-3 or 12-15; signatures {A+B}/{B+C} only; no pure
+{A}/{B}/{C}). Outcome C verdict: separation collapses (selectivity
+0.168), statistics are seed-dependent (P4 fails). The v2 mechanism
+set has no veto for "channel fires at half the rate but carries all
+the information". Candidates (unregistered; would need a new
+amendment/protocol): (a) input-side decorrelation (pre-normalization
+by channel firing rate), (b) M2 variant over co-activation-scaled
+weights, (c) a novelty/information-gated plasticity (U4-class). No
+candidate chosen; no mechanism added; status re-registered-open.
