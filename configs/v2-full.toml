@@ -122,8 +122,8 @@ t_e = 0.8
 # M3 — candidates
 c_slots = 6
 w_c_init = 0.01
-delta_perm = 0.005
-decay_c = 0.9
+delta_perm = 0.01
+decay_c = 0.99
 theta_permanent = 0.05
 w_c_permanent = 0.02
 theta_die = 0.005

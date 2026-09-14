@@ -21,8 +21,8 @@ pub fn v2_params() -> V2Params {
         t_e: 0.8,
         c_slots: 6,
         w_c_init: 0.01,
-        delta_perm: 0.005,
-        decay_c: 0.9,
+        delta_perm: 0.01,
+        decay_c: 0.99,
         theta_permanent: 0.05,
         w_c_permanent: 0.02,
         theta_die: 0.005,
@@ -482,4 +482,105 @@ fn v2_structural_cycle_deterministic() {
     };
     assert_eq!(run(33), run(33), "same seed → identical v2 structural stream");
     assert_ne!(run(33), run(34), "different seed → different stream");
+}
+/// M3-1 (approved amendment): permanence must be reachable during a
+/// single 500 ms presentation (5 co-active windows) — mathematically
+/// 0.01 + 4x0.01 = 0.05 at the 4th co-active window.
+#[test]
+fn m3_1_permanence_reachable_within_presentation() {
+    let (mut net, mut v2) = v2_net(4_001);
+    let post = net
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    // Take a candidate and drive its pre + post co-active every window.
+    let pre = v2.candidates[post.idx()][0].pre;
+    let mut perms = 0usize;
+    for w in 1..=5u64 {
+        v2.tick(&[pre, post]);
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { reason, .. } = e {
+                assert_eq!(reason, "candidate-permanence");
+                perms += 1;
+            }
+        }
+    }
+    assert!(
+        perms == 1 || perms == 2,
+        "M3-1: permanence expected at 4th-5th co-active window of one presentation, got {perms}"
+    );
+    // The new synapse exists as a live plastic excitatory synapse.
+    // Its weight starts at w_c_permanent (0.02) then M2 renormalizes the
+    // neuron's total to t_e within the same window, so assert the
+    // mechanism-relevant properties (permanence created it, plastic,
+    // excitatory, still alive), not the transient pre-normalization value.
+    let new_syn = net
+        .synapses
+        .iter()
+        .rev()
+        .find(|s| s.silent_ticks != u64::MAX && !s.inhibitory)
+        .expect("permanence created a live synapse");
+    assert!(new_syn.plastic);
+    assert!(new_syn.w >= 0.005, "M2-normalized weight must survive M4 bar");
+}
+
+/// M3-1: silent candidate lifetime — 0.01 decays to theta_die (0.005)
+/// at 0.99^n = 0.5 => n = 69 windows (~6.9 s), preserving search
+/// semantics (die + redraw).
+#[test]
+fn m3_1_silent_candidate_dies_and_redraws() {
+    let (mut net, mut v2) = v2_net(4_002);
+    let post = net
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    // Track a specific candidate until it is swapped (dies) — with no
+    // firing at all, all candidates decay 0.99/window and redraw at 0.005.
+    let orig: Vec<u32> = v2.candidates[post.idx()].iter().map(|c| c.pre.0).collect();
+    let mut death_windows = 0u64;
+    for w in 1..=200u64 {
+        v2.window(&mut net, Tick(w * 100));
+        let now: Vec<u32> = v2.candidates[post.idx()].iter().map(|c| c.pre.0).collect();
+        if now != orig {
+            death_windows = w;
+            break;
+        }
+    }
+    assert!(
+        (60..=80).contains(&death_windows),
+        "M3-1: silent candidate should die around 69 windows, got {death_windows}"
+    );
+    assert!(
+        !v2.candidates[post.idx()].is_empty(),
+        "redraw must refill the slot"
+    );
+}
+
+/// M3-1: permanence still gated on *reinforcement* — a candidate whose
+/// pre fires without the post firing never reaches threshold and stays
+/// in the pool (no spurious permanence from pre-activity alone).
+#[test]
+fn m3_1_no_permanence_without_post_coactivity() {
+    let (mut net, mut v2) = v2_net(4_003);
+    let post = net
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    let pre = v2.candidates[post.idx()][0].pre;
+    let mut perms = 0usize;
+    for w in 1..=30u64 {
+        v2.tick(&[pre]); // ONLY pre fires
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { .. } = e {
+                perms += 1;
+            }
+        }
+    }
+    assert_eq!(perms, 0, "M3-1: pre-only activity must not cause permanence");
 }

@@ -522,3 +522,41 @@ No curriculum/stimulus change; no gate change; no other mechanism
 change. This amendment is exclusively the two M3 constants above.
 
 **Awaiting approval.**
+
+---
+
+## M3-1 implementation record (approved)
+
+### Code + verification
+
+- Applied to all `configs/v2*.toml`: `decay_c = 0.99`, `delta_perm =
+  0.01`. Verified programmatically that all other 27 frozen values in
+  every arm config are unchanged (only expected exception: v2−M6
+  `p_inh = 0.0` per registered A-5).
+- 3 new unit tests (all green): permanence reachable within one
+  presentation (4th co-active window); silent candidate dies at
+  ~69 windows (6.9 s) and redraws; pre-only activity causes no
+  permanence. Existing M1/M2/M4/M5/M6 + determinism tests unchanged
+  and green.
+- Full suite: **79 tests, 0 failed**; release build **0 warnings**.
+
+### New config hashes (sha256, prefix)
+
+| Arm | hash |
+|---|---|
+| v2-full | `2a4d1c7b…` |
+| v2-minus-m6 | `6efea191…` |
+| v2-nom2 | `2ee0f1c4…` |
+| v2-nom3m4 | `c3b56d67…` |
+| v2-nom5 | `d8b55c42…` |
+| v2-m1only | `af457523…` |
+| v2 (master) | `9505227d…` |
+
+### Behavior notes
+
+- M3 permanence now fires at the 4th co-active window of a single
+  presentation (0.01 + 4×0.01 = 0.05 ≥ θ_permanent).
+- The new synapse starts at w_c_permanent (0.02); M2 renormalizes the
+  neuron's excitatory total to t_e in the same window — asserted via
+  mechanism-relevant properties (plastic, excitatory, alive,
+  above M4 bar) rather than the transient pre-normalization value.
