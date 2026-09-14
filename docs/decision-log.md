@@ -168,3 +168,19 @@ claim).
   telemetry budget needs time-bucketing before E3.
 - **Remaining uncertainty**: whether a stability mechanism alone enables
   separation, or whether bound shape matters at all in this regime.
+
+## 2026-09-15 — E6 construction selection (rate balancing)
+
+- v3 closed with Outcome C; diagnosis registered as U9 (shared
+  channels win every plasticity contest at 2:1 co-activation).
+- User directed: E6 = rate-balancing experiment; protocol to be
+  frozen before any implementation.
+- Evidence-tagged candidates presented (budget-charge M2′, plasticity-
+  event β-balancing, input-current decorrelation, A+B): equilibrium
+  analysis showed weight ratios are set by STDP co-activation counts,
+  so only the plasticity-event site changes the ratios.
+- User selected **B — plasticity-event balancing** (recommended).
+- E6 designation moved from the U7 reward-modulated-STDP placeholder
+  to this experiment per user direction; U7 re-deferred (E7).
+- docs/anima-e6-protocol.md frozen; implementation deferred until the
+  user releases the freeze.

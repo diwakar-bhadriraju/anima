@@ -38,3 +38,17 @@ amendment/protocol): (a) input-side decorrelation (pre-normalization
 by channel firing rate), (b) M2 variant over co-activation-scaled
 weights, (c) a novelty/information-gated plasticity (U4-class). No
 candidate chosen; no mechanism added; status re-registered-open.
+
+### U9 update (2026-09-15)
+
+Candidate selected and approved by user: **plasticity-event rate
+balancing (E6: scale STDP a⁺ and M3 Δ_perm by β = φ̄/φ_pre, local
+per-channel rate EMA)** — docs/anima-e6-protocol.md. U7
+(reward-modulated STDP) re-deferred: the E6 designation now names
+the rate-balancing experiment per user direction; reward remains
+open (placeholder E7).
+
+### U7 update (2026-09-15)
+
+E6 designation reassigned (see above); reward-modulated STDP
+placeholder re-deferred to a future E7. No mechanism work done.
