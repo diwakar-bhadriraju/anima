@@ -669,3 +669,59 @@ evaluation instruments. Remaining registered items: the other arms'
 full runs (control/ablations) — v2−M6 and v2−M3/M4, v2-M1-only
 blocked at gate by registration; v2−M2 and v2−M5 passed their gates
 and their full runs are the registered next step.
+
+---
+
+## Ablation full runs (2026-09-14, registered order; gate-passing arms only)
+
+### v2−M5 (`runs/v2-nom5-20260914T094208Z`, seed 20260912)
+
+| metric | v2-full | v2−M5 |
+|---|---|---|
+| mean cross-cosine | 0.0043 | **0.0043** (A-B 0.000, A-C 0.013, B-C 0.000) |
+| selectivity median | 0.991 | **0.991** (n=104) |
+| within-pattern | 0.958 | 0.958 |
+| quasi-private fraction | 0.575 | **0.575** |
+| mean H | 1.029 | 1.029 |
+| established changes | 2,272 | **2,272** |
+| failures | 0 | 0 |
+
+**Verdict: M5 (budget/eviction) is not load-bearing at this
+operating point** — outputs are byte-identical on every metric. The
+per-neuron budget (B_e 40) rarely binds because M2 normalization caps
+the weight total; eviction almost never fires. Recorded, not tuned.
+
+### v2−M2 (`runs/v2-nom2-20260914T094208Z`, seed 20260912)
+
+| metric | v2-full | v2−M2 |
+|---|---|---|
+| mean cross-cosine | 0.0043 | **0.789** (A-B 0.737, A-C 0.832, B-C 0.799) |
+| selectivity median | 0.991 | 0.902 (n=99) |
+| within-pattern | 0.958 | 0.996 |
+| quasi-private fraction | 0.575 | 0.250 |
+| mean H | 1.029 | **2.359** |
+| established changes | 2,272 | 3,327 |
+| failures | 0 | 0 |
+
+**Verdict: M2 (per-neuron normalization to T_e) is the load-bearing
+mechanism for separation.** Without it the candidate/STDP dynamics
+still run (3,327 established changes — more, in fact) but weights
+saturate toward uniformity (H 2.359, no competition between
+afferents), cross-cosine returns to the E1-class 0.79, and
+quasi-private fraction halves. This isolates the mechanism: the
+conservation law (heterosynaptic competition) — not synaptogenesis or
+STDP alone — is what converts structural search into separation.
+Consistent with the design diagnosis and the v2−M5 null.
+
+### Blocked arms (recorded, no full runs)
+
+v2−M6 (rates bar > 250 Hz), v2−M3/M4 (cadence; M3 disabled by
+registration), v2-M1-only (stability; all mechanisms off). Gate
+records stand from the M3-1 gate re-run.
+
+### Summary — mechanism attribution
+
+- separation: M2 (essential); M3/M4 (necessary to supply candidates,
+  but inert without M2's competition — v2−M3/M4 arm gate-blocked);
+  M5 (not load-bearing at this operating point); M6 (rate bounding,
+  not separation — v2−M6 gate-blocked on rates).
