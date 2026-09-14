@@ -591,16 +591,8 @@ fn m3_1_no_permanence_without_post_coactivity() {
 #[test]
 fn m3_1_many_windows_with_growth_no_oob() {
     let (mut net, mut v2) = v2_net(5_101);
-    // Saturate one neuron near its budget so permanence triggers eviction,
-    // then drive heavy co-activity for many windows.
-    let post = net
-        .neurons
-        .iter()
-        .find(|n| n.class == NeuronClass::Internal)
-        .unwrap()
-        .id;
-    // Fire every neuron (post + all pre channels) every window: massive
-    // co-activity -> permanence storms.
+    // Fire every neuron every window: massive co-activity -> permanence
+    // storms with mid-window arena growth and budget evictions.
     let all: Vec<NeuronId> = net.neurons.iter().map(|n| n.id).collect();
     for w in 1..=400u64 {
         v2.tick(&all);

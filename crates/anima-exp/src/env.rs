@@ -192,6 +192,19 @@ fn rep_of(schedule: &[ScheduledPresentation], pattern: &str) -> usize {
 }
 
 fn channels_for(cfg: &ExpConfig, pat: &PatternSpec, channel_group: &[String]) -> Vec<InputChannelId> {
+    // v3 (anima-v3-protocol.md §2): explicit channel-id list (overlapping
+    // categories); sorted + deduped for a canonical, deterministic order.
+    if let Some(ids) = &pat.channel_ids {
+        let mut out: Vec<InputChannelId> = Vec::with_capacity(ids.len());
+        for &c in ids {
+            let chan = InputChannelId(c);
+            if !out.contains(&chan) {
+                out.push(chan);
+            }
+        }
+        out.sort_unstable();
+        return out;
+    }
     let mut out = Vec::new();
     for (i, g) in channel_group.iter().enumerate() {
         if pat.channels.contains(g) {
@@ -287,8 +300,8 @@ mod tests {
                 fragmentation_min_component: 0.5,
             },
             pattern: vec![
-                PatternSpec { id: "A".into(), channels: vec!["A".into()], rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
-                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "A".into(), channels: vec!["A".into()], channel_ids: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
             ],
             stage: vec![
                 StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200) },
@@ -350,5 +363,166 @@ mod tests {
         }
         // S1: 3 × A(1 group = 4 ch × ~2 spikes) + S2: 1 × D(8 ch × 2) ≈ 3×8 + 16 = 40
         assert!(count > 15 && count < 75, "plausible Poisson volume: {count}");
+    }
+
+    // ---- ANIMA v3 pre-registered tests (docs/anima-v3-protocol.md §7) ----
+
+    fn v3_config(name: &str) -> ExpConfig {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../configs")
+            .join(name);
+        ExpConfig::parse(&path).unwrap_or_else(|e| panic!("parse {name}: {e}"))
+    }
+
+    /// v3-full pattern channel sets = registered overlap design,
+    /// exactly (§3): A {0-7}, B {4-11}, C {8-15}, D {0-15}.
+    #[test]
+    fn v3_overlap_patterns_expand_to_registered_sets() {
+        let env = Environment::new(v3_config("v3-full.toml"), 20260912);
+        let mut sets: std::collections::BTreeMap<String, std::collections::BTreeSet<u32>> = Default::default();
+        for (si, sch) in env.schedule.iter().enumerate() {
+            if sch.pattern == "silence" {
+                continue;
+            }
+            sets.entry(sch.pattern.clone())
+                .or_default()
+                .extend(env.trains[si].iter().map(|(_, ch)| ch.0));
+        }
+        let want: std::collections::BTreeMap<String, std::collections::BTreeSet<u32>> = [
+            ("A", vec![0, 1, 2, 3, 4, 5, 6, 7]),
+            ("B", vec![4, 5, 6, 7, 8, 9, 10, 11]),
+            ("C", vec![8, 9, 10, 11, 12, 13, 14, 15]),
+            ("D", vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.into_iter().collect::<std::collections::BTreeSet<_>>()))
+        .collect();
+        assert_eq!(sets, want, "v3 channel sets must match the registered protocol");
+        // Stage structure identical to v2 (reps / order / off / silence).
+        let v2 = v3_config("v2-full.toml");
+        let v3 = v3_config("v3-full.toml");
+        assert_eq!(v2.stage.len(), v3.stage.len());
+        for (a, b) in v2.stage.iter().zip(v3.stage.iter()) {
+            assert_eq!(
+                (a.id.as_str(), a.present.as_slice(), a.reps, a.order.as_str(), a.off_ms, a.silence_ms),
+                (b.id.as_str(), b.present.as_slice(), b.reps, b.order.as_str(), b.off_ms, b.silence_ms),
+                "stage {} must be identical between v2 and v3",
+                a.id
+            );
+        }
+        for (p2, p3) in v2.pattern.iter().zip(v3.pattern.iter()) {
+            assert_eq!(p2.id, p3.id);
+            assert_eq!((p2.rate_hz, p2.duration_ms, p2.jitter_ms), (p3.rate_hz, p3.duration_ms, p3.jitter_ms));
+        }
+    }
+
+    /// Shared-stream identity: at the same seed, the v3 presentation
+    /// schedule equals v2's, and per-(pattern, rep, channel) trains are
+    /// identical on channels present in BOTH curricula (§2 determinism).
+    #[test]
+    fn v3_schedule_and_shared_trains_identical_to_v2() {
+        let env2 = Environment::new(v3_config("v2-full.toml"), 20260912);
+        let env3 = Environment::new(v3_config("v3-full.toml"), 20260912);
+        assert_eq!(env2.schedule.len(), env3.schedule.len());
+        assert_eq!(env2.duration(), env3.duration());
+        // Presentation order, stages, starts: identical.
+        for (a, b) in env2.schedule.iter().zip(env3.schedule.iter()) {
+            assert_eq!(
+                (a.stage.as_str(), a.pattern.as_str(), a.start, a.duration_ms),
+                (b.stage.as_str(), b.pattern.as_str(), b.start, b.duration_ms)
+            );
+        }
+        // Channel sets per pattern in both curricula.
+        let sets = |env: &Environment| {
+            let mut m: std::collections::BTreeMap<String, std::collections::BTreeSet<u32>> = Default::default();
+            for (si, sch) in env.schedule.iter().enumerate() {
+                if sch.pattern == "silence" {
+                    continue;
+                }
+                m.entry(sch.pattern.clone()).or_default().extend(env.trains[si].iter().map(|(_, c)| c.0));
+            }
+            m
+        };
+        let s2 = sets(&env2);
+        let s3 = sets(&env3);
+        for (pat, chans2) in &s2 {
+            let chans3 = &s3[pat];
+            let shared: std::collections::BTreeSet<u32> =
+                chans2.intersection(chans3).copied().collect();
+            // Per schedule index, trains on shared channels must be identical.
+            for (si, a) in env2.schedule.iter().enumerate() {
+                if a.pattern != *pat {
+                    continue;
+                }
+                let t2: Vec<(u64, u32)> = env2.trains[si]
+                    .iter()
+                    .filter(|(_, c)| shared.contains(&c.0))
+                    .map(|&(t, c)| (t, c.0))
+                    .collect();
+                let t3: Vec<(u64, u32)> = env3.trains[si]
+                    .iter()
+                    .filter(|(_, c)| shared.contains(&c.0))
+                    .map(|&(t, c)| (t, c.0))
+                    .collect();
+                assert_eq!(t2, t3, "shared-channel stream divergence at {pat} si={si}");
+            }
+        }
+        // The overlap is non-trivial: B is genuinely straddling.
+        assert_eq!(s2["B"], std::collections::BTreeSet::from([8, 9, 10, 11, 12, 13, 14, 15]));
+        assert_eq!(s3["B"], std::collections::BTreeSet::from([4, 5, 6, 7, 8, 9, 10, 11]));
+    }
+
+    /// Freeze check: every non-pattern, non-exp_id section of v3-full is
+    /// structurally identical to v2-full (§1 enforcement).
+    #[test]
+    fn v3_freezes_v2_organism_config() {
+        let v2 = v3_config("v2-full.toml");
+        let v3 = v3_config("v3-full.toml");
+        let sec = |c: &ExpConfig| {
+            [
+                toml::to_string(&c.organism).unwrap(),
+                toml::to_string(&c.plasticity).unwrap(),
+                toml::to_string(&c.structural).unwrap(),
+                toml::to_string(&c.resources).unwrap(),
+                toml::to_string(&c.v2).unwrap(),
+                // run section minus exp_id (the only permitted delta)
+                toml::to_string(&c.run)
+                    .unwrap()
+                    .lines()
+                    .filter(|l| !l.starts_with("exp_id"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ]
+            .join("~~")
+        };
+        assert_eq!(sec(&v2), sec(&v3), "v3 must freeze every v2 organism config section");
+    }
+
+    /// channel_ids: sorted + deduped expansion, mutual-exclusion and
+    /// bounds validation at parse time (§2).
+    #[test]
+    fn channel_ids_sorted_deduped_and_validated() {
+        let mut cfg = test_config();
+        cfg.organism.n_input_channels = 24;
+        cfg.pattern[0].channels = vec![];
+        cfg.pattern[0].channel_ids = Some(vec![7, 0, 7, 3]);
+        let env = Environment::new(cfg.clone(), 1);
+        let chans = channels_for(&cfg, &cfg.pattern[0], &["A".into(), "B".into()]);
+        assert_eq!(chans, vec![InputChannelId(0), InputChannelId(3), InputChannelId(7)], "sorted + deduped");
+        assert!(env.schedule.iter().any(|s| s.pattern == "A"));
+        // Mutual exclusion error.
+        cfg.pattern[0].channels = vec!["A".into()];
+        let toml = toml::to_string(&cfg).unwrap();
+        let tmp = std::env::temp_dir().join("v3-bad-both.toml");
+        std::fs::write(&tmp, toml).unwrap();
+        assert!(ExpConfig::parse(&tmp).is_err(), "channels + channel_ids must be rejected");
+        // Out-of-bounds error.
+        cfg.pattern[0].channels = vec![];
+        cfg.pattern[0].channel_ids = Some(vec![24]);
+        let tmp2 = std::env::temp_dir().join("v3-bad-oob.toml");
+        std::fs::write(&tmp2, toml::to_string(&cfg).unwrap()).unwrap();
+        assert!(ExpConfig::parse(&tmp2).is_err(), "channel id out of range must be rejected");
+        let _ = std::fs::remove_file(&tmp);
+        let _ = std::fs::remove_file(&tmp2);
     }
 }

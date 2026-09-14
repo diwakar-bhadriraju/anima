@@ -169,6 +169,13 @@ pub struct PatternSpec {
     pub id: String,
     /// Input groups this pattern drives (e.g. ["A"], ["A","C"]).
     pub channels: Vec<String>,
+    /// v3 (anima-v3-protocol.md §2): explicit channel ids for patterns
+    /// whose active set is not expressible as group-label blocks
+    /// (overlapping categories). When Some, it wins over `channels`
+    /// (configs MUST NOT populate both). Environment-only: no
+    /// organism/RNG/seed behavior changes.
+    #[serde(default)]
+    pub channel_ids: Option<Vec<u32>>,
     pub rate_hz: f32,
     pub duration_ms: u64,
     pub jitter_ms: f32,
@@ -200,6 +207,27 @@ fn default_adaptation_tau() -> f32 {
 impl ExpConfig {
     pub fn parse(path: &std::path::Path) -> Result<Self, String> {
         let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        toml::from_str(&raw).map_err(|e| e.to_string())
+        let cfg: ExpConfig = toml::from_str(&raw).map_err(|e| e.to_string())?;
+        // v3 (anima-v3-protocol.md §2): channel_ids must be in-bounds and
+        // mutually exclusive with group labels.
+        for p in &cfg.pattern {
+            if let Some(ids) = &p.channel_ids {
+                if !p.channels.is_empty() {
+                    return Err(format!(
+                        "pattern '{}': channels and channel_ids are mutually exclusive",
+                        p.id
+                    ));
+                }
+                for &c in ids {
+                    if c as usize >= cfg.organism.n_input_channels {
+                        return Err(format!(
+                            "pattern '{}': channel {} out of range (n_input_channels = {})",
+                            p.id, c, cfg.organism.n_input_channels
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(cfg)
     }
 }
