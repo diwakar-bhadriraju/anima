@@ -243,6 +243,11 @@ impl V2Plasticity {
             }
         }
         if let Some((_, sid)) = worst {
+            if net.synapses.len() > self.low_windows.len() {
+                // M3 permanence grew the synapse arena mid-window; keep the
+                // prune counter vector index-aligned (regression: OOB).
+                self.low_windows.resize(net.synapses.len(), 0);
+            }
             net.prune_synapse(sid);
             self.low_windows[sid.idx()] = 0;
             self.live_e[post.idx()] -= 1;

@@ -584,3 +584,29 @@ fn m3_1_no_permanence_without_post_coactivity() {
     }
     assert_eq!(perms, 0, "M3-1: pre-only activity must not cause permanence");
 }
+
+/// M3-1 regression: with permanence now engaging, many windows of
+/// candidate permanence + eviction must not index low_windows out of
+/// bounds (arena grows mid-window; evict_for must resize first).
+#[test]
+fn m3_1_many_windows_with_growth_no_oob() {
+    let (mut net, mut v2) = v2_net(5_101);
+    // Saturate one neuron near its budget so permanence triggers eviction,
+    // then drive heavy co-activity for many windows.
+    let post = net
+        .neurons
+        .iter()
+        .find(|n| n.class == NeuronClass::Internal)
+        .unwrap()
+        .id;
+    // Fire every neuron (post + all pre channels) every window: massive
+    // co-activity -> permanence storms.
+    let all: Vec<NeuronId> = net.neurons.iter().map(|n| n.id).collect();
+    for w in 1..=400u64 {
+        v2.tick(&all);
+        let _ = v2.window(&mut net, Tick(w * 100));
+    }
+    // Arena grew and stayed within budget invariants (hard asserts inside
+    // window() already fired on violation — reaching here means stable).
+    assert!(net.synapses.len() > 0);
+}

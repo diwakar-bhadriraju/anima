@@ -560,3 +560,34 @@ change. This amendment is exclusively the two M3 constants above.
   neuron's excitatory total to t_e in the same window — asserted via
   mechanism-relevant properties (plastic, excitatory, alive,
   above M4 bar) rather than the transient pre-normalization value.
+
+---
+
+## M3-1 gate re-run (2026-09-14, all six arms, fixed binary)
+
+One implementation regression was found and fixed during the re-run:
+`evict_for` indexed `low_windows` after M3 permanence grew the synapse
+arena mid-window (OOB, visible only once permanence engaged). Fixed
+with in-place resize + regression test (400-window permanence storm).
+Suite: **80 tests green, 0 warnings**.
+
+| Arm | failures | established changes | S1 mean-rate (snap) | Gate |
+|---|---|---|---|---|
+| v2-full | 0 | **768** | 0–46.8 Hz | **PASS** |
+| v2-minus-m6 | 0 | **449** | up to 301.7 Hz | **FAIL (rates > 250)** |
+| v2-nom2 | 0 | **901** | 0–58.0 Hz | **PASS** |
+| v2-nom3m4 | 0 | 0 | up to 104.6 Hz | **FAIL (cadence; M3 disabled by registration)** |
+| v2-nom5 | 0 | **768** | 0–46.8 Hz | **PASS** |
+| v2-m1only | 1 (runaway t≈19 s) | 0 | — | **FAIL (stability; all mechanisms off by registration)** |
+
+M3-1's prediction verified: candidates now engage (768–901 established
+per probe), permanence fires within a single presentation in unit
+tests, silent candidates still die in ~6.9 s. **v2-full passes the
+gate** → proceed with the frozen execution order: full run, P1–P4,
+then the v2−M6 control (its own rates-bar failure is recorded and
+blocks it), then registered ablations.
+
+Gate-row detail: v2-nom2 permanence 2063 events / 901 established;
+v2-full 1991 / 768; v2-nom5 identical to v2-full (expected — M5
+disable only changes eviction among already-established synapses at
+this probe scale).
