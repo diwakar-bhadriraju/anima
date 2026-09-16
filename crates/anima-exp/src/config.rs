@@ -204,6 +204,19 @@ pub struct ResourceSection {
     pub fragmentation_min_component: f32,
 }
 
+/// One within-presentation phase (docs/anima-e9-protocol.md §9): the
+/// pattern drives `channel_ids` at `rate_hz` during [from_ms, to_ms).
+/// Environment-only construction — the organism sees only the spike
+/// trains. Phases MUST tile the pattern's [0, duration_ms) exactly
+/// (contiguous, gap-free, first from = 0, last to = duration_ms).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseSpec {
+    pub from_ms: u64,
+    pub to_ms: u64,
+    pub channel_ids: Vec<u32>,
+    pub rate_hz: f32,
+}
+
 /// D9 pattern spec: synthetic config-defined stimulus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatternSpec {
@@ -217,6 +230,15 @@ pub struct PatternSpec {
     /// organism/RNG/seed behavior changes.
     #[serde(default)]
     pub channel_ids: Option<Vec<u32>>,
+    /// E9 (docs/anima-e9-protocol.md §9): optional within-presentation
+    /// phases. Mutually exclusive with `channels`/`channel_ids`; when
+    /// Some, the pattern's active channels = union over phases and each
+    /// phase generates its own deterministic Poisson streams (seed tuple
+    /// extended by the phase index — only for phase configs; phase-less
+    /// configs keep the exact existing derivation). Absent ⇒ byte-
+    /// identical behavior for every existing config.
+    #[serde(default)]
+    pub phases: Option<Vec<PhaseSpec>>,
     pub rate_hz: f32,
     pub duration_ms: u64,
     pub jitter_ms: f32,
@@ -264,6 +286,53 @@ impl ExpConfig {
                         return Err(format!(
                             "pattern '{}': channel {} out of range (n_input_channels = {})",
                             p.id, c, cfg.organism.n_input_channels
+                        ));
+                    }
+                }
+            }
+        }
+        // E9 (docs/anima-e9-protocol.md §9): phase validation.
+        for p in &cfg.pattern {
+            if let Some(phases) = &p.phases {
+                if !p.channels.is_empty() || p.channel_ids.is_some() {
+                    return Err(format!(
+                        "pattern '{}': phases are mutually exclusive with channels/channel_ids",
+                        p.id
+                    ));
+                }
+                let mut prev_to: Option<u64> = None;
+                for (i, ph) in phases.iter().enumerate() {
+                    if ph.to_ms <= ph.from_ms {
+                        return Err(format!("pattern '{}': phase {i} has to_ms <= from_ms", p.id));
+                    }
+                    if ph.to_ms > p.duration_ms {
+                        return Err(format!("pattern '{}': phase {i} exceeds duration", p.id));
+                    }
+                    if let Some(pt) = prev_to {
+                        if ph.from_ms != pt {
+                            return Err(format!(
+                                "pattern '{}': phases must tile [0, {}] contiguously (gap at phase {i})",
+                                p.id, p.duration_ms
+                            ));
+                        }
+                    } else if ph.from_ms != 0 {
+                        return Err(format!("pattern '{}': first phase must start at 0", p.id));
+                    }
+                    for &c in &ph.channel_ids {
+                        if c as usize >= cfg.organism.n_input_channels {
+                            return Err(format!(
+                                "pattern '{}': phase {i} channel out of range",
+                                p.id
+                            ));
+                        }
+                    }
+                    prev_to = Some(ph.to_ms);
+                }
+                if let Some(pt) = prev_to {
+                    if pt != p.duration_ms {
+                        return Err(format!(
+                            "pattern '{}': phases must tile [0, {}] exactly (ends at {pt})",
+                            p.id, p.duration_ms
                         ));
                     }
                 }

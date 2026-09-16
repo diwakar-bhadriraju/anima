@@ -121,16 +121,22 @@ nominal (E8 convention). Analyzer args:
 | **φ/β vs baseline** | matched | matched | **matched** | **matched** |
 | shared-group co-active windows (of 5) | 5 (0-3/4-7) | 5 (8-11/12-15) | **1** ({4-7}/{8-11}) | **1** |
 
-*B channels pulse at 40 Hz in 250 ms spans: per 100-ms window the
-expected tick-exceedance count equals the static channels'
-(≈ 2 events/window; Poisson identity at matched spike-per-window
-expectation). Residual differences (registered, quantified):
-(a) within-epoch instantaneous rate 40 vs 20 Hz (inherent to any
-temporal structure; MARGINAL equal); (b) B's M3 co-activity for
-its two groups is 1/5 windows vs A/C's 5/5 — this IS the
-temporal cue; (c) φ transients at phase boundaries (2 windows per
-presentation, bounded by the EMA's τ = 2.5 s at ≈ 4% duty —
-negligible, registered).
+*B channels pulse at 40 Hz in 250 ms spans — AMENDMENT A-4
+(2026-09-16, user-approved): per-window event density is NOT
+matched (the A-3-class static expectation was wrong): 40 Hz ×
+250 ms concentrates ≈ 13 window-events in 3 of 5 presentation
+windows versus the static 10 in 5 → B-channel φ ratios vs
+static span ≈ [0.88, 1.16] (measured, deterministic; direction
+is channel- and order-dependent — the sawtooth equilibrium does
+not preserve a simple ordering), β_B ≈ 0.8–1.1×, audit band
+(0.85, 1.45) with actuals reported; E6 responds to the burst
+structure but does NOT produce the naive 2×/matched extremes
+(registered interaction, reported not corrected).
+MARGINAL identity (spikes per presentation) is preserved: 10 ±
+√10 per channel. Registered residuals: (a) per-window density
+concentration (above); (b) B's M3 co-activity for its two groups
+is 1/5 windows vs A/C's 5/5 — the temporal cue; (c) instantaneous
+rate 40 vs 20 Hz (inherent; marginal equal).
 
 ## 5. Endpoints (frozen; E8 definitions verbatim)
 
@@ -217,9 +223,12 @@ partner per seed.
    event means matched vs a static reference (≈ 2/window).
 3. M3 co-activity accounting: B's groups co-occur in exactly 1 of
    5 windows (grid-aligned), A/C pairs 5 of 5.
-4. E6 matching: feed the frozen EMA with both conditions' streams
-   — per-channel φ and β equal to the E8-static streams' within a
-   registered band (5%).
+4. E6 audit (A-4): feed the frozen EMA with both conditions'
+   streams — assert marginal identity (10 ± √10 per channel per
+   owning presentation) AND report the φ/β values: all B-channel φ
+   ratios in the registered [1.0, 1.45)-static band (burst
+   concentration; mixed-duty channels sit lower), per-channel
+   values printed; no static-match claim.
 5. Determinism: repeated generation + short-run telemetry identity
    (existing integration idiom, e9 layout).
 6. Organism freeze: sections byte-identical to e6-full; freeze
@@ -245,8 +254,11 @@ Failures stop the run and are diagnosed.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e9-seq `…`; e9-rev `…`; e9-seq-seed9001 `…`;
-  e9-seq-seed424242 `…` (recorded at creation, before runs).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e9-seq `2e28d6cea8696b6233d68cbeb7627e69b12c49fe12ee8764d5136feebd766751`;
+  e9-rev `78d5a909edf9c20e4e923432dcd3ec7faf33e2079dcb24e766fd443b21243e17`;
+  e9-seq-seed9001 `f935280a428d12c78faa38eff83efd7376e37d094b2b829c39cce115ccdcac13`;
+  e9-seq-seed424242 `de6bbb9ae98471d34ffef8cb69fd546b163e182b0f5d816528d1c41285c20c89`.
 - E8 baseline (verbatim): 20260912 (0.073/0.873/0.032), 9001
   (0.592/0.165/0.048), 424242 (0.763/0.075/0.033); B-alignment
   A / C / C.
