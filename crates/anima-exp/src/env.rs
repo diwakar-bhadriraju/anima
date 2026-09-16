@@ -1284,4 +1284,65 @@ fn e6_configs_freeze_source_with_e6_only() {
             }
         }
     }
+
+    // ---- ANIMA E10 pre-registered tests (docs/anima-e10-protocol.md §8) ----
+
+    /// §8.1/§8.2/§8.6: e10 == e9-seq EXCEPT reps 120 + exp_id/seed;
+    /// phases/timing identical.
+    #[test]
+    fn e10_freeze_vs_e9_seq() {
+        let strip = |s: String| -> String {
+            s.lines()
+                .filter(|l| !l.is_empty() && !l.starts_with("exp_id") && !l.starts_with("seed") && !l.starts_with("reps"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let e9 = strip(toml::to_string(&v3_config("e9-seq.toml")).unwrap());
+        for name in ["e10.toml", "e10-seed9001.toml", "e10-seed424242.toml"] {
+            let c = v3_config(name);
+            assert_eq!(strip(toml::to_string(&c).unwrap()), e9, "{name}: identical to e9-seq except reps/exp_id/seed");
+            let s1 = c.stage.iter().find(|st| st.id == "S1").unwrap();
+            assert_eq!(s1.reps, 120, "{name} S1 reps 120");
+        }
+        assert_eq!(v3_config("e10.toml").run.seed, 20260912);
+        assert_eq!(v3_config("e10-seed9001.toml").run.seed, 9001);
+        assert_eq!(v3_config("e10-seed424242.toml").run.seed, 424242);
+        // phases byte-identical to e9-seq
+        let c9 = v3_config("e9-seq.toml");
+        let c10 = v3_config("e10.toml");
+        let p9 = c9.pattern.iter().find(|p| p.id == "B").unwrap();
+        let p10 = c10.pattern.iter().find(|p| p.id == "B").unwrap();
+        assert_eq!(p9.phases.as_ref().unwrap().len(), p10.phases.as_ref().unwrap().len());
+        for (a, b) in p9.phases.as_ref().unwrap().iter().zip(p10.phases.as_ref().unwrap().iter()) {
+            assert_eq!((a.from_ms, a.to_ms, a.rate_hz), (b.from_ms, b.to_ms, b.rate_hz));
+            assert_eq!(a.channel_ids, b.channel_ids);
+        }
+        // scale-commensurability audit: the frozen mechanism time
+        // constants are config-level and unchanged (E6 EMA tau = 25
+        // windows x 100 ms = 2.5 s; adaptation 200 ms; M3 window 100 ms).
+        let c = v3_config("e10.toml");
+        assert_eq!(c.v2.as_ref().unwrap().window_ticks, 100, "M3 window 100 ms");
+        assert_eq!(c.organism.adaptation_tau_ms, 200.0, "adaptation tau 200 ms");
+        assert_eq!(c.e6.as_ref().unwrap().alpha, 1.0 / 25.0, "E6 phi tau = 25 windows (2.5 s)");
+    }
+
+    /// §8.3: timeline — S1 360 presentations [5000, 725000), S3 45
+    /// [725000, 815000), actual duration 813,500 ms.
+    #[test]
+    fn e10_timeline_exact() {
+        let env = Environment::new(v3_config("e10.toml"), 20260912);
+        assert_eq!(env.schedule.len(), 1 + 360 + 45);
+        assert_eq!(env.duration(), 813_500, "actual duration 813.5 s");
+        let s1 = env.schedule.iter().filter(|p| p.stage == "S1").collect::<Vec<_>>();
+        assert_eq!(s1.len(), 360);
+        assert_eq!(s1.first().unwrap().start, 5_000);
+        // presentations fill [5000, 723500); the registered analyzer
+        // window extends to the nominal 725000 (trailing off-period).
+        assert_eq!(s1.iter().map(|p| p.start).max().unwrap() + 500, 723_500, "S1 presentations end at 723500");
+        let s3 = env.schedule.iter().filter(|p| p.stage == "S3").collect::<Vec<_>>();
+        assert_eq!(s3.len(), 45);
+        assert_eq!(s3.first().unwrap().start, 725_000);
+        assert!(env.schedule.iter().all(|p| p.stage != "S2" && p.pattern != "D"));
+    }
 }
+

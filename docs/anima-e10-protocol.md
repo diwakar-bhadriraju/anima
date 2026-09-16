@@ -164,8 +164,10 @@ the [run] identity fields.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e10 `…`; e10-seed9001 `…`; e10-seed424242 `…`
-  (recorded at creation, before runs).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e10 `0f2fb5775dcd1249b23d625cc429eecff39d9cbaa0f6398b2e876752ecd26db0`;
+  e10-seed9001 `ad7438860b19b1549917d876dffaa59e87d52c210c04ec9a8ba6dd8f98898afa`;
+  e10-seed424242 `3a16f327c6ed31400633b0690536ed46e7f35488c43aed03db5107bea1af02ca`.
 - E9 baseline (verbatim): 20260912 (0.630/0.083/0.000), 9001
   (0.723/0.152/0.019), 424242 (0.512/0.079/0.000); B-independence
   F / F / T.
