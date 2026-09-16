@@ -206,3 +206,22 @@ result; no mechanism claim; no organism change. Sequence
 v3 -> E6 -> E7 -> E8 -> E9 -> E10 -> E11: the 3-way disambiguation
 limitation is now precisely characterized as experience-order-
 sensitivity — balanced experience dissolves it.
+
+### U9 / path-dependence update (2026-09-17, E12 registration)
+
+E11 closed OUTCOME A (balanced order => 3/3 B-independence; lock-in
+is order-asymmetry-dependent). E12 is now REGISTERED
+(docs/anima-e12-protocol.md): path-dependence/recovery probe on the
+frozen E6 organism - blocked history (60 SEQ then 60 REV), all else
+identical to E10. Registered env-layer generalization:
+variant_index = (rep / variant_block) % len with variant_block
+default 1 (E11 rule byte-identical), E12 registers 60. Boundary
+T0 = 365,000 ms registered; new measurement-only example
+e12_transition.rs computes all representation metrics at T0
+(midpoint, E9-reference) and T1 (final, E11-reference). Verdict
+tree A (recovery 3/3), B (persistent lock-in 3/3; never called
+irreversible), C (reorganization without full independence -
+preserved as distinct), D (gates); per-seed modal rule for
+disagreements. phi/beta audit band +/-0.15 (A-5 class, placement
+documented pre-data). No E13 until E12 fully analyzed. No
+implementation performed - freeze first.
