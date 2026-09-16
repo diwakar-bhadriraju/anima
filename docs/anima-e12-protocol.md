@@ -239,8 +239,10 @@ reruns.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e12 `…`; e12-seed9001 `…`; e12-seed424242 `…`
-  (recorded at creation, before runs).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e12 `2efb082ef170a86873b0f04b2a3c3faf45d4c7527dde6375295ae0f813da1c0d`;
+  e12-seed9001 `72d3021c1fb015060606a42b75fddc64f489bf8e81c866f8b45b3006f8f807d6`;
+  e12-seed424242 `5fbf2e78f1b8cbbcf80bf64468c06c798cc094260a47ca9ce66faa140e1c4f5c`.
 - Baseline references (verbatim): E9 canonical (0.630/0.083/0.000);
   E10 (0.697/0.081/0.003, 0.760/0.080/0.000, 0.624/0.080/0.000,
   F/F/F); E11 (0.462/0.488/0.000, 0.535/0.511/0.000,

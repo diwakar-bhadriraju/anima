@@ -46,6 +46,10 @@ pub struct E6Section {
     pub beta_max: f32,
 }
 
+fn default_variant_block() -> u64 {
+    1
+}
+
 fn default_e6_alpha() -> f32 {
     1.0 / 25.0
 }
@@ -247,15 +251,23 @@ pub struct PatternSpec {
     /// identical behavior for every existing config.
     #[serde(default)]
     pub phases: Option<Vec<PhaseSpec>>,
-    /// E11 (docs/anima-e11-protocol.md §2/§6): optional counterbalanced
-    /// phase variants. Mutually exclusive with phases/channels/
-    /// channel_ids. When Some, the pattern's phases for presentation
-    /// with rep index r are `variants[r % variants.len()]` (registered
-    /// semantics; the E11 case uses two variants with exactly 60/60
-    /// balance). Environment-only; variant selection consumes NO RNG.
-    /// Absent => byte-identical behavior for every existing config.
+    /// E11/E12 (docs/anima-e11-protocol.md §2, anima-e12-protocol.md
+    /// §2): optional counterbalanced phase variants. Mutually exclusive
+    /// with phases/channels/channel_ids. When Some, the pattern's
+    /// phases for presentation with rep index r are
+    /// `variants[(r / variant_block) % variants.len()]` (registered
+    /// semantics; E11 uses two variants with variant_block 1 — the
+    /// E11 60/60 interleave; E12 uses variant_block 60 — the blocked
+    /// 60 SEQ then 60 REV history). Environment-only; variant selection
+    /// consumes NO RNG. Absent => byte-identical behavior for every
+    /// existing config.
     #[serde(default)]
     pub phase_variants: Option<Vec<PhaseVariantSpec>>,
+    /// E12 (docs/anima-e12-protocol.md §2): variant-block size for the
+    /// registered selection rule. Default 1 => the E11 rule
+    /// `rep % variants.len()` byte-identically.
+    #[serde(default = "default_variant_block")]
+    pub variant_block: u64,
     pub rate_hz: f32,
     pub duration_ms: u64,
     pub jitter_ms: f32,
@@ -366,6 +378,9 @@ impl ExpConfig {
                         "pattern '{}': phase_variants needs >= 2 variants (E11 registered semantics)",
                         p.id
                     ));
+                }
+                if p.variant_block == 0 {
+                    return Err(format!("pattern '{}': variant_block must be >= 1", p.id));
                 }
                 for (vi, variant) in variants.iter().enumerate() {
                     let mut prev_to: Option<u64> = None;

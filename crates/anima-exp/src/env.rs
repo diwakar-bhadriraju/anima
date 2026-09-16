@@ -116,7 +116,13 @@ impl Environment {
             // variants[r % variants.len()]; deterministic, consumes no
             // RNG. Absent => prior behavior exactly.
             let phases: Option<&Vec<crate::config::PhaseSpec>> = match &pat.phase_variants {
-                Some(variants) => Some(&variants[sch.rep % variants.len()].phases),
+                // E12 (docs/anima-e12-protocol.md §2): blocked variant
+                // selection — (rep / variant_block) % len; variant_block
+                // defaults to 1 => the E11 rule byte-identically.
+                Some(variants) => {
+                    let block = pat.variant_block.max(1) as usize;
+                    Some(&variants[(sch.rep / block) % variants.len()].phases)
+                }
                 None => pat.phases.as_ref(),
             };
             if let Some(phases) = phases {
@@ -346,8 +352,8 @@ mod tests {
                 fragmentation_min_component: 0.5,
             },
             pattern: vec![
-                PatternSpec { id: "A".into(), channels: vec!["A".into()], channel_ids: None, phases: None, phase_variants: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
-                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, phase_variants: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "A".into(), channels: vec!["A".into()], channel_ids: None, phases: None, phase_variants: None, variant_block: 1, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, phase_variants: None, variant_block: 1, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
             ],
             stage: vec![
                 StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200) },
@@ -1551,6 +1557,216 @@ fn e6_configs_freeze_source_with_e6_only() {
         }
         let env = Environment::new(v3_config("e11.toml"), 20260912);
         assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
+    }
+
+    // ---- ANIMA E12 pre-registered tests (docs/anima-e12-protocol.md §9) ----
+
+    /// §9.1: e12 == e10 except B variant structure + variant_block +
+    /// exp_id/seed; organism frozen; E6 on.
+    #[test]
+    fn e12_freeze_vs_e10() {
+        let f = |c: &ExpConfig| -> String {
+            toml::to_string(c)
+                .unwrap()
+                .lines()
+                .filter(|l| !l.is_empty() && !l.starts_with("exp_id") && !l.starts_with("seed"))
+                .filter(|l| {
+                    !l.starts_with("from_ms") && !l.starts_with("to_ms")
+                        && !l.starts_with("channel_ids") && !l.starts_with("phase_variants")
+                        && !l.starts_with("[[pattern.phase_variants") && !l.starts_with("[[pattern.phases")
+                        && !l.starts_with("rate_hz = 40.0") && !l.starts_with("variant_block")
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        assert_eq!(f(&v3_config("e10.toml")), f(&v3_config("e12.toml")),
+            "e12 differs from e10 ONLY in B variant structure + variant_block + exp_id/seed");
+        let c12 = v3_config("e12.toml");
+        let sec = |c: &ExpConfig| {
+            [
+                toml::to_string(&c.organism).unwrap(),
+                toml::to_string(&c.plasticity).unwrap(),
+                toml::to_string(&c.structural).unwrap(),
+                toml::to_string(&c.resources).unwrap(),
+                toml::to_string(&c.v2).unwrap(),
+                toml::to_string(&c.e6).unwrap(),
+            ]
+            .join("~~")
+        };
+        assert_eq!(sec(&c12), sec(&v3_config("e6-full.toml")), "E12 organism frozen");
+        assert_eq!(v3_config("e12-seed9001.toml").run.seed, 9001);
+        assert_eq!(v3_config("e12-seed424242.toml").run.seed, 424242);
+        let b = c12.pattern.iter().find(|p| p.id == "B").unwrap();
+        assert_eq!(b.variant_block, 60, "E12 registered block");
+        let vs = b.phase_variants.as_ref().unwrap();
+        assert_eq!(vs.len(), 2);
+        assert_eq!(vs[0].phases[0].channel_ids, vec![4, 5, 6, 7], "variant 0 = SEQ");
+        assert_eq!(vs[1].phases[0].channel_ids, vec![8, 9, 10, 11], "variant 1 = REV");
+    }
+
+    /// §9.2: blocked selection — reps 0-59 SEQ, 60-119 REV; 60/60;
+    /// boundary rep 60 verified; S3 all-SEQ.
+    #[test]
+    fn e12_blocked_selection() {
+        for (name, seed) in [("e12.toml", 20260912u64), ("e12-seed9001.toml", 9001), ("e12-seed424242.toml", 424242)] {
+            let env = Environment::new(v3_config(name), seed);
+            let mut n_seq = 0usize;
+            let mut n_rev = 0usize;
+            let mut rep_boundary = None;
+            for (si, sch) in env.schedule.iter().enumerate() {
+                if sch.pattern != "B" || sch.stage != "S1" {
+                    continue;
+                }
+                let mut min_t = u64::MAX;
+                let mut first_ch = 0u32;
+                for &(t, ch) in &env.trains[si] {
+                    if t < min_t {
+                        min_t = t;
+                        first_ch = ch.0;
+                    }
+                }
+                let leads_47 = (4..8).contains(&first_ch);
+                if sch.rep < 60 {
+                    assert!(leads_47, "{name} rep {} (<60) must be SEQ", sch.rep);
+                    n_seq += 1;
+                } else {
+                    assert!(!leads_47, "{name} rep {} (>=60) must be REV", sch.rep);
+                    n_rev += 1;
+                    if rep_boundary.is_none() {
+                        rep_boundary = Some((sch.rep, sch.start));
+                    }
+                }
+                // T0 = 365,000: this B presentation must start AFTER the
+                // 180th presentation's window end; verify no B rep < 60
+                // falls in the second half and vice versa.
+                if sch.rep == 60 {
+                    assert!(sch.start >= 365_000, "{name} first REV-B at {}(start {}) must be >= 365000",
+                        sch.rep, sch.start);
+                }
+            }
+            assert_eq!((n_seq, n_rev), (60, 60), "{name} 60/60 blocked balance");
+            assert!(rep_boundary.is_some(), "{name} boundary rep found");
+            // S3 reps 120-134: (rep/60)%2 = 0 => SEQ (retention-only rule)
+            for (si, sch) in env.schedule.iter().enumerate() {
+                if sch.pattern == "B" && sch.stage == "S3" {
+                    let mut min_t = u64::MAX;
+                    let mut first_ch = 0u32;
+                    for &(t, ch) in &env.trains[si] {
+                        if t < min_t {
+                            min_t = t;
+                            first_ch = ch.0;
+                        }
+                    }
+                    assert!((4..8).contains(&first_ch), "S3 retention B must be SEQ per registered rule");
+                }
+            }
+        }
+    }
+
+    /// §9.3/§9.4: equivalence vs e10 — A/C streams bit-identical,
+    /// marginals, totals, M3 co-activity 1/5, φ/β audit band.
+    #[test]
+    fn e12_equivalence_vs_e10() {
+        for (n12, n10, seed) in [
+            ("e12.toml", "e10.toml", 20260912u64),
+            ("e12-seed9001.toml", "e10-seed9001.toml", 9001),
+            ("e12-seed424242.toml", "e10-seed424242.toml", 424242),
+        ] {
+            let e12 = Environment::new(v3_config(n12), seed);
+            let e10 = Environment::new(v3_config(n10), seed);
+            assert_eq!(e12.schedule.len(), e10.schedule.len());
+            for (si, (a, b)) in e12.schedule.iter().zip(e10.schedule.iter()).enumerate() {
+                assert_eq!(
+                    (a.stage.as_str(), a.pattern.as_str(), a.start, a.duration_ms),
+                    (b.stage.as_str(), b.pattern.as_str(), b.start, b.duration_ms)
+                );
+                if a.pattern != "B" {
+                    assert_eq!(e12.trains[si], e10.trains[si], "{n12} vs {n10} si={si} A/C stream");
+                }
+            }
+            let mut per_ch = vec![0u64; 24];
+            let mut ch_pres = vec![0u64; 24];
+            let mut totals = Vec::new();
+            for (si, sch) in e12.schedule.iter().enumerate() {
+                if sch.pattern == "silence" {
+                    continue;
+                }
+                let mut seen = [false; 24];
+                let mut n = 0u64;
+                for &(_, ch) in &e12.trains[si] {
+                    per_ch[ch.0 as usize] += 1;
+                    seen[ch.0 as usize] = true;
+                    n += 1;
+                }
+                totals.push(n);
+                for (c, &v) in seen.iter().enumerate() {
+                    ch_pres[c] += v as u64;
+                }
+                if sch.pattern == "B" {
+                    let mut w1 = [false; 5];
+                    let mut w2 = [false; 5];
+                    for &(t, ch) in &e12.trains[si] {
+                        let w = (t / 100) as usize;
+                        if (4..8).contains(&ch.0) {
+                            w1[w] = true;
+                        }
+                        if (8..12).contains(&ch.0) {
+                            w2[w] = true;
+                        }
+                    }
+                    let co = (0..5).filter(|&w| w1[w] && w2[w]).count();
+                    assert_eq!(co, 1, "B groups co-occur in exactly 1 of 5 windows (rep {}), got {co}", sch.rep);
+                }
+            }
+            for c in 0..16 {
+                let per = per_ch[c] as f64 / ch_pres[c].max(1) as f64;
+                assert!((per - 10.0).abs() < 3.2, "{n12} ch{c}: marginal {per:.1}");
+            }
+            let (mn, mx) = (totals.iter().min().unwrap(), totals.iter().max().unwrap());
+            assert!(*mn >= 51 && *mx <= 109, "{n12} totals 80±9: {mn}..{mx}");
+            // φ/β audit vs e10: B channels ±0.15 (E12 registered band),
+            // A/C < 0.01
+            let ema = |env: &Environment| -> Vec<f32> {
+                let mut rb = anima_core::rate_balance::RateBalance::new(
+                    anima_core::rate_balance::E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 24),
+                );
+                let n_windows = 8_151usize + 1;
+                let mut wc = vec![[0u32; 24]; n_windows];
+                for (si, sch) in env.schedule.iter().enumerate() {
+                    for &(off, ch) in &env.trains[si] {
+                        let t = sch.start + off;
+                        wc[(t / 100) as usize][ch.0 as usize] += 1;
+                    }
+                }
+                for w in 0..n_windows {
+                    for (ch, &c) in wc[w].iter().enumerate() {
+                        for _ in 0..c {
+                            rb.tick(anima_core::network::NeuronId(ch as u32));
+                        }
+                    }
+                    rb.window_start();
+                }
+                rb.phi().to_vec()
+            };
+            let p12 = ema(&e12);
+            let p10 = ema(&e10);
+            for c in 0..24 {
+                let d = (p12[c] - p10[c]).abs() / p10[c].max(1e-6);
+                let is_b = (4..12).contains(&c);
+                if is_b {
+                    assert!(d < 0.15, "{n12} ch{c} B φ drift in E12 band (<0.15): {d:.4}");
+                } else {
+                    assert!(d < 0.01, "{n12} ch{c} A/C φ drift (<0.01): {d:.4}");
+                }
+            }
+        }
+        let env = Environment::new(v3_config("e12.toml"), 20260912);
+        assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
+        // T0 boundary exactness: presentation 181 (index 180 in S1) starts
+        // at 365,000 and is B rep 60 or an A/C of round 61.
+        let s1: Vec<&crate::env::ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S1").collect();
+        assert_eq!(s1[180].start, 365_000, "T0 = start of the 181st S1 presentation");
+        assert!(s1[179].start < 365_000 && s1[179].start + 500 <= 365_000, "180th ends at/before T0");
     }
 }
 

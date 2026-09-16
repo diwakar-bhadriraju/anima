@@ -986,6 +986,180 @@ order = "interleaved"
 off_ms = 300
 "#;
 
+// ---- E12 (docs/anima-e12-protocol.md §9.6): deterministic repeat on
+// ---- the blocked phase-variant layout (variant_block = 60).
+
+const E12_SHORT_TOML: &str = r#"
+[run]
+exp_id = "e12it"
+seed = 20260912
+viz_port = 8803
+ticks_per_sec = 1000.0
+stats_decimate = 10
+
+[organism]
+n_input_channels = 24
+group_size = 8
+n_internal = 12
+n_output = 4
+connectivity = 0.038
+w_init = 0.2
+amplitude = 52.0
+adaptation_tau_ms = 200.0
+adaptation_gain = 0.05
+
+[plasticity]
+rule = "stdp-pairwise"
+tau_plus_ms = 20.0
+tau_minus_ms = 20.0
+a_plus = 0.005
+a_minus = 0.0053
+w_min = 0.0
+w_max = 1.0
+decay = 1e-6
+silence_w = 0.02
+silence_ticks = 60000
+min_age_ticks = 30000
+gate = "always"
+
+[structural]
+birth_trigger = "none"
+dormancy_rate_hz = 0.1
+dormancy_ms = 30000
+recovery_rate_hz = 1.0
+retirement_ms = 300000
+wiring_synapses = 5
+
+[resources]
+max_neurons = 200
+max_synapses = 2000
+births_per_window = 4
+runaway_rate_hz = 50.0
+runaway_sustained_ms = 5000
+fragmentation_min_component = 0.6
+
+[v2]
+enabled = true
+p_in = 0.5
+w_in_lo = 0.02
+w_in_hi = 0.06
+p_rec = 0.2
+w_rec_lo = 0.005
+w_rec_hi = 0.02
+t_e = 0.8
+c_slots = 6
+w_c_init = 0.01
+delta_perm = 0.01
+decay_c = 0.99
+theta_permanent = 0.05
+w_c_permanent = 0.02
+theta_die = 0.005
+p_cand_in = 0.5
+p_cand_rec = 0.5
+theta_prune = 0.005
+prune_windows = 10
+b_e = 40
+b_i = 10
+p_inh = 0.3
+w_inh_lo = 0.01
+w_inh_hi = 0.03
+a_inh = 0.005
+decay_inh = 0.98
+w_inh_max = 0.10
+window_ticks = 100
+
+[e6]
+enable = true
+alpha = 0.04
+phi_init = 0.02
+phi_min = 0.001
+beta_min = 0.1
+beta_max = 10.0
+
+[[pattern]]
+id = "A"
+channels = []
+channel_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[pattern]]
+id = "B"
+channels = []
+rate_hz = 40.0
+duration_ms = 300
+jitter_ms = 2.0
+variant_block = 2
+
+[[pattern.phase_variants]]
+[[pattern.phase_variants.phases]]
+from_ms = 0
+to_ms = 150
+channel_ids = [4, 5, 6, 7]
+rate_hz = 40.0
+
+[[pattern.phase_variants.phases]]
+from_ms = 150
+to_ms = 300
+channel_ids = [8, 9, 10, 11]
+rate_hz = 40.0
+
+[[pattern.phase_variants]]
+[[pattern.phase_variants.phases]]
+from_ms = 0
+to_ms = 150
+channel_ids = [8, 9, 10, 11]
+rate_hz = 40.0
+
+[[pattern.phase_variants.phases]]
+from_ms = 150
+to_ms = 300
+channel_ids = [4, 5, 6, 7]
+rate_hz = 40.0
+
+[[pattern]]
+id = "C"
+channels = []
+channel_ids = [8, 9, 10, 11, 12, 13, 14, 15]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[stage]]
+id = "S0"
+present = []
+reps = 0
+order = "interleaved"
+off_ms = 0
+silence_ms = 300
+
+[[stage]]
+id = "S1"
+present = ["A", "B", "C"]
+reps = 4
+order = "interleaved"
+off_ms = 300
+
+[[stage]]
+id = "S3"
+present = ["A", "B", "C"]
+reps = 2
+order = "interleaved"
+off_ms = 300
+"#;
+
+#[test]
+fn e12_blocked_layout_deterministic_repeated_run() {
+    let d1 = run_config("e12d1", E12_SHORT_TOML);
+    let d2 = run_config("e12d2", E12_SHORT_TOML);
+    let h1 = sha256_dir(&d1.join("telemetry"));
+    let h2 = sha256_dir(&d2.join("telemetry"));
+    assert_eq!(h1, h2, "same seed + e12 blocked layout => byte-identical telemetry");
+    let _ = std::fs::remove_dir_all(d1.parent().unwrap());
+    let _ = std::fs::remove_dir_all(d2.parent().unwrap());
+}
+
 #[test]
 fn e11_variant_layout_deterministic_repeated_run() {
     let d1 = run_config("e11d1", E11_SHORT_TOML);
