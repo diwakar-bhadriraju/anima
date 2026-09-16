@@ -172,3 +172,54 @@ the [run] identity fields.
   (0.723/0.152/0.019), 424242 (0.512/0.079/0.000); B-independence
   F / F / T.
 - Commit: `…` (recorded at run time).
+---
+
+## E10 execution record (2026-09-17)
+
+Implementation `6700090` (configs + freeze/timeline tests); 116
+tests green, 0 warnings. Run dirs: primary
+`runs/e10-20260916T184902Z`, cross-seed
+`runs/e10-seed9001-20260916T185308Z`,
+`runs/e10-seed424242-20260916T185308Z` — all curriculum-complete,
+telemetry intact, zero failures.
+
+### Two-point scale curves (E9 = 60 reps baseline vs E10 = 120 reps)
+
+| seed | pair | E9 (60) | E10 (120) | flip |
+|---|---|---|---|---|
+| 20260912 | A-B | 0.630 | **0.697** | . |
+| 20260912 | B-C | 0.083 | 0.081 | . |
+| 20260912 | A-C | 0.000 | 0.003 | . |
+| 9001 | A-B | 0.723 | **0.760** | . |
+| 9001 | B-C | 0.152 | **0.080** | . |
+| 9001 | A-C | 0.019 | 0.000 | . |
+| 424242 | A-B | 0.512 | **0.624** | **Y (away from bar)** |
+| 424242 | B-C | 0.079 | 0.080 | . |
+| 424242 | A-C | 0.000 | 0.000 | . |
+
+**B-independence at 120: 0/3 seeds** (20260912 F, 9001 F,
+424242 F). Engagement ≈ doubled with experience (4,276 / 3,517 /
+4,006 vs 2,384 / 2,017 / 2,214); selectivity 0.662 / 0.802 /
+0.902; P2 supported in all seeds (0 failures; rates 9.9/87.1 Hz
+canonical); L1 attribution clean everywhere.
+
+### Frozen verdict: **0/3 — no evidence that doubling experience
+### resolves the limitation** (registered N/3 rule)
+
+1. **The strengthening branch won**: every A-B value moved AWAY
+   from the bar (+0.067, +0.037, +0.112) — additional experience
+   CONSOLIDATES the leading-group (A-side) absorption rather than
+   dissolving it. The only categorical flip across all nine
+   comparisons was the loss of 424242's E9 B-independence
+   (0.512 → 0.624).
+2. **B-C is experience-robust**: the temporal cue's separation
+   from the trailing side held and even improved (9001: 0.152 →
+   0.080) — the de-coalescence from C is not the limiting axis.
+3. Interpretation per §10: "doubling experience did not stabilize
+   the temporal representation at this scale"; the two-point
+   curve exhibits a hardening (not consolidation) trend on the
+   A-side pair. Registered boundary: this is a scale effect on
+   the E9 capability — NOT a mechanism discovery, NOT a license
+   to tune; a third repetition point or any parameter change
+   requires a separate registration.
+4. A-C separability remains universal (≤ 0.003 vs E9's ≤ 0.019).

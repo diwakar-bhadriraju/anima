@@ -158,3 +158,20 @@ snapshot 725000, analyzer args registered; scale-commensurability
 audit (phi tau 2.5 s / adaptation 200 ms / M3 100 ms all << S1);
 freeze test: e10 == e9-seq except reps = 120 + exp_id. E9 runs =
 untouchable baseline. No mechanism work.
+
+### U9 / experience-scale update (2026-09-17, E10 result)
+
+E10 (120 reps, only variable vs E9; commit 6700090 + execution):
+OUTCOME 0/3 B-independence (per the registered N/3 rule) - no
+evidence that doubling experience resolves the limitation. The
+strengthening branch of the registered two-sided consolidation
+hypothesis won: A-B moved away from the bar in every seed
+(0.630->0.697, 0.723->0.760, 0.512->0.624; 424242 LOST its E9
+independence - the only categorical flip). B-C stays
+experienced-robust (<= 0.081, improved in 9001). Engagement
+scaled ~2x as expected; P2 clean; L1 structural everywhere; A-C
+universally separated. Interpretation: the temporal capability's
+limiting axis is the leading-group (A-side) inheritance, which
+hardens with experience; a scale effect, not a mechanism result.
+No tuning; a third scale point or any mechanism would need a new
+registration.
