@@ -142,3 +142,19 @@ missed by 0.030 on the canonical (0.630). Conclusion: curriculum-
 level temporal capability exists but is insufficient/not robust
 for independent B at the registered scale; no mechanism
 implemented or implied.
+
+### U9 / experience-scale update (2026-09-17, E10 registration)
+
+E9 closed OUTCOME B (temporal capability real, order-sensitive,
+B-independence 1/3 seeds). E10 is now REGISTERED
+(docs/anima-e10-protocol.md): two-point scale comparison only
+(E9 = 60 reps baseline, E10 = 120 reps; NO third point under
+E10); consolidation hypothesis explicitly two-sided (dissolve vs
+strengthen the leading-group absorption — no directional prior);
+per-seed scale curves (pair x seed: E9_60 vs E10_120) + verdict
+flips; strict N/3 interpretation rule (3/3 = robust evidence,
+2/3 = stochastic, etc.); timeline [5000,725000)/[725000,815000),
+snapshot 725000, analyzer args registered; scale-commensurability
+audit (phi tau 2.5 s / adaptation 200 ms / M3 100 ms all << S1);
+freeze test: e10 == e9-seq except reps = 120 + exp_id. E9 runs =
+untouchable baseline. No mechanism work.
