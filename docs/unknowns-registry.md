@@ -114,3 +114,18 @@ seed-labile. Interpretation: the 3-way limitation is real and
 scale/no-D-robust on the reference seed, but its expression
 (which neighbor absorbs the middle category) is stochastic;
 A-C separability is universal. No mechanism implied, no changes.
+
+### U9 / 3-way disambiguation update (2026-09-16, E9 registration)
+
+E8 closed OUTCOME B (seed-labile B-coalition; A-C universally
+separate). E9 is now REGISTERED (docs/anima-e9-protocol.md):
+minimal temporal/contextual probe on the frozen E6 organism —
+SEQ-B: B = {4-7}@40 Hz [0,250) then {8-11}@40 Hz [250,500) (marginal
+20 Hz, totals and phi/beta matched vs static A/C), REV-B control
+(reversed order, isolates direction), E8-static baseline. Endpoint:
+B-independence = A-B < 0.60 AND B-C < 0.60 with L1 attribution;
+cross-seed verdict reproduction on SEQ-B (9001/424242, P2+gated).
+Derivation registered: readout limit (count-based), STDP tau 20 ms
+(separation > ~100 ms), M3 100-ms windows (1/5 co-active windows
+for B's groups), E6 phi/beta matched marginals. No mechanism work;
+outcome A is a curriculum-level capability result only.
