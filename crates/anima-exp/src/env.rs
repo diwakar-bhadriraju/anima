@@ -111,7 +111,15 @@ impl Environment {
             }
             let pat = cfg.pattern.iter().find(|p| p.id == sch.pattern).expect("pattern in config");
             let mut spikes: Vec<(u64, InputChannelId)> = Vec::new();
-            if let Some(phases) = &pat.phases {
+            // E11 (docs/anima-e11-protocol.md §2/§6): counterbalanced
+            // variants — phases for presentation rep r =
+            // variants[r % variants.len()]; deterministic, consumes no
+            // RNG. Absent => prior behavior exactly.
+            let phases: Option<&Vec<crate::config::PhaseSpec>> = match &pat.phase_variants {
+                Some(variants) => Some(&variants[sch.rep % variants.len()].phases),
+                None => pat.phases.as_ref(),
+            };
+            if let Some(phases) = phases {
                 // E9 (docs/anima-e9-protocol.md §9): per-phase Poisson
                 // streams. Seed tuple extended by the phase index —
                 // registered extension, used ONLY by phase configs; the
@@ -338,8 +346,8 @@ mod tests {
                 fragmentation_min_component: 0.5,
             },
             pattern: vec![
-                PatternSpec { id: "A".into(), channels: vec!["A".into()], channel_ids: None, phases: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
-                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "A".into(), channels: vec!["A".into()], channel_ids: None, phases: None, phase_variants: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
+                PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, phase_variants: None, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
             ],
             stage: vec![
                 StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200) },
@@ -1343,6 +1351,206 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(s3.len(), 45);
         assert_eq!(s3.first().unwrap().start, 725_000);
         assert!(env.schedule.iter().all(|p| p.stage != "S2" && p.pattern != "D"));
+    }
+
+    // ---- ANIMA E11 pre-registered tests (docs/anima-e11-protocol.md §7) ----
+
+    /// §7.1: e11 == e10 except B's phase structure + exp_id/seed;
+    /// organism frozen; E6 on; variant validation errors.
+    #[test]
+    fn e11_freeze_vs_e10() {
+        let f = |c: &ExpConfig| -> String {
+            toml::to_string(c)
+                .unwrap()
+                .lines()
+                .filter(|l| !l.is_empty() && !l.starts_with("exp_id") && !l.starts_with("seed"))
+                .filter(|l| {
+                    !l.starts_with("from_ms") && !l.starts_with("to_ms")
+                        && !l.starts_with("channel_ids") && !l.starts_with("phase_variants")
+                        && !l.starts_with("[[pattern.phase_variants") && !l.starts_with("[[pattern.phases")
+                        && !l.starts_with("rate_hz = 40.0")
+                })
+                .collect::<Vec<_>>()
+                .join("
+")
+        };
+        assert_eq!(f(&v3_config("e10.toml")), f(&v3_config("e11.toml")),
+            "e11 differs from e10 ONLY in B phase structure + exp_id/seed");
+        let c11 = v3_config("e11.toml");
+        let sec = |c: &ExpConfig| {
+            [
+                toml::to_string(&c.organism).unwrap(),
+                toml::to_string(&c.plasticity).unwrap(),
+                toml::to_string(&c.structural).unwrap(),
+                toml::to_string(&c.resources).unwrap(),
+                toml::to_string(&c.v2).unwrap(),
+                toml::to_string(&c.e6).unwrap(),
+            ]
+            .join("~~")
+        };
+        assert_eq!(sec(&c11), sec(&v3_config("e6-full.toml")), "E11 organism frozen");
+        assert_eq!(c11.run.seed, 20260912);
+        assert_eq!(v3_config("e11-seed9001.toml").run.seed, 9001);
+        assert_eq!(v3_config("e11-seed424242.toml").run.seed, 424242);
+        let b11 = c11.pattern.iter().find(|p| p.id == "B").unwrap();
+        let variants = b11.phase_variants.as_ref().expect("two variants");
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0].phases[0].channel_ids, vec![4, 5, 6, 7], "variant 0 = SEQ");
+        assert_eq!(variants[1].phases[0].channel_ids, vec![8, 9, 10, 11], "variant 1 = REV");
+        let mut cfg = test_config();
+        cfg.organism.n_input_channels = 24;
+        cfg.pattern[0].channels = vec![];
+        cfg.pattern[0].channel_ids = None;
+        cfg.pattern[0].phases = None;
+        cfg.pattern[0].phase_variants = Some(vec![crate::config::PhaseVariantSpec {
+            phases: vec![crate::config::PhaseSpec { from_ms: 0, to_ms: 50, channel_ids: vec![1], rate_hz: 20.0 }],
+        }]);
+        let tmp = std::env::temp_dir().join("e11-bad.toml");
+        std::fs::write(&tmp, toml::to_string(&cfg).unwrap()).unwrap();
+        assert!(ExpConfig::parse(&tmp).is_err(), "single variant rejected");
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// §7.2: variant = rep parity — leading group matches parity; 60/60.
+    #[test]
+    fn e11_variant_parity_and_balance() {
+        for (name, seed) in [("e11.toml", 20260912u64), ("e11-seed9001.toml", 9001), ("e11-seed424242.toml", 424242)] {
+            let env = Environment::new(v3_config(name), seed);
+            let mut n_seq = 0usize;
+            let mut n_rev = 0usize;
+            let mut checked = 0usize;
+            for (si, sch) in env.schedule.iter().enumerate() {
+                if sch.pattern != "B" {
+                    continue;
+                }
+                if sch.stage == "S1" {
+                    checked += 1;
+                }
+                let mut min_t = u64::MAX;
+                let mut first_ch = 0u32;
+                for &(t, ch) in &env.trains[si] {
+                    if t < min_t {
+                        min_t = t;
+                        first_ch = ch.0;
+                    }
+                }
+                let leads_47 = (4..8).contains(&first_ch);
+                if sch.rep % 2 == 0 {
+                    assert!(leads_47, "{name} rep {} (even) must lead with {{4-7}} (SEQ)", sch.rep);
+                    if sch.stage == "S1" {
+                        n_seq += 1;
+                    }
+                } else {
+                    assert!(!leads_47, "{name} rep {} (odd) must lead with {{8-11}} (REV)", sch.rep);
+                    if sch.stage == "S1" {
+                        n_rev += 1;
+                    }
+                }
+            }
+            assert_eq!(checked, 120, "{name} S1 B presentations");
+            assert_eq!((n_seq, n_rev), (60, 60), "{name} 60/60 balance");
+        }
+    }
+
+    /// §7.3/§7.5: A/C streams bit-identical to E10 (all seeds); B
+    /// per-channel marginals 10 ± √10; totals 80 ± 9; φ/β drift < 3%;
+    /// M3 co-activity 1 of 5; timeline unchanged.
+    #[test]
+    fn e11_equivalence_vs_e10() {
+        for (n11, n10, seed) in [
+            ("e11.toml", "e10.toml", 20260912u64),
+            ("e11-seed9001.toml", "e10-seed9001.toml", 9001),
+            ("e11-seed424242.toml", "e10-seed424242.toml", 424242),
+        ] {
+            let e11 = Environment::new(v3_config(n11), seed);
+            let e10 = Environment::new(v3_config(n10), seed);
+            assert_eq!(e11.schedule.len(), e10.schedule.len());
+            for (si, (a, b)) in e11.schedule.iter().zip(e10.schedule.iter()).enumerate() {
+                assert_eq!(
+                    (a.stage.as_str(), a.pattern.as_str(), a.start, a.duration_ms),
+                    (b.stage.as_str(), b.pattern.as_str(), b.start, b.duration_ms)
+                );
+                if a.pattern != "B" {
+                    assert_eq!(e11.trains[si], e10.trains[si], "{n11} vs {n10} si={si} A/C stream");
+                }
+            }
+            let mut per_ch = vec![0u64; 24];
+            let mut ch_pres = vec![0u64; 24];
+            let mut totals = Vec::new();
+            for (si, sch) in e11.schedule.iter().enumerate() {
+                if sch.pattern == "silence" {
+                    continue;
+                }
+                let mut seen = [false; 24];
+                let mut n = 0u64;
+                for &(_, ch) in &e11.trains[si] {
+                    per_ch[ch.0 as usize] += 1;
+                    seen[ch.0 as usize] = true;
+                    n += 1;
+                }
+                totals.push(n);
+                for (c, &v) in seen.iter().enumerate() {
+                    ch_pres[c] += v as u64;
+                }
+                if sch.pattern == "B" {
+                    let mut w1 = [false; 5];
+                    let mut w2 = [false; 5];
+                    for &(t, ch) in &e11.trains[si] {
+                        let w = (t / 100) as usize;
+                        if (4..8).contains(&ch.0) {
+                            w1[w] = true;
+                        }
+                        if (8..12).contains(&ch.0) {
+                            w2[w] = true;
+                        }
+                    }
+                    let co = (0..5).filter(|&w| w1[w] && w2[w]).count();
+                    assert_eq!(co, 1, "B groups co-occur in exactly 1 of 5 windows (rep {}), got {co}", sch.rep);
+                }
+            }
+            for c in 0..16 {
+                let per = per_ch[c] as f64 / ch_pres[c].max(1) as f64;
+                assert!((per - 10.0).abs() < 3.2, "{n11} ch{c}: marginal {per:.1}");
+            }
+            let (mn, mx) = (totals.iter().min().unwrap(), totals.iter().max().unwrap());
+            assert!(*mn >= 51 && *mx <= 109, "{n11} totals 80±9: {mn}..{mx}");
+            // φ drift vs E10 < 3%
+            let ema = |env: &Environment| -> Vec<f32> {
+                let mut rb = anima_core::rate_balance::RateBalance::new(
+                    anima_core::rate_balance::E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 24),
+                );
+                let n_windows = 8_151usize + 1;
+                let mut wc = vec![[0u32; 24]; n_windows];
+                for (si, sch) in env.schedule.iter().enumerate() {
+                    for &(off, ch) in &env.trains[si] {
+                        let t = sch.start + off;
+                        wc[(t / 100) as usize][ch.0 as usize] += 1;
+                    }
+                }
+                for w in 0..n_windows {
+                    for (ch, &c) in wc[w].iter().enumerate() {
+                        for _ in 0..c {
+                            rb.tick(anima_core::network::NeuronId(ch as u32));
+                        }
+                    }
+                    rb.window_start();
+                }
+                rb.phi().to_vec()
+            };
+            let p11 = ema(&e11);
+            let p10 = ema(&e10);
+            for c in 0..24 {
+                let d = (p11[c] - p10[c]).abs() / p10[c].max(1e-6);
+                let is_b = (4..12).contains(&c);
+                if is_b {
+                    assert!(d < 0.15, "{n11} ch{c} B-channel φ drift in A-5 band (<0.15): {d:.4}");
+                } else {
+                    assert!(d < 0.01, "{n11} ch{c} A/C φ drift (<0.01): {d:.4}");
+                }
+            }
+        }
+        let env = Environment::new(v3_config("e11.toml"), 20260912);
+        assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
     }
 }
 

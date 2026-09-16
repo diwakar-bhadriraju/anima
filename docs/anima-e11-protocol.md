@@ -106,12 +106,18 @@ reported, not corrected (a covariate, not a confounder).
    leading-order mix (all-SEQ vs balanced). E10 run dirs are the
    untouchable baseline — never rerun.
 
-**E6 φ/β audit (registered):** per-channel window-count marginals
-are identically distributed between E10 and E11 (each B channel
-fires 40 Hz × 250 ms per presentation in both) ⇒ φ and β match
-E10's within the registered drift band (|φ_E11 − φ_E10|/φ_E10 <
-0.03, per channel; actuals reported). A/C φ identical by
-construction.
+**E6 φ/β audit (AMENDMENT A-5, 2026-09-17, user-approved; replaces
+the original < 3% band — an A-4-class EMA window-placement
+sensitivity, measured pre-data):** per-channel MARGINAL statistics
+are exactly preserved by counterbalancing (10 ± √10 per
+presentation; totals 80 ± 9 — asserted by test), but the EMA is
+window-placement-sensitive: SEQ bursts span presentation windows
+0–2, REV bursts windows 2–4, so mixing variants changes each B
+channel's per-window density profile. Measured (deterministic,
+pre-data): B-channel φ drift vs E10 spans ≈ ±9%; A/C channels 0%
+by construction. Registered audit band: B channels |φ_E11 −
+φ_E10|/φ_E10 ∈ (0.85, 1.15) with actuals reported; A/C < 1%;
+marginal identity and totals as above.
 
 ## 4. Endpoints (frozen; E9/E10 definitions verbatim)
 
@@ -205,8 +211,17 @@ reruns "because a seed is inconvenient".
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e11 `…`; e11-seed9001 `…`; e11-seed424242 `…`
-  (recorded at creation, before runs).
+- Amendment A-5 (2026-09-17, user-approved): §3 φ/β audit — the
+  < 3% band is superseded by measured (pre-data) EMA window-
+  placement sensitivity: B-channel φ drift vs E10 spans ≈ ±9%
+  (SEQ bursts windows 0-2, REV windows 2-4), A/C 0% by
+  construction; audit band (0.85, 1.15) with actuals reported;
+  per-channel marginal identity (10 ± √10) and totals (80 ± 9)
+  are exactly preserved and asserted.
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e11 `ad5c0ebfcc273c80854f23880a431ec392cf2bf37bf9445309f44577b7292674`;
+  e11-seed9001 `0e72af26116076881ea618fcce9cbe7299670a9325acbf99a2547950c74e0445`;
+  e11-seed424242 `c36ea92261a248af5a19ffb7c99c593422b8d295b9931ae89be65b8af69da007`.
 - E10 baseline (verbatim): 20260912 (0.697/0.081/0.003), 9001
   (0.760/0.080/0.000), 424242 (0.624/0.080/0.000); B-independence
   F / F / F; selectivity 0.662 / 0.802 / 0.902.

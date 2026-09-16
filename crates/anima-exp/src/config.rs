@@ -204,6 +204,14 @@ pub struct ResourceSection {
     pub fragmentation_min_component: f32,
 }
 
+/// One counterbalanced phase variant (docs/anima-e11-protocol.md §6):
+/// a full tiling of the pattern duration; the variant is selected by
+/// rep parity (registered semantics).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseVariantSpec {
+    pub phases: Vec<PhaseSpec>,
+}
+
 /// One within-presentation phase (docs/anima-e9-protocol.md §9): the
 /// pattern drives `channel_ids` at `rate_hz` during [from_ms, to_ms).
 /// Environment-only construction — the organism sees only the spike
@@ -239,6 +247,15 @@ pub struct PatternSpec {
     /// identical behavior for every existing config.
     #[serde(default)]
     pub phases: Option<Vec<PhaseSpec>>,
+    /// E11 (docs/anima-e11-protocol.md §2/§6): optional counterbalanced
+    /// phase variants. Mutually exclusive with phases/channels/
+    /// channel_ids. When Some, the pattern's phases for presentation
+    /// with rep index r are `variants[r % variants.len()]` (registered
+    /// semantics; the E11 case uses two variants with exactly 60/60
+    /// balance). Environment-only; variant selection consumes NO RNG.
+    /// Absent => byte-identical behavior for every existing config.
+    #[serde(default)]
+    pub phase_variants: Option<Vec<PhaseVariantSpec>>,
     pub rate_hz: f32,
     pub duration_ms: u64,
     pub jitter_ms: f32,
@@ -294,9 +311,9 @@ impl ExpConfig {
         // E9 (docs/anima-e9-protocol.md §9): phase validation.
         for p in &cfg.pattern {
             if let Some(phases) = &p.phases {
-                if !p.channels.is_empty() || p.channel_ids.is_some() {
+                if !p.channels.is_empty() || p.channel_ids.is_some() || p.phase_variants.is_some() {
                     return Err(format!(
-                        "pattern '{}': phases are mutually exclusive with channels/channel_ids",
+                        "pattern '{}': phases are mutually exclusive with channels/channel_ids/phase_variants",
                         p.id
                     ));
                 }
@@ -334,6 +351,66 @@ impl ExpConfig {
                             "pattern '{}': phases must tile [0, {}] exactly (ends at {pt})",
                             p.id, p.duration_ms
                         ));
+                    }
+                }
+            }
+            if let Some(variants) = &p.phase_variants {
+                if !p.channels.is_empty() || p.channel_ids.is_some() || p.phases.is_some() {
+                    return Err(format!(
+                        "pattern '{}': phase_variants are mutually exclusive with phases/channels/channel_ids",
+                        p.id
+                    ));
+                }
+                if variants.len() < 2 {
+                    return Err(format!(
+                        "pattern '{}': phase_variants needs >= 2 variants (E11 registered semantics)",
+                        p.id
+                    ));
+                }
+                for (vi, variant) in variants.iter().enumerate() {
+                    let mut prev_to: Option<u64> = None;
+                    for (pi, ph) in variant.phases.iter().enumerate() {
+                        if ph.to_ms <= ph.from_ms {
+                            return Err(format!(
+                                "pattern '{}': variant {vi} phase {pi} has to_ms <= from_ms",
+                                p.id
+                            ));
+                        }
+                        if ph.to_ms > p.duration_ms {
+                            return Err(format!(
+                                "pattern '{}': variant {vi} phase {pi} exceeds duration",
+                                p.id
+                            ));
+                        }
+                        if let Some(pt) = prev_to {
+                            if ph.from_ms != pt {
+                                return Err(format!(
+                                    "pattern '{}': variant {vi} must tile [0, {}] contiguously",
+                                    p.id, p.duration_ms
+                                ));
+                            }
+                        } else if ph.from_ms != 0 {
+                            return Err(format!("pattern '{}': variant {vi} first phase must start at 0", p.id));
+                        }
+                        for &c in &ph.channel_ids {
+                            if c as usize >= cfg.organism.n_input_channels {
+                                return Err(format!(
+                                    "pattern '{}': variant {vi} phase {pi} channel out of range",
+                                    p.id
+                                ));
+                            }
+                        }
+                        prev_to = Some(ph.to_ms);
+                    }
+                    if let Some(pt) = prev_to {
+                        if pt != p.duration_ms {
+                            return Err(format!(
+                                "pattern '{}': variant {vi} must tile [0, {}] exactly (ends at {pt})",
+                                p.id, p.duration_ms
+                            ));
+                        }
+                    } else {
+                        return Err(format!("pattern '{}': variant {vi} has no phases", p.id));
                     }
                 }
             }
