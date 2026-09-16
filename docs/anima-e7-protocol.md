@@ -247,13 +247,22 @@ stops the run and is diagnosed; no silent repair.
 ## Appendix (filled at execution time)
 
 - Config hashes (sha256 of raw file, recorded at creation before any
-  run): e7-pos `e4385792fc999cb04abaf3a760183d33b8b73a6e96bb9a9fc85d208d0a1b2eba`;
-  e7-abs `6ac461de82d084b577778a4e8fc422308de28bea28fccdbc10562fd2e1aa0107`;
-  e7-bridge `bf3d3c2652eaafe55e2351f3176e4ab3f293c98e1c24dec13cee02752a135742`;
-  e7-abs-seed9001 `bf831485214099436f33ae8f093df91e069eb1d070a16ab2894fc2fe6c834a66`;
-  e7-abs-seed424242 `17db26e9be8ba23f4c07810302089f25568194ca8a396e2890fae1ea5d4fe3b8`.
+  run; A-2 revision, 2026-09-16): e7-pos `04b6dfd50c3c2b8397edad31fa39b51989891cef1e500f64be7dab109e8e3799`;
+  e7-abs `df13806966e88175ef38af4708d76a3aadec954f3e15cb4cbe95b9a583554a1a`;
+  e7-bridge `069b4a845555837f68d40c1543caa8ad2b13661876d3421cf37c13920add1143`;
+  e7-abs-seed9001 `89d68483fbdcfbbdb9a25f2300ddaa6cc7bf83fb2b7e023ca7388463e7137a88`;
+  e7-abs-seed424242 `81152337f80648c8298031bf784a1378606d044a118d30432815025e3488fe88`.
 - Amendment A-1 (2026-09-16, user-approved): §10.3 P-condition E6
   property — P has ACTIVE E6 (common {0-3} at 2:1 duty), β_common < 1
   < β_exclusive in [0.5, 2]; test asserts the 2:1 structure and the
   mechanism β range.
+- Amendment A-2 (2026-09-16, user-approved): E7 pattern ids X→A, Y→B
+  in all five configs. Reason: the frozen anima-telemetry analyzer
+  hard-codes selectivity/retention to pattern ids A/B/C, so X/Y-
+  labeled curricula yield EMPTY selectivity (0 entries) — the M3
+  endpoint would be undefined. Ids are labels + seed-derivation
+  inputs only; condition content (channel sets, activity, residuals,
+  paired streams) unchanged; streams re-derived; hashes above
+  supersede the X/Y versions; the pre-A-2 X/Y runs are superseded
+  and rerun.
 - Commit (implementation): `(recorded at run time)`.

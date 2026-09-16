@@ -50,7 +50,7 @@ runaway_sustained_ms = 5000
 fragmentation_min_component = 0.6
 
 [[pattern]]
-id = "X"
+id = "A"
 channels = []
 channel_ids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 rate_hz = 20.0
@@ -58,7 +58,7 @@ duration_ms = 500
 jitter_ms = 2.0
 
 [[pattern]]
-id = "Y"
+id = "B"
 channels = []
 channel_ids = [0, 1, 2, 3, 4, 5, 6, 7]
 rate_hz = 20.0
@@ -75,14 +75,14 @@ silence_ms = 5000
 
 [[stage]]
 id = "S1"
-present = ["X", "Y"]
+present = ["A", "B"]
 reps = 120
 order = "interleaved"
 off_ms = 1500
 
 [[stage]]
 id = "S3"
-present = ["X", "Y"]
+present = ["A", "B"]
 reps = 15
 order = "interleaved"
 off_ms = 1500

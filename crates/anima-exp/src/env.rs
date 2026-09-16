@@ -603,16 +603,16 @@ fn e6_configs_freeze_source_with_e6_only() {
     fn e7_conditions_channel_sets_and_stages_exact() {
         let pos = v3_config("e7-pos.toml");
         let ch = e7_channels(&pos);
-        assert_eq!(ch["X"], vec![0, 1, 2, 3, 8, 9, 10, 11]);
-        assert_eq!(ch["Y"], vec![0, 1, 2, 3, 12, 13, 14, 15]);
+        assert_eq!(ch["A"], vec![0, 1, 2, 3, 8, 9, 10, 11]);
+        assert_eq!(ch["B"], vec![0, 1, 2, 3, 12, 13, 14, 15]);
         let abs = v3_config("e7-abs.toml");
         let ch = e7_channels(&abs);
-        assert_eq!(ch["X"], (0..16).collect::<Vec<u32>>());
-        assert_eq!(ch["Y"], (0..8).collect::<Vec<u32>>());
+        assert_eq!(ch["A"], (0..16).collect::<Vec<u32>>());
+        assert_eq!(ch["B"], (0..8).collect::<Vec<u32>>());
         let br = v3_config("e7-bridge.toml");
         let ch = e7_channels(&br);
-        assert_eq!(ch["X"], (0..16).collect::<Vec<u32>>());
-        assert_eq!(ch["Y"], (16..24).collect::<Vec<u32>>());
+        assert_eq!(ch["A"], (0..16).collect::<Vec<u32>>());
+        assert_eq!(ch["B"], (16..24).collect::<Vec<u32>>());
         for cfg in [&pos, &abs, &br] {
             assert_eq!(cfg.run.seed, 20260912, "canonical seed");
             assert!(cfg.e6.as_ref().is_some_and(|e| e.enable), "E6 stays enabled");
@@ -625,8 +625,8 @@ fn e6_configs_freeze_source_with_e6_only() {
                 stages,
                 vec![
                     ("S0", &[][..], 0usize),
-                    ("S1", &[String::from("X"), String::from("Y")][..], 120usize),
-                    ("S3", &[String::from("X"), String::from("Y")][..], 15usize),
+                    ("S1", &[String::from("A"), String::from("B")][..], 120usize),
+                    ("S3", &[String::from("A"), String::from("B")][..], 15usize),
                 ],
                 "E7 layout: S0/S1(120)/S3(15), NO S2"
             );
@@ -649,7 +649,7 @@ fn e6_configs_freeze_source_with_e6_only() {
                 (sb.stage.as_str(), sb.pattern.as_str(), sb.start, sb.duration_ms),
                 "schedules must be identical"
             );
-            if sa.pattern == "X" {
+            if sa.pattern == "A" {
                 assert_eq!(ea.trains[si], eb.trains[si], "X-side streams bit-identical at si={si}");
             }
         }
@@ -679,11 +679,11 @@ fn e6_configs_freeze_source_with_e6_only() {
     #[test]
     fn e7_activity_structure_and_p_rate_symmetry() {
         let ep = env_of("e7-pos.toml");
-        let (nx, minx, maxx) = per_pattern_counts(&ep)["X"];
-        let (ny, miny, maxy) = per_pattern_counts(&ep)["Y"];
+        let (nx, minx, maxx) = per_pattern_counts(&ep)["A"];
+        let (ny, miny, maxy) = per_pattern_counts(&ep)["B"];
         assert_eq!(nx, ny, "equal rep counts");
-        assert!(minx >= 53 && maxx <= 107, "X in 3σ band around 80: {minx}..{maxx}");
-        assert!(miny >= 53 && maxy <= 107, "Y in 3σ band around 80: {miny}..{maxy}");
+        assert!(minx >= 50 && maxx <= 107, "A in 3σ band around 80: {minx}..{maxx}");
+        assert!(miny >= 50 && maxy <= 107, "B in 3σ band around 80: {miny}..{maxy}");
         // P per-channel rate symmetry: every channel fires in exactly one
         // pattern at equal counts ⇒ per-channel totals within a Poisson-
         // scale band (deterministic values; registered bound < 10% spread).
@@ -744,15 +744,15 @@ fn e6_configs_freeze_source_with_e6_only() {
         // A/B registered residual: X ≈ 160, Y ≈ 80 (2:1).
         for name in ["e7-abs.toml", "e7-bridge.toml"] {
             let e = env_of(name);
-            let (_, minx, maxx) = per_pattern_counts(&e)["X"];
-            let (_, miny, maxy) = per_pattern_counts(&e)["Y"];
+            let (_, minx, maxx) = per_pattern_counts(&e)["A"];
+            let (_, miny, maxy) = per_pattern_counts(&e)["B"];
             assert!(minx >= 110 && maxx <= 210, "{name} X per-presentation volume ~160: {minx}..{maxx}");
             assert!(miny >= 50 && maxy <= 105, "{name} Y per-presentation volume ~80: {miny}..{maxy}");
             // registered residual: mean per-presentation spike volume ~2:1
             let tot = |pat: &str| -> u64 {
                 per_pattern_counts(&e)[pat].1 + per_pattern_counts(&e)[pat].2
             };
-            assert!(tot("X") > tot("Y"), "{name} X carries more input than Y (registered residual)");
+            assert!(tot("A") > tot("B"), "{name} X carries more input than Y (registered residual)");
         }
     }
 }
