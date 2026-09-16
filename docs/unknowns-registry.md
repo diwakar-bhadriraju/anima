@@ -175,3 +175,20 @@ limiting axis is the leading-group (A-side) inheritance, which
 hardens with experience; a scale effect, not a mechanism result.
 No tuning; a third scale point or any mechanism would need a new
 registration.
+
+### U9 / temporal-order balance update (2026-09-17, E11 registration)
+
+E10 closed (0/3 B-independence; leading-side lock-in consolidated
+with experience). E11 is now REGISTERED (docs/anima-e11-protocol.md):
+minimal distinguishing experiment — counterbalance B's temporal
+order (60 SEQ-B + 60 REV-B, variant = rep parity, no new RNG),
+everything else frozen from E10 (reps 120, timeline, seeds, E6).
+Pre-freeze pairing audit registered (no systematic position or
+preceding-pattern bias by variant across all three seeds; residual
+<= 4/60 reported as covariate). Pre-data proofs: total and
+per-channel marginal exposure identical to E10; leading-position
+counts balanced 60/60 by construction; A/C streams bit-identical
+to E10; phi/beta drift band < 3%. Outcome A = lock-in depends on
+persistent order asymmetry (curriculum-level, no mechanism claim);
+Outcome B = intrinsic asymmetry remains implicated (no mechanism
+invented). No implementation performed - freeze first.
