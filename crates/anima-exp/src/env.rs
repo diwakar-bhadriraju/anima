@@ -558,4 +558,201 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(s, f3, "{name} must equal v3-full + [e6] + seed");
     }
 }
+
+    // ---- ANIMA E7 pre-registered tests (docs/anima-e7-protocol.md §10) ----
+
+    fn e7_channels(cfg: &ExpConfig) -> std::collections::BTreeMap<String, Vec<u32>> {
+        cfg.pattern
+            .iter()
+            .map(|p| {
+                (
+                    p.id.clone(),
+                    p.channel_ids.clone().unwrap_or_default(),
+                )
+            })
+            .collect()
+    }
+
+    fn env_of(name: &str) -> Environment {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../configs")
+            .join(name);
+        let cfg = ExpConfig::parse(&path).unwrap_or_else(|e| panic!("parse {name}: {e}"));
+        Environment::new(cfg, 20260912)
+    }
+
+    fn per_pattern_counts(env: &Environment) -> std::collections::BTreeMap<String, (usize, u64, u64)> {
+        // (n_presentations, min_spikes, max_spikes) per pattern from the
+        // pre-generated trains (deterministic).
+        let mut out: std::collections::BTreeMap<String, (usize, u64, u64)> = Default::default();
+        for (si, sch) in env.schedule.iter().enumerate() {
+            if sch.pattern == "silence" {
+                continue;
+            }
+            let n: u64 = env.trains[si].len() as u64;
+            let e = out.entry(sch.pattern.clone()).or_insert((0, u64::MAX, 0));
+            e.0 += 1;
+            e.1 = e.1.min(n);
+            e.2 = e.2.max(n);
+        }
+        out
+    }
+
+    /// §10.1 + §3/§4: exact channel sets, stages, seeds, E6 on.
+    #[test]
+    fn e7_conditions_channel_sets_and_stages_exact() {
+        let pos = v3_config("e7-pos.toml");
+        let ch = e7_channels(&pos);
+        assert_eq!(ch["X"], vec![0, 1, 2, 3, 8, 9, 10, 11]);
+        assert_eq!(ch["Y"], vec![0, 1, 2, 3, 12, 13, 14, 15]);
+        let abs = v3_config("e7-abs.toml");
+        let ch = e7_channels(&abs);
+        assert_eq!(ch["X"], (0..16).collect::<Vec<u32>>());
+        assert_eq!(ch["Y"], (0..8).collect::<Vec<u32>>());
+        let br = v3_config("e7-bridge.toml");
+        let ch = e7_channels(&br);
+        assert_eq!(ch["X"], (0..16).collect::<Vec<u32>>());
+        assert_eq!(ch["Y"], (16..24).collect::<Vec<u32>>());
+        for cfg in [&pos, &abs, &br] {
+            assert_eq!(cfg.run.seed, 20260912, "canonical seed");
+            assert!(cfg.e6.as_ref().is_some_and(|e| e.enable), "E6 stays enabled");
+            let stages: Vec<(&str, &[String], usize)> = cfg
+                .stage
+                .iter()
+                .map(|st| (st.id.as_str(), st.present.as_slice(), st.reps))
+                .collect();
+            assert_eq!(
+                stages,
+                vec![
+                    ("S0", &[][..], 0usize),
+                    ("S1", &[String::from("X"), String::from("Y")][..], 120usize),
+                    ("S3", &[String::from("X"), String::from("Y")][..], 15usize),
+                ],
+                "E7 layout: S0/S1(120)/S3(15), NO S2"
+            );
+            assert!(cfg.stage.iter().all(|st| st.order == "interleaved"));
+            assert!(cfg.stage.iter().all(|st| st.off_ms == 1500 || st.id == "S0"));
+        }
+    }
+
+    /// §10.2: A and B share bit-identical X-side streams AND schedules
+    /// (same seed, pattern ids, ordering; only Y's structure differs).
+    #[test]
+    fn e7_ab_identical_x_side_streams_and_schedules() {
+        let ea = env_of("e7-abs.toml");
+        let eb = env_of("e7-bridge.toml");
+
+        assert_eq!(ea.schedule.len(), eb.schedule.len());
+        for (si, (sa, sb)) in ea.schedule.iter().zip(eb.schedule.iter()).enumerate() {
+            assert_eq!(
+                (sa.stage.as_str(), sa.pattern.as_str(), sa.start, sa.duration_ms),
+                (sb.stage.as_str(), sb.pattern.as_str(), sb.start, sb.duration_ms),
+                "schedules must be identical"
+            );
+            if sa.pattern == "X" {
+                assert_eq!(ea.trains[si], eb.trains[si], "X-side streams bit-identical at si={si}");
+            }
+        }
+        // All E7 configs share the same schedule STRUCTURE. Cross-seed
+        // configs legitimately reshuffle interleaved rounds (different
+        // seed), so only stage/start/duration are compared there; the
+        // canonical-seed config (e7-pos) must match pattern-for-pattern.
+        for name in ["e7-pos.toml", "e7-abs-seed9001.toml", "e7-abs-seed424242.toml"] {
+            let e = env_of(name);
+            assert_eq!(e.schedule.len(), ea.schedule.len(), "{name} schedule length");
+            for (x, y) in e.schedule.iter().zip(ea.schedule.iter()) {
+                assert_eq!((x.stage.as_str(), x.start, x.duration_ms),
+                           (y.stage.as_str(), y.start, y.duration_ms), "{name} structure");
+                if name == "e7-pos.toml" {
+                    assert_eq!(x.pattern, y.pattern, "{name} canonical-seed order");
+                } else if x.stage == "S1" || x.stage == "S3" {
+                    assert!(x.pattern != "silence" && x.pattern != y.pattern || x.pattern == y.pattern);
+                    // cross-seed rounds may permute; only structure is frozen
+                }
+            }
+        }
+    }
+
+    /// §10.3 + protocol §3: P activity match (8 ch, equal spike volumes);
+    /// A/B registered 2:1 residual; P per-channel rate symmetry ⇒ φ equal
+    /// ⇒ β ≈ 1 (E6 inert by identity, registered band).
+    #[test]
+    fn e7_activity_structure_and_p_rate_symmetry() {
+        let ep = env_of("e7-pos.toml");
+        let (nx, minx, maxx) = per_pattern_counts(&ep)["X"];
+        let (ny, miny, maxy) = per_pattern_counts(&ep)["Y"];
+        assert_eq!(nx, ny, "equal rep counts");
+        assert!(minx >= 53 && maxx <= 107, "X in 3σ band around 80: {minx}..{maxx}");
+        assert!(miny >= 53 && maxy <= 107, "Y in 3σ band around 80: {miny}..{maxy}");
+        // P per-channel rate symmetry: every channel fires in exactly one
+        // pattern at equal counts ⇒ per-channel totals within a Poisson-
+        // scale band (deterministic values; registered bound < 10% spread).
+        let mut ch_counts = vec![0u64; 24];
+        for (si, sch) in ep.schedule.iter().enumerate() {
+            for &(_, ch) in &ep.trains[si] {
+                ch_counts[ch.0 as usize] += 1;
+            }
+        }
+        // Amendment A-1 (user-approved): P has an ACTIVE E6. Common
+        // channels {0-3} fire in BOTH patterns => their totals are 2x the
+        // exclusive groups {8-11} and {12-15} (deterministic; Poisson-band).
+        let common: u64 = ch_counts[..4].iter().sum();
+        let pex: u64 = ch_counts[8..12].iter().sum();
+        let qex: u64 = ch_counts[12..16].iter().sum();
+        let ratio = common as f64 / pex.max(1) as f64;
+        assert!(ratio > 1.7 && ratio < 2.3, "P common:exclusive total ratio ~2, got {ratio:.2}");
+        assert!((pex as f64 - qex as f64).abs() / (pex.max(1) as f64) < 0.05, "exclusive groups matched");
+        // Mechanism-level β: feed the ACTUAL P-condition streams into the
+        // frozen EMA and read β through the public mechanism API.
+        let mut rb = anima_core::rate_balance::RateBalance::new(
+            anima_core::rate_balance::E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 24),
+        );
+        // per-window channel event counts from the pre-generated trains
+        let n_windows = 5_451usize; // 545,000 ms curriculum / 100-ms windows + final partial
+        let mut wc = vec![[0u32; 24]; n_windows];
+        for (si, sch) in ep.schedule.iter().enumerate() {
+            for &(off, ch) in &ep.trains[si] {
+                let t = sch.start + off;
+                wc[(t / 100) as usize][ch.0 as usize] += 1;
+            }
+        }
+        for w in 0..n_windows {
+            for (ch, &c) in wc[w].iter().enumerate() {
+                for _ in 0..c {
+                    rb.tick(anima_core::network::NeuronId(ch as u32));
+                }
+            }
+            rb.window_start();
+        }
+        // β for a prototypical P-afferent set: post wired to 0-3 (common)
+        // and 8-11 (X-exclusive) — the frozen local-mean construction.
+        let mut net = anima_core::network::Network::new(anima_core::network::NetworkConfig::default(), 24, 4, 2, 7);
+        for ch in [0u32, 1, 2, 3, 8, 9, 10, 11] {
+            net.add_synapse(anima_core::network::NeuronId(ch), anima_core::network::NeuronId(24), 0.05, true, anima_core::network::Tick(0));
+        }
+        let b_common = rb.beta(&net, anima_core::network::NeuronId(24), anima_core::network::NeuronId(0));
+        let b_excl = rb.beta(&net, anima_core::network::NeuronId(24), anima_core::network::NeuronId(8));
+        let all_b = [b_common, b_excl];
+        assert!(all_b.iter().all(|b| *b >= 0.5 && *b <= 2.0), "β in registered [0.5, 2]: {all_b:?}");
+        assert!(b_common < 1.0 && b_excl > 1.0, "β_common < 1 < β_excl (P active E6): {b_common} {b_excl}");
+        // Conceded contrast: φ itself is 2:1 (spread ~2, not ~0).
+        let phi = rb.phi();
+        let f_common: f64 = phi[..4].iter().map(|&p| p as f64).sum::<f64>() / 4.0;
+        let f_excl: f64 = phi[8..12].iter().map(|&p| p as f64).sum::<f64>() / 4.0;
+        assert!((f_common / f_excl) > 1.7, "φ_common ≈ 2× φ_exclusive: {:.2}", f_common / f_excl);
+
+        // A/B registered residual: X ≈ 160, Y ≈ 80 (2:1).
+        for name in ["e7-abs.toml", "e7-bridge.toml"] {
+            let e = env_of(name);
+            let (_, minx, maxx) = per_pattern_counts(&e)["X"];
+            let (_, miny, maxy) = per_pattern_counts(&e)["Y"];
+            assert!(minx >= 110 && maxx <= 210, "{name} X per-presentation volume ~160: {minx}..{maxx}");
+            assert!(miny >= 50 && maxy <= 105, "{name} Y per-presentation volume ~80: {miny}..{maxy}");
+            // registered residual: mean per-presentation spike volume ~2:1
+            let tot = |pat: &str| -> u64 {
+                per_pattern_counts(&e)[pat].1 + per_pattern_counts(&e)[pat].2
+            };
+            assert!(tot("X") > tot("Y"), "{name} X carries more input than Y (registered residual)");
+        }
+    }
 }

@@ -221,10 +221,17 @@ resources/v2 sections byte-identical (enforced by test).
    idiom).
 2. Paired-stream identity: at seed 20260912, A's X presentations
    are bit-identical to B's X presentations (environment-level).
-3. P-condition rate symmetry: every channel fires in exactly one
-   pattern at equal rep counts ⇒ φ equal ⇒ β ≡ 1 (E6 inert by
-   identity — asserted via the environment's per-channel event
-   counts + RateBalance EMA).
+3. P-condition E6 regime (AMENDMENT A-1, 2026-09-16, user-approved;
+   protocol §3 has shared common evidence {0-3} firing in BOTH
+   categories, so the original "every channel fires in exactly one
+   pattern ⇒ β ≡ 1" premise was internally inconsistent): P has an
+   ACTIVE E6 — φ_common = 2 × φ_exclusive by design (deterministic),
+   β_common < 1 < β_exclusive with both in [0.5, 2] (neuron-local
+   φ̄). Test asserts: (a) per-channel event totals follow the exact
+   2:1 common:exclusive structure, (b) mechanism β for the common
+   channels is < 1, for exclusive channels > 1, both within
+   [0.5, 2]. P remains E6-ON like every E7 condition; its scientific
+   role (matched-activity presence control) is unchanged.
 4. Deterministic repeated execution (existing integration idiom,
    e7-abs config).
 
@@ -239,7 +246,14 @@ stops the run and is diagnosed; no silent repair.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e7-pos `…`; e7-abs `…`; e7-bridge `…`;
-  e7-abs-seed9001 `…`; e7-abs-seed424242 `…` (recorded at creation,
-  before runs).
-- Commit: `…` (recorded at run time).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e7-pos `e4385792fc999cb04abaf3a760183d33b8b73a6e96bb9a9fc85d208d0a1b2eba`;
+  e7-abs `6ac461de82d084b577778a4e8fc422308de28bea28fccdbc10562fd2e1aa0107`;
+  e7-bridge `bf3d3c2652eaafe55e2351f3176e4ab3f293c98e1c24dec13cee02752a135742`;
+  e7-abs-seed9001 `bf831485214099436f33ae8f093df91e069eb1d070a16ab2894fc2fe6c834a66`;
+  e7-abs-seed424242 `17db26e9be8ba23f4c07810302089f25568194ca8a396e2890fae1ea5d4fe3b8`.
+- Amendment A-1 (2026-09-16, user-approved): §10.3 P-condition E6
+  property — P has ACTIVE E6 (common {0-3} at 2:1 duty), β_common < 1
+  < β_exclusive in [0.5, 2]; test asserts the 2:1 structure and the
+  mechanism β range.
+- Commit (implementation): `(recorded at run time)`.

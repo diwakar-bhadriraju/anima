@@ -22,7 +22,14 @@ const CATS: [(&str, std::ops::Range<usize>); 3] = [
 ];
 
 fn main() {
-    let run_dir = std::env::args().nth(1).expect("run dir");
+    let args: Vec<String> = std::env::args().collect();
+    let run_dir = args.get(1).expect("run dir").clone();
+    // E7 (docs/anima-e7-protocol.md §6): optional trailing window args
+    // (late_s1_lo late_s1_hi s2_lo s2_hi s3_lo s3_hi snapshot_tick).
+    // All-or-none; absent ⇒ byte-identical v2/v3 defaults. The D-section
+    // prints a fixed "no S2" line when the run has no S2 presentations.
+    let (late_lo, late_hi, s2_lo, s2_hi, s3_lo, s3_hi, snap_target) = parse_window_args(&args);
+    let has_s2 = s2_lo != s2_hi;
     let tdir = std::path::Path::new(&run_dir).join("telemetry");
 
     // ---- established structural changes (v2 definition, verbatim) ----
@@ -88,7 +95,7 @@ fn main() {
     .expect("snapshots");
     let snap = snaps
         .iter()
-        .min_by_key(|s| s.tick.abs_diff(715_000))
+        .min_by_key(|s| s.tick.abs_diff(snap_target))
         .expect("snapshots non-empty");
     println!("== RF snapshot (v3 sets) ==");
     println!("snapshot tick = {} (target 715000)", snap.tick);
@@ -212,12 +219,19 @@ fn main() {
         s1.sort_unstable();
         s1[s1.len() / 2]
     };
+    // E7 §6: explicit arg overrides the event-driven second half; the
+    // sentinel keeps the v2/v3 default path byte-identical.
+    let late_lo_eff = if late_lo == u64::MAX { late_start } else { late_lo };
     println!("== stage mean internal rates ==");
     for (name, lo, hi) in [
-        ("late-S1", late_start, 725_000u64),
-        ("S2", 725_000, 785_000),
-        ("S3", 785_000, 875_000),
+        ("late-S1", late_lo_eff, late_hi),
+        ("S2", s2_lo, s2_hi),
+        ("S3", s3_lo, s3_hi),
     ] {
+        if name == "S2" && !has_s2 {
+            println!("S2: (no S2 in this curriculum; E7 registered layout)");
+            continue;
+        }
         let mut rates: Vec<f32> = Vec::new();
         for s in &snaps {
             if s.tick >= lo && s.tick < hi {
@@ -273,56 +287,68 @@ fn main() {
     pres.sort_by_key(|p| p.2);
     let s1: Vec<_> = pres.iter().filter(|p| p.1 == "S1").collect();
     let s2d: Vec<_> = pres.iter().filter(|p| p.1 == "S2" && p.0 == "D").collect();
-    let mean_vec = |which: &[&(String, String, u64, u64)], pattern: &str| -> BTreeMap<u32, f64> {
-        let mut m: BTreeMap<u32, f64> = BTreeMap::new();
-        let mut n = 0usize;
-        for p in which {
-            if p.0 != pattern {
-                continue;
-            }
-            if p.2 < late_start {
-                continue;
-            }
-            n += 1;
-            for &(t, id) in &spikes {
-                if t >= p.2 && t < p.3 && id >= N_IN as u32 {
-                    *m.entry(id).or_insert(0.0) += 1.0;
+    if s2d.is_empty() {
+        println!("== D-condition: (no S2-D presentations; E7 has no novelty condition, protocol §4) ==");
+    } else {
+        let mean_vec = |which: &[&(String, String, u64, u64)], pattern: &str| -> BTreeMap<u32, f64> {
+            let mut m: BTreeMap<u32, f64> = BTreeMap::new();
+            let mut n = 0usize;
+            for p in which {
+                if p.0 != pattern {
+                    continue;
+                }
+                if p.2 < late_start {
+                    continue;
+                }
+                n += 1;
+                for &(t, id) in &spikes {
+                    if t >= p.2 && t < p.3 && id >= N_IN as u32 {
+                        *m.entry(id).or_insert(0.0) += 1.0;
+                    }
                 }
             }
-        }
-        if n > 0 {
-            for v in m.values_mut() {
-                *v /= n as f64;
+            if n > 0 {
+                for v in m.values_mut() {
+                    *v /= n as f64;
+                }
+            }
+            m
+        };
+        let s1v: Vec<&(String, String, u64, u64)> = s1.iter().map(|p| *p).collect();
+        let dvec = mean_vec(&s2d, "D");
+        println!("== D-condition (S2) vs S1 categories ==");
+        for cat in ["A", "B", "C"] {
+            let cvec = mean_vec(&s1v, cat);
+            let c = cosine_f64(&cvec, &dvec);
+            match c {
+                Some(v) => println!("cosine({cat}-mean, D-mean): {v:.3}"),
+                None => println!("cosine({cat}-mean, D-mean): (degenerate)"),
             }
         }
-        m
-    };
-    let s1v: Vec<&(String, String, u64, u64)> = s1.iter().map(|p| *p).collect();
-    let dvec = mean_vec(&s2d, "D");
-    println!("== D-condition (S2) vs S1 categories ==");
-    for cat in ["A", "B", "C"] {
-        let cvec = mean_vec(&s1v, cat);
-        let c = cosine_f64(&cvec, &dvec);
-        match c {
-            Some(v) => println!("cosine({cat}-mean, D-mean): {v:.3}"),
-            None => println!("cosine({cat}-mean, D-mean): (degenerate)"),
-        }
     }
-    let s2_rate: Vec<f32> = snaps
-        .iter()
-        .filter(|s| s.tick >= 725_000 && s.tick < 785_000)
-        .flat_map(|s| s.neurons.iter().filter(|n| n.class == "internal").filter_map(|n| n.rate_hz))
-        .collect();
+    let s2_rate: Vec<f32> = if has_s2 {
+        snaps
+            .iter()
+            .filter(|s| s.tick >= s2_lo && s.tick < s2_hi)
+            .flat_map(|s| s.neurons.iter().filter(|n| n.class == "internal").filter_map(|n| n.rate_hz))
+            .collect()
+    } else {
+        Vec::new()
+    };
     let s2_mean = s2_rate.iter().sum::<f32>() / s2_rate.len().max(1) as f32;
     let s1l_mean = {
         let r: Vec<f32> = snaps
             .iter()
-            .filter(|s| s.tick >= late_start && s.tick < 725_000)
+            .filter(|s| s.tick >= late_lo_eff && s.tick < late_hi)
             .flat_map(|s| s.neurons.iter().filter(|n| n.class == "internal").filter_map(|n| n.rate_hz))
             .collect();
         r.iter().sum::<f32>() / r.len().max(1) as f32
     };
-    println!("S2/late-S1 mean-rate ratio: {:.3} (S2 {s2_mean:.1} Hz vs late-S1 {s1l_mean:.1} Hz)", s2_mean / s1l_mean.max(1e-6));
+    if !has_s2 {
+        println!("S2/late-S1 ratio: (no S2 in this curriculum)");
+    } else {
+        println!("S2/late-S1 mean-rate ratio: {:.3} (S2 {s2_mean:.1} Hz vs late-S1 {s1l_mean:.1} Hz)", s2_mean / s1l_mean.max(1e-6));
+    }
 }
 
 fn cosine_f64(a: &BTreeMap<u32, f64>, b: &BTreeMap<u32, f64>) -> Option<f64> {
@@ -337,4 +363,42 @@ fn cosine_f64(a: &BTreeMap<u32, f64>, b: &BTreeMap<u32, f64>) -> Option<f64> {
         return None;
     }
     Some(dot / (na * nb))
+}
+/// E7 §6: parse optional stage-window args. All-or-none; absent returns
+/// the v2/v3 defaults with late_lo = u64::MAX sentinel (event-defined
+/// second half) — the byte-identical default path.
+fn parse_window_args(args: &[String]) -> (u64, u64, u64, u64, u64, u64, u64) {
+    if args.len() <= 2 {
+        return (u64::MAX, 725_000, 725_000, 785_000, 785_000, 875_000, 715_000);
+    }
+    let nums: Vec<u64> = args[2..]
+        .iter()
+        .map(|a| a.parse().expect("window args must be integers"))
+        .collect();
+    assert_eq!(
+        nums.len(),
+        7,
+        "window args: 7 integers (late_s1_lo late_s1_hi s2_lo s2_hi s3_lo s3_hi snapshot_tick)"
+    );
+    (nums[0], nums[1], nums[2], nums[3], nums[4], nums[5], nums[6])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_window_args;
+
+    #[test]
+    fn window_args_defaults_byte_identical() {
+        let (lo, hi, s2l, s2h, s3l, s3h, snap) = parse_window_args(&["v3_analysis".into(), "dir".into()]);
+        assert_eq!((lo, hi, s2l, s2h, s3l, s3h, snap), (u64::MAX, 725_000, 725_000, 785_000, 785_000, 875_000, 715_000));
+    }
+
+    #[test]
+    fn window_args_explicit_values() {
+        let a = ["x".into(), "dir".into(), "245000".into(), "485000".into(), "0".into(), "0".into(), "485000".into(), "530000".into(), "485000".into()];
+        let (lo, hi, s2l, s2h, s3l, s3h, snap) = parse_window_args(&a);
+        assert_eq!((lo, hi, s2l, s2h, s3l, s3h, snap), (245_000, 485_000, 0, 0, 485_000, 530_000, 485_000));
+        // s2_lo == s2_hi => the registered "no S2" condition.
+        assert_eq!(s2l, s2h);
+    }
 }

@@ -63,6 +63,12 @@ impl RateBalance {
         }
     }
 
+    /// Read-only measurement access to the current φ estimates
+    /// (analysis/tests; the mechanism never reads this path).
+    pub fn phi(&self) -> &[f32] {
+        &self.phi
+    }
+
     /// Fast path: record one input-channel event per tick (channel id ==
     /// input neuron id; environment de-duplicates per tick, so this is a
     /// 0/1 count per channel per tick — the frozen counting semantics).
