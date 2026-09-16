@@ -68,3 +68,20 @@ separation under overlap; the residual requirement is
 absence-gating (a veto for shared evidence when exclusive evidence
 is absent) — registered as an open mechanism question, no
 amendment proposed.
+
+### U9 / absence hypothesis update (2026-09-16, E7 result)
+
+E7 (minimal absence experiment, frozen E6 organism, curriculum-
+only; commits 5254369 + 49fc8ef incl. amendments A-1/A-2):
+**OUTCOME A** — P (matched presence), A (absence: Y = {0-7} ⊂ X =
+{0-15}, registered 2:1 residual), B (bridge: same residual,
+presence) ALL PASS with the pre-registered L1 attribution (A: cross
+0.413 raw = normalized, selectivity 0.972; cross-seed reproducible,
+|dH| <= 0.067). The absence/disconfirmation hypothesis is NOT
+supported at the minimal 2-category scale: the frozen organism
+separates subset-from-superset categories. Registered scope
+boundary: 2-way absence tasks are solvable by presence-detector +
+complement default; the 3-way overlapping disambiguation that E6
+outcome C exposed (absence-veto/context) remains untested.
+Hypothesis surviving form: absence-DISAMBIGUATION among overlapping
+categories, not absence-detection per se. No mechanism change.

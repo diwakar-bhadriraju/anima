@@ -266,3 +266,70 @@ stops the run and is diagnosed; no silent repair.
   supersede the X/Y versions; the pre-A-2 X/Y runs are superseded
   and rerun.
 - Commit (implementation): `(recorded at run time)`.
+---
+
+## E7 execution record (2026-09-16)
+
+Implementation `5254369`; amendments A-1 (P active-E6 property) and
+A-2 (pattern ids A/B) committed `49fc8ef`; 104 tests green, 0
+warnings. Run dirs: P `runs/e7-pos-20260916T083635Z`, A
+`runs/e7-abs-20260916T083635Z`, B `runs/e7-bridge-20260916T083635Z`,
+A-9001/A-424242 `runs/e7-abs-{9001,424242}-20260916T084235Z` — all
+curriculum-complete, telemetry intact, zero failures. Analyzer:
+v3_analysis with the registered E7 window args
+(245000 485000 0 0 485000 530000 485000); cross_cosine and
+e7_attribution verbatim.
+
+### Per-condition results (frozen M1–M3 + attribution)
+
+| | P (presence) | A (absence) | B (bridge) |
+|---|---|---|---|
+| established by S1 end | 3,074 ✓ | 7,046 ✓ | 5,365 ✓ |
+| P2 (failures; rates) | 0; 9.7/81.4 Hz ✓ | 0; 6.9/70.8 Hz ✓ | 0; 11.8/103.3 Hz ✓ |
+| late-S1 cross A-B | **0.033** ✓ | **0.413** ✓ | **0.000** ✓ |
+| L1-normalized cross | 0.033 ✓ | **0.413** ✓ | 0.000 ✓ |
+| within-pattern mean | 0.950 | 0.544 | 0.952 |
+| selectivity median (S1) | 0.987 ✓ | **0.972** ✓ | 1.000 ✓ |
+| **condition verdict** | **PASS** | **PASS** | **PASS** |
+
+P's E6-regime as amended (A-1): community channels at 2:1 duty,
+β_common < 1 < β_exclusive — the active regime, verified in tests.
+
+### Cross-seed A (§8.4): **SUPPORTED**
+
+| seed | mean H | established | cross | L1-norm |
+|---|---|---|---|---|
+| 20260912 | 2.513 | 7,046 | 0.413 | 0.413 |
+| 9001 | 2.580 | 6,904 | 0.331 | 0.309 |
+| 424242 | 2.492 | 7,130 | 0.520 | 0.520 |
+
+|ΔH| ≤ 0.067 < 0.20; |Δestablished|/est ≤ 0.02 < 0.50; the A
+separation verdict (raw AND normalized < 0.60) reproduces in all
+three seeds.
+
+### Frozen verdict: **OUTCOME A** (§7 tree)
+
+P PASS ∧ A PASS (with attribution) ∧ B PASS ⇒ positive AND absence
+discriminations both work ⇒ the absence/disconfirmation hypothesis
+as registered is **NOT supported at the minimal scale**.
+
+Interpretation (registered; no over-claim):
+
+1. The frozen E6 organism demonstrably separates subset-from-
+   superset categories whose only selective structure is the
+   absence of channels {8-15}: cross 0.413 with a clean L1
+   attribution (structure, not drive), selectivity 0.972, stable,
+   cross-seed reproducible.
+2. A is markedly noisier than the presence controls (0.413 vs
+   0.033/0.000; within-pattern 0.544 vs 0.950) — absence-structured
+   discrimination works, but via a coarser complement readout.
+3. Scope boundary (intentional): a 2-category presence-vs-absence
+   task is solvable by a P-presence detector plus default
+   classification. E7 therefore establishes "absence-structured
+   discrimination succeeds at the 2-way level"; it does NOT test
+   the 3-way overlapping ambiguity where E6's outcome C arose
+   (B ⊆ A∪C, disambiguation requires absence-veto/context, not
+   complement classification). E7's outcome A weakens the strong
+   form of H7 without contradicting E6's outcome C.
+4. No mechanism is implied or implemented; absence-gating remains
+   an open question for any future user-approved experiment.
