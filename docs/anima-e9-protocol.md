@@ -263,3 +263,62 @@ Failures stop the run and are diagnosed.
   (0.592/0.165/0.048), 424242 (0.763/0.075/0.033); B-alignment
   A / C / C.
 - Commit: `…` (recorded at run time).
+---
+
+## E9 execution record (2026-09-16)
+
+Implementation `dbdc329` (phase support, SEQ/REV configs, tests;
+amendment A-4 included); 114 tests green, 0 warnings. Run dirs:
+REV-B `runs/e9-rev-20260916T175209Z`, SEQ-B primary
+`runs/e9-seq-20260916T175209Z`, cross-seed
+`runs/e9-seq-9001-20260916T175408Z`, `runs/e9-seq-424242-20260916T175408Z`
+— all curriculum-complete, telemetry intact, zero failures.
+
+### Primary + cross-seed (SEQ-B)
+
+| seed | A-B | B-C | A-C | B-independence | B-align | sel | est |
+|---|---|---|---|---|---|---|---|
+| 20260912 | **0.630** | 0.083 | 0.000 | **FALSE** (0.630 ≥ 0.60) | C | 0.702 | 2,384 |
+| 9001 | **0.723** | 0.152 | 0.019 | **FALSE** | C | 0.719 | 2,017 |
+| 424242 | 0.512 | 0.079 | 0.000 | **TRUE** | C | 0.867 | 2,214 |
+
+L1 attribution: all values equal raw (structural). P2 supported in
+all seeds (0 failures; late-S1 rates 10.7/94.3 Hz canonical).
+
+### REV-B control (20260912)
+
+A-B 0.264, B-C **0.819**, A-C 0.163; sel 0.317; L1-invariant;
+0 failures; 1,866 established. **Order-direction sensitive**: the
+trailing phase's side absorbs B — SEQ ({4-7}→{8-11}): B near C
+(0.083); REV ({8-11}→{4-7}): B near A (0.264). The pattern is
+consistent across all four runs.
+
+### Frozen verdict: **OUTCOME B** (with the exact seed dependence
+### recorded)
+
+Outcome A requires B-independence on 20260912 AND reproduction —
+not met (canonical A-B 0.630; 9001 A-B 0.723). The tree's
+outcome-B branch is thus taken with the registered seed-
+dependence clause (§8 records it exactly):
+
+1. **Universal**: A-C separated in every E9 run (≤ 0.019); B-C
+   de-coalesced in every SEQ-B seed (≤ 0.152 vs E8 static
+   0.075–0.873) — the temporal construction systematically
+   separates B from its TRAILING side.
+2. **The residual failure is the A-side**: A-B stays high
+   (0.512–0.723) — B's representation inherits the leading group's
+   (A-side) character, so B never clears BOTH thresholds.
+3. **B-independence was achieved in 424242** (0.512/0.079) and
+   missed by 0.030 on the canonical seed — the capability is
+   curriculum-real but not robust at the registered 60-rep scale.
+4. **Selectivity doubled-tripled** vs E8 (0.70–0.87 vs 0.19–0.50)
+   — the temporal cue reshapes the representations (the count-
+   based readouts DO see it, via plasticity-mediated weight
+   shifts, exactly as the derivation predicted).
+5. Interpretation boundary honored: recorded "the frozen organism
+   did not exploit the registered temporal/contextual distinction
+   sufficiently to produce ROBUST independent B representation";
+   the near-miss (0.030) and single-seed success are facts, not a
+   license to tune; no temporal mechanism is implemented; a
+   future registration may revisit (e.g., scale or phase-duration
+   as a registered variable — NOT performed here).

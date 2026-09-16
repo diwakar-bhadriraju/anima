@@ -129,3 +129,16 @@ Derivation registered: readout limit (count-based), STDP tau 20 ms
 (separation > ~100 ms), M3 100-ms windows (1/5 co-active windows
 for B's groups), E6 phi/beta matched marginals. No mechanism work;
 outcome A is a curriculum-level capability result only.
+
+### U9 / temporal/contextual disambiguation update (2026-09-16, E9 result)
+
+E9 (phase-sequenced B, frozen E6 organism; commit dbdc329 +
+execution): OUTCOME B with recorded seed dependence. The temporal
+cue is REAL and order-direction-sensitive (SEQ B-C 0.083 vs REV
+B-C 0.819; trailing side absorbs B); A-C universally separated
+(<= 0.019); selectivity doubled (0.70-0.87 vs E8 0.19-0.50);
+B-independence achieved in 1/3 seeds (424242: 0.512/0.079),
+missed by 0.030 on the canonical (0.630). Conclusion: curriculum-
+level temporal capability exists but is insufficient/not robust
+for independent B at the registered scale; no mechanism
+implemented or implied.
