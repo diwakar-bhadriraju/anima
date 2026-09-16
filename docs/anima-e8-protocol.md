@@ -265,3 +265,64 @@ is diagnosed.
   E7's recorded outcome A is unaffected — no endpoint depended on
   the β constants).
 - Commit: `…` (recorded at run time).
+---
+
+## E8 execution record (2026-09-16)
+
+Implementation `c4e89f4` (configs + tests; amendment A-3 committed
+with it); 108 tests green, 0 warnings. Run dirs: primary
+`runs/e8-20260916T160816Z`, cross-seed
+`runs/e8-seed9001-20260916T161058Z`, `runs/e8-seed424242-20260916T161058Z`
+— all curriculum-complete, telemetry intact, zero failures.
+
+### Primary (seed 20260912, 60 reps, no S2/D)
+
+| Endpoint | Value | vs E6-full |
+|---|---|---|
+| established | 2,358 ✓ (≥1) | 5,332 |
+| P2 (failures; late-S1 rates) | 0; 13.0 / 88.5 Hz ✓ | 0; 11.9/98.0 |
+| **A-B** | **0.073** ✓ | 0.078 |
+| **B-C** | **0.873** ✗ | 0.792 |
+| **A-C** | **0.032** ✓ | 0.046 |
+| L1 attribution (AB/BC/AC) | 0.073 / 0.873 / 0.032 (all structural) | — |
+| selectivity median | 0.205 (reported) | 0.116 |
+| **B-alignment** | argmin(B-A, B-C) = **A** (0.073 < 0.873) | A |
+
+The E6-full verdict table **{A-B ✓, B-C ✗, A-C ✓} reproduces
+exactly** at 60 reps without S2/D, with continuous values close to
+E6-full — the B-entanglement structure is robust across the scale
+and no-D axes on the reference seed.
+
+### Cross-seed (9001, 424242) — verdict-table reproduction: **NOT IDENTICAL**
+
+| seed | A-B | B-C | A-C | verdict (AB, BC, AC < 0.60) | B-alignment | |ΔH| vs canon | |Δest|/est |
+|---|---|---|---|---|---|---|---|---|
+| 20260912 | 0.073 | 0.873 | 0.032 | (✓, ✗, ✓) | A | — | — |
+| 9001 | 0.592 | 0.165 | 0.048 | **(✓, ✓, ✓)** | C | 0.477 | 0.204 |
+| 424242 | 0.763 | 0.075 | 0.033 | **(✗, ✓, ✓)** | C | 0.210 | 0.109 |
+
+L1-normalized values equal the raw values in every pair of every
+seed — all separation is structural.
+
+### Frozen verdict: **OUTCOME B — scale/regime dependence** (§7 tree)
+
+Canonical-seed table matches E6-full; cross-seed tables differ ⇒
+the "table differs across seeds" branch is taken. Recorded
+findings:
+
+1. **Robust core**: A-C (the two categories WITH private evidence)
+   separates in every seed (≤ 0.048). 
+2. **B is never independently represented**: in no seed is B
+   strongly separated from BOTH neighbors (20260912: B-C 0.873;
+   424242: A-B 0.763; 9001: A-B 0.592 — borderline pass, B pulled
+   toward C). When B entangles, it coalesces with exactly ONE
+   neighbor; the partner is seed-dependent (A in 20260912, C in
+   424242, none-hard in 9001) — the middle category's absorption is
+   stochastic, its failure to stand alone is universal.
+3. E6-full's limitation reproduces on the reference seed (scale/
+   no-D robust) but its expression is seed-labile — the per-seed
+   placement of the coalition, not its existence-minimally, varies.
+4. Interpretation boundary honored: this records the limitation's
+   robustness/lability characterization. NO mechanism is implied,
+   NO organism change follows; scale/regime dependence is the
+   registered outcome.

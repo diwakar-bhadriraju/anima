@@ -98,3 +98,19 @@ private-evidence control for B is inexpressible (any 8-channel
 balanced middle category ⊆ A∪C has zero private channels); the
 internal pairwise trichotomy is the attribution. No mechanism
 change; no absence gating.
+
+### U9 / 3-way disambiguation update (2026-09-16, E8 result)
+
+E8 (60 reps, no S2/D, frozen E6 organism; commits c4e89f4 +
+execution): OUTCOME B (scale/regime dependence). Canonical seed
+20260912 reproduces E6-full's verdict table exactly (A-B 0.073,
+B-C 0.873, A-C 0.032 vs E6-full 0.078/0.792/0.046; L1-invariant).
+Cross-seed 9001 = all pairs separated (0.592/0.165/0.048);
+424242 = A-B entangled (0.763), B-C separated (0.075). Robust
+core across ALL seeds: the private-evidence pair A-C separates
+(<= 0.048); B never stands alone (min across both neighbors >=
+0.165; entangled >= 0.763 in 2/3 seeds). B's coalition partner is
+seed-labile. Interpretation: the 3-way limitation is real and
+scale/no-D-robust on the reference seed, but its expression
+(which neighbor absorbs the middle category) is stochastic;
+A-C separability is universal. No mechanism implied, no changes.
