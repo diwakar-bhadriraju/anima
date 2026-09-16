@@ -192,3 +192,17 @@ to E10; phi/beta drift band < 3%. Outcome A = lock-in depends on
 persistent order asymmetry (curriculum-level, no mechanism claim);
 Outcome B = intrinsic asymmetry remains implicated (no mechanism
 invented). No implementation performed - freeze first.
+
+### U9 / temporal-order balance update (2026-09-17, E11 result)
+
+E11 (counterbalanced SEQ/REV, frozen E6 organism; commits 2f652f0
++ execution): **OUTCOME A** — B-independent in 3/3 seeds
+(A-B 0.462/0.535/0.398, B-C 0.488/0.511/0.529, A-C <= 0.232; L1 =
+raw everywhere; categorical reproduction IDENTICAL; P2 clean;
+engagement 2,989-3,793). The E10 leading-side lock-in is caused by
+persistent temporal-order asymmetry in the curriculum, not by an
+intrinsic bias of the frozen learning dynamics. Curriculum-level
+result; no mechanism claim; no organism change. Sequence
+v3 -> E6 -> E7 -> E8 -> E9 -> E10 -> E11: the 3-way disambiguation
+limitation is now precisely characterized as experience-order-
+sensitivity — balanced experience dissolves it.

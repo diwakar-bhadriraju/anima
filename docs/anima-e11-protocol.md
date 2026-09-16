@@ -226,3 +226,52 @@ reruns "because a seed is inconvenient".
   (0.760/0.080/0.000), 424242 (0.624/0.080/0.000); B-independence
   F / F / F; selectivity 0.662 / 0.802 / 0.902.
 - Commit: `…` (recorded at run time).
+---
+
+## E11 execution record (2026-09-17)
+
+Implementation `2f652f0` (phase_variants, configs, tests; amendment
+A-5 included); 120 tests green, 0 warnings. Run dirs: primary
+`runs/e11-20260916T195359Z`, cross-seed
+`runs/e11-seed9001-20260916T195722Z`,
+`runs/e11-seed424242-20260916T195722Z` — all curriculum-complete,
+telemetry intact, zero failures.
+
+### Results (E10 baseline → E11 counterbalanced; L1 == raw everywhere)
+
+| seed | A-B (E10→E11) | B-C (E10→E11) | A-C | B-independence | B-aln | sel | est |
+|---|---|---|---|---|---|---|---|
+| 20260912 | 0.697 → **0.462** | 0.081 → **0.488** | 0.000 | **TRUE** | A | 0.506 | 3,793 |
+| 9001 | 0.760 → **0.535** | 0.080 → **0.511** | 0.000 | **TRUE** | C | 0.470 | 3,325 |
+| 424242 | 0.624 → **0.398** | 0.080 → **0.529** | 0.232 | **TRUE** | A | 0.487 | 2,989 |
+
+All L1-normalized values equal raw (structural separation). P2
+supported in all seeds (0 failures; rates 10.0/92.8 Hz canonical).
+A-C < 0.60 in every seed (rose to 0.232 in 424242 — reported, no
+bar). B-alignment: mixed (seed-dependent, as expected without a
+systematic leading side). Selectivity 0.47–0.51 (E10: 0.66–0.90 —
+reported; the balanced B trades within-representation consistency
+for independence).
+
+### Frozen verdict: **OUTCOME A — B-independent in all three seeds,
+### categorical reproduction IDENTICAL**
+
+The counterbalancing intervention dissolved the E10 leading-side
+lock-in: every seed now separates B from BOTH neighbors below the
+0.60 bar. Registered interpretation (verbatim §5/§9):
+
+"The E10 leading-side lock-in is **dependent on persistent
+temporal-order asymmetry in experience**; balancing the order (60
+SEQ + 60 REV, rep-parity schedule, no new RNG) produces
+independently distinguishable B representations across all three
+seeds. This is a CURRICULUM-LEVEL result — it does NOT establish a
+mechanism, does not imply one is needed, and no organism change
+follows."
+
+Notes: within-pattern coherence dropped (0.815 vs E10 0.953 on the
+canonical) and A-C rose (≤ 0.232) — the balanced B is achieved at
+the cost of some representational consistency; both are reported,
+neither had a registered bar. The E9/E10/E11 sequence thereby
+locates the 3-way disambiguation limitation precisely: it is
+sensitive to temporal-order ASYMMETRY in experience, not intrinsic
+to the frozen E6 organism's plasticity.
