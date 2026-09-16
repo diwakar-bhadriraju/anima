@@ -249,3 +249,60 @@ reruns.
   0.398/0.529/0.232, T/T/T). B-alignment: E9 A; E10 A/C/A; E11
   A/C/A.
 - Commit: `…` (recorded at run time).
+---
+
+## E12 execution record (2026-09-17)
+
+Implementation `0b049f2` (variant_block, configs, tests,
+e12_transition); 124 tests green, 0 warnings. Run dirs: primary
+`runs/e12-20260916T202445Z`, cross-seed
+`runs/e12-seed9001-20260916T202822Z`,
+`runs/e12-seed424242-20260916T202822Z` — all curriculum-complete,
+telemetry intact, zero failures.
+
+### Transition results (T0 = after 60 SEQ; T1 = after 60 REV;
+### L1 == raw everywhere)
+
+| seed | T0 A-B / B-C / A-C | T0 indep / align | T1 A-B / B-C / A-C | T1 indep / align | Δ A-B | Δ B-C |
+|---|---|---|---|---|---|---|
+| 20260912 | 0.682 / 0.228 / 0.169 | F / **C** | 0.270 / 0.844 / 0.000 | F / **A** | −0.412 | +0.616 |
+| 9001 | 0.655 / 0.339 / 0.260 | F / **C** | 0.215 / 0.646 / 0.000 | F / **A** | −0.440 | +0.307 |
+| 424242 | 0.562 / 0.193 / 0.179 | **T** / **C** | 0.175 / 0.600 / 0.000 | F / **A** | −0.387 | +0.407 |
+
+Selectivity rose T0→T1 in every seed (0.680→0.847, 0.614→0.850,
+0.811→0.901 — the reorganized representation is sharper).
+Permanence: 4,814/3,328; 4,902/3,256; 3,810/2,737 (SEQ-block >
+REV-block, both engaged). P2 clean everywhere (0 failures; rates
+≤ 120 Hz). A-C = 0.000 at T1 in every seed.
+
+### Frozen verdict: **OUTCOME C — REORGANIZATION WITHOUT FULL
+### INDEPENDENCE, unanimous (3/3 seeds)**
+
+The registered C-definition applies exactly, in every seed: the
+representation moved **substantially away** from the original
+leading-side state (A-B dropped by ≥ 0.39 in all seeds —
+criterion ≥ 0.10) but did NOT satisfy B-independence at T1.
+
+Two systematic findings (both consistent across all three seeds):
+
+1. **The REV block reorganizes the association's SIDE, not its
+   existence.** B-alignment flipped C → A in every seed, and the
+   flip follows the registered E9 trailing-side law: SEQ trails on
+   the C-side ⇒ T0 absorption by C; REV trails on the A-side ⇒ T1
+   absorption by A. The lock-in is a live equilibrium that
+   re-anchors to the current trailing order — at this scale
+   (60 subsequent REV presentations) B remains absorbed, by the
+   NEW side.
+2. **T0's locked state reproduces the E9 reference** (60 reps
+   all-SEQ: canonical alignment C, A-B 0.682), and the flip is
+   symmetric in magnitude (|ΔA-B| − |ΔB-C| ≈ 0) — the
+   reorganization is a near-mirror transfer, not a partial unbind.
+
+Interpretation boundaries honored: Outcome C is preserved as its
+own distinct result (NOT forced into A or B); no mechanism is
+invented; B's absorption is never called irreversible (the test
+covers exactly 60 subsequent REV presentations); path-dependent
+RE-ANCHORING is established at the tested scale, recovery to
+independence is not. 424242's T0 independence was lost by T1
+(0.562/0.193 → 0.175/0.600) — the contradictory experience
+dissolved the balanced midpoint state too.

@@ -225,3 +225,19 @@ preserved as distinct), D (gates); per-seed modal rule for
 disagreements. phi/beta audit band +/-0.15 (A-5 class, placement
 documented pre-data). No E13 until E12 fully analyzed. No
 implementation performed - freeze first.
+
+### U9 / path-dependence update (2026-09-17, E12 result)
+
+E12 (60 SEQ then 60 REV blocked, frozen E6 organism; commits
+0b049f2 + execution): OUTCOME C (reorganization without full
+independence), unanimous 3/3. The REV block flipped B-alignment
+from C to A in every seed (A-B dropped 0.39-0.44; B-C rose
+0.31-0.62), following the E9 trailing-side law exactly (T0: SEQ
+trails C-side => absorb C; T1: REV trails A-side => absorb A).
+B-independence fails at T1 in all seeds (B-C 0.60-0.84); the
+midpoint state (424242 T0 independence) was dissolved. Reading:
+path-dependent RE-ANCHORING - the lock-in is a live equilibrium
+tracking the current trailing order, not an irreversible or
+inert association; recovery to independence did not occur at this
+scale. Outcome C preserved as distinct, no mechanism, no claims
+beyond the tested quantities.

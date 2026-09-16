@@ -45,7 +45,7 @@ fn main() {
                     }
                 }
                 3 => spikes.push((row.t, row.n.unwrap_or(0) as u32)),
-                7 => {
+                6 => {
                     if let Ok(e) = row.envelope("v2") {
                         if let anima_telemetry::events::Payload::SynapseCreated { reason, .. } = e.payload {
                             if reason.trigger == "candidate-permanence" {
@@ -54,7 +54,7 @@ fn main() {
                         }
                     }
                 }
-                2 => {
+                17 => {
                     if let Ok(e) = row.envelope("v2") {
                         if let anima_telemetry::events::Payload::Failure { kind, detail, .. } = e.payload {
                             failures.push((e.t, format!("{kind}: {detail}")));
