@@ -85,3 +85,16 @@ complement default; the 3-way overlapping disambiguation that E6
 outcome C exposed (absence-veto/context) remains untested.
 Hypothesis surviving form: absence-DISAMBIGUATION among overlapping
 categories, not absence-detection per se. No mechanism change.
+
+### U9 / 3-way disambiguation update (2026-09-16, E8 registration)
+
+E7 rejected the broad absence hypothesis (OUTCOME A). E8 is now
+REGISTERED (docs/anima-e8-protocol.md) as a scale/no-D/cross-seed
+robustness probe of E6-full's observed B-entanglement (A-B 0.078,
+B-C 0.792, A-C 0.046): same v3 geometry, 60 reps, S0/S1/S3 only,
+seeds 20260912/9001/424242, pairwise-verdict-table endpoint,
+B-alignment readout. Registered geometric proof: a matched
+private-evidence control for B is inexpressible (any 8-channel
+balanced middle category ⊆ A∪C has zero private channels); the
+internal pairwise trichotomy is the attribution. No mechanism
+change; no absence gating.
