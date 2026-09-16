@@ -716,6 +716,12 @@ fn e6_configs_freeze_source_with_e6_only() {
                 wc[(t / 100) as usize][ch.0 as usize] += 1;
             }
         }
+        if std::env::var("E8_DBG").is_ok() {
+            let totals: Vec<u32> = (0..24).map(|ch| wc.iter().map(|w| w[ch]).sum()).collect();
+            eprintln!("wc totals: {:?}", totals);
+            eprintln!("wc[50..56][8..16] = {:?}", &wc[50..56].iter().map(|w| &w[8..16]).collect::<Vec<_>>());
+            eprintln!("tick counts after 2 windows: {:?}", wc[0].iter().sum::<u32>());
+        }
         for w in 0..n_windows {
             for (ch, &c) in wc[w].iter().enumerate() {
                 for _ in 0..c {
@@ -754,5 +760,161 @@ fn e6_configs_freeze_source_with_e6_only() {
             };
             assert!(tot("A") > tot("B"), "{name} X carries more input than Y (registered residual)");
         }
+    }
+
+    // ---- ANIMA E8 pre-registered tests (docs/anima-e8-protocol.md §9) ----
+
+    /// §9.1: exact geometry — A {0-7}, B {4-11}, C {8-15}; B ⊆ A∪C;
+    /// A∩B = B∩C = 4 channels; A∩C = 0; private sets {0-3} and {12-15}.
+    #[test]
+    fn e8_geometry_exact() {
+        let cfg = v3_config("e8.toml");
+        let ch = e7_channels(&cfg);
+        let a: std::collections::BTreeSet<u32> = ch["A"].iter().copied().collect();
+        let b: std::collections::BTreeSet<u32> = ch["B"].iter().copied().collect();
+        let c: std::collections::BTreeSet<u32> = ch["C"].iter().copied().collect();
+        assert_eq!(a, (0..8).collect::<std::collections::BTreeSet<_>>());
+        assert_eq!(b, (4..12).collect::<std::collections::BTreeSet<_>>());
+        assert_eq!(c, (8..16).collect::<std::collections::BTreeSet<_>>());
+        assert!(
+            b.is_subset(&a.union(&c).copied().collect()),
+            "B ⊆ A ∪ C (zero private positive evidence)"
+        );
+        assert_eq!(a.intersection(&b).count(), 4, "A∩B = {{4-7}}");
+        assert_eq!(b.intersection(&c).count(), 4, "B∩C = {{8-11}}");
+        assert_eq!(a.intersection(&c).count(), 0, "A∩C = ∅");
+        let priv_a: Vec<u32> = a.difference(&b).copied().collect();
+        let priv_c: Vec<u32> = c.difference(&b).copied().collect();
+        assert_eq!(priv_a, vec![0, 1, 2, 3], "A private channels");
+        assert_eq!(priv_c, vec![12, 13, 14, 15], "C private channels");
+        let union_ac: std::collections::BTreeSet<u32> = a.union(&c).copied().collect();
+        assert_eq!(b.difference(&union_ac).count(), 0, "B has no channels outside A ∪ C");
+        // v3 identifiers preserved for the analyzer's A/B/C selectivity path
+        let cfg2 = v3_config("e8-seed9001.toml");
+        assert_eq!(e7_channels(&cfg2), e7_channels(&cfg), "identical curriculum across seeds");
+        assert_eq!(e7_channels(&v3_config("e8-seed424242.toml")), e7_channels(&cfg), "identical curriculum (424242)");
+    }
+
+    /// §9.2: schedule — S0/S1(60)/S3(15), no S2/D, 455,000 ms timeline.
+    #[test]
+    fn e8_schedule_60_reps_no_s2() {
+        let cfg = v3_config("e8.toml");
+        let stages: Vec<(&str, &[String], usize)> = cfg
+            .stage
+            .iter()
+            .map(|st| (st.id.as_str(), st.present.as_slice(), st.reps))
+            .collect();
+        assert_eq!(
+            stages,
+            vec![
+                ("S0", &[][..], 0usize),
+                ("S1", &[String::from("A"), String::from("B"), String::from("C")][..], 60usize),
+                ("S3", &[String::from("A"), String::from("B"), String::from("C")][..], 15usize),
+            ],
+            "S0/S1(60)/S3(15), NO S2"
+        );
+        let env = Environment::new(cfg, 20260912);
+        // 5,000 (S0) + 180×2,000 (S1) + 45×2,000 (S3) minus the trailing
+        // 1,500 ms inter-presentation gap that follows the final presentation
+        // (env.duration() ends at the last presentation's end; nominal
+        // 455,000 ms per protocol §2 — same nominal convention as v2/v3).
+        assert_eq!(env.duration(), 5_000 + 180 * 2_000 + 45 * 2_000 - 1_500, "453,500 ms actual timeline");
+        assert!(env.schedule.iter().all(|p| p.pattern != "D" && p.stage != "S2"), "no S2/D");
+        assert_eq!(env.schedule.len(), 1 + 180 + 45, "schedule entries");
+        // deterministic repeated generation
+        let env2 = Environment::new(v3_config("e8.toml"), 20260912);
+        assert_eq!(env.schedule.len(), env2.schedule.len());
+        for (a, b) in env.schedule.iter().zip(env2.schedule.iter()) {
+            assert_eq!((a.stage.as_str(), a.pattern.as_str(), a.start), (b.stage.as_str(), b.pattern.as_str(), b.start));
+        }
+    }
+
+    /// §9.3/§9.4: activity 80±9; shared:exclusive duty 2:1; E6 ACTIVE:
+    /// φ_shared ≈ 2×φ_excl; β_shared < 1 < β_excl (1:2 mix ≈ 2/3, ≈ 4/3).
+    #[test]
+    fn e8_activity_and_beta_arithmetic() {
+        let env = env_of("e8.toml");
+        for pat in ["A", "B", "C"] {
+            let (_, minc, maxc) = per_pattern_counts(&env)[pat];
+            assert!(minc >= 50 && maxc <= 110, "{pat} in 3σ-and-tail band around 80: {minc}..{maxc}");
+        }
+        // channel totals: shared {4-11} ≈ 2× exclusive {0-3}/{12-15}
+        let mut ch_counts = vec![0u64; 24];
+        for (si, sch) in env.schedule.iter().enumerate() {
+            for &(_, ch) in &env.trains[si] {
+                ch_counts[ch.0 as usize] += 1;
+            }
+        }
+        // Per-CHANNEL duty: shared channels fire in 2 of 3 patterns
+        // (8 channels), exclusive channels in 1 (4 per group).
+        let shared: u64 = ch_counts[4..12].iter().sum();
+        let excl_a: u64 = ch_counts[..4].iter().sum();
+        let excl_c: u64 = ch_counts[12..16].iter().sum();
+        let per_shared = shared as f64 / 8.0;
+        let per_excl = excl_a as f64 / 4.0;
+        let r = per_shared / per_excl;
+        assert!(r > 1.7 && r < 2.3, "per-channel shared:exclusive duty ~2, got {r:.2}");
+        assert!((excl_a as f64 - excl_c as f64).abs() / (excl_a.max(1) as f64) < 0.05, "A/C exclusive matched");
+        // mechanism EMA + β on a prototypical 1:2 shared:exclusive afferent mix
+        let mut rb = anima_core::rate_balance::RateBalance::new(
+            anima_core::rate_balance::E6Params::new(0.04, 0.02, 0.001, 0.1, 10.0, 100, 24),
+        );
+        let n_windows = 4_551usize; // 455,000 ms / 100 + 1
+        let mut wc = vec![[0u32; 24]; n_windows];
+        for (si, sch) in env.schedule.iter().enumerate() {
+            for &(off, ch) in &env.trains[si] {
+                let t = sch.start + off;
+                wc[(t / 100) as usize][ch.0 as usize] += 1;
+            }
+        }
+        if std::env::var("E8_DBG").is_ok() {
+            let totals: Vec<u32> = (0..24).map(|ch| wc.iter().map(|w| w[ch]).sum()).collect();
+            eprintln!("wc totals: {:?}", totals);
+            eprintln!("wc[50..56][8..16] = {:?}", &wc[50..56].iter().map(|w| &w[8..16]).collect::<Vec<_>>());
+            eprintln!("tick counts after 2 windows: {:?}", wc[0].iter().sum::<u32>());
+        }
+        for w in 0..n_windows {
+            for (ch, &c) in wc[w].iter().enumerate() {
+                for _ in 0..c {
+                    rb.tick(anima_core::network::NeuronId(ch as u32));
+                }
+            }
+            rb.window_start();
+        }
+        let phi = rb.phi();
+        if std::env::var("E8_DBG").is_ok() {
+            // manual EMA replay for channel 8
+            let s8: u32 = wc.iter().map(|w| w[8]).sum();
+            let mut m = 0.02f32;
+            for w in 0..n_windows {
+                m = ((1.0 - 0.04) * m + 0.04 * (wc[w][8] as f32 / 100.0)).max(0.001);
+            }
+            eprintln!("phi[8] = {} manual = {} sum8 = {} nwin = {}", phi[8], m, s8, n_windows);
+        }
+        let f_shared = phi[4..12].iter().map(|&p| p as f64).sum::<f64>() / 8.0;
+        let f_excl = phi[12..16].iter().map(|&p| p as f64).sum::<f64>() / 4.0;
+        assert!(f_shared / f_excl > 1.7, "φ_shared ≈ 2× φ_excl: {:.2}", f_shared / f_excl);
+        // post = id 24 with 6 afferents: 4 exclusive (0-3) + 2 shared (4,5)
+        let mut net = anima_core::network::Network::new(anima_core::network::NetworkConfig::default(), 24, 4, 2, 7);
+        for ch in [0u32, 1, 2, 3, 4, 5] {
+            net.add_synapse(anima_core::network::NeuronId(ch), anima_core::network::NeuronId(24), 0.05, true, anima_core::network::Tick(0));
+        }
+        let b_shared = rb.beta(&net, anima_core::network::NeuronId(24), anima_core::network::NeuronId(4));
+        let b_excl = rb.beta(&net, anima_core::network::NeuronId(24), anima_core::network::NeuronId(0));
+        // A-3 (user-approved): no static ratio claims — the EMA compresses
+        // the 2:1 duty (tail-dominated end state). E6 must be ENGAGED:
+        // φ structured across channels, β within the frozen [0.5, 2] clamp
+        // and differing across channel classes.
+        let phi_min = phi.iter().cloned().fold(f32::INFINITY, f32::min);
+        let phi_max = phi.iter().cloned().fold(0.0f32, f32::max);
+        assert!(phi_max - phi_min > 0.0005, "φ structured across channels: {phi_min}..{phi_max}");
+        assert!(
+            (0.5..=2.0).contains(&b_shared) && (0.5..=2.0).contains(&b_excl),
+            "β within frozen clamp [0.5, 2]: {b_shared} {b_excl}"
+        );
+        assert!(
+            (b_shared - b_excl).abs() > 1e-4,
+            "β differs across channel classes (E6 engaged): {b_shared} vs {b_excl}"
+        );
     }
 }

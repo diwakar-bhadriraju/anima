@@ -57,14 +57,20 @@ per channel, ±2 ms jitter, 500 ms presentations, 1500 ms off.
 shared channels {4-11} fire in 2 of 3 patterns, exclusive channels
 {0-3} ∪ {12-15} in 1 of 3 → **shared : exclusive ≈ 2 : 1**.
 
-**E6 is ACTIVE in E8** (registered arithmetic):
-φ_shared ≈ 2·φ_exclusive. For mixed-afferent neurons:
-- 1:1 shared:exclusive afferent mix: φ̄ = 1.5·φ_excl → β_shared ≈
-  0.75, β_excl ≈ 1.5;
-- 1:2 mix: φ̄ = 4/3·φ_excl → **β_shared ≈ 2/3, β_excl ≈ 4/3**;
-- invariant for every livable mix: β_shared < 1 < β_excl, both
-  within the frozen [0.5, 2]. E8 is an E6-active condition; never
-  described as inert (A-1 precedent).
+**E6 is ACTIVE in E8** (AMENDMENT A-3, 2026-09-16, user-approved —
+replaces the static 2:1/2:3–4:3 arithmetic, which the frozen EMA
+dynamics disproved; see appendix): φ is a τ = 2.5 s EMA over
+bursty Poisson windows. The 2:1 presentation duty compresses at
+equilibrium to ratios ≈ 1.1–1.3 (E6-full's own readout: exclusive
+3.58 vs shared 4.22 Hz-equiv, ratio 1.18), and the end-state φ is
+tail-dominated (last presentation dominates the ≈ 25-window decay
+tail), so channel orders can even invert near the floor. β is
+therefore TIME-VARYING across ≈ 0.7–1.5 during S1, always inside
+the frozen [0.5, 2] clamp; there is NO static β_shared < 1 <
+β_excl invariant. E8 is an E6-active condition (φ differs across
+channels — the mechanism engages); it is never described as inert.
+Engagement evidence comes from the φ readout structure, not from
+static ratio claims.
 
 ### Repetition count (frozen, deliberate)
 
@@ -200,9 +206,11 @@ of outcome.
 2. Schedule: 60 reps, S0/S1/S3 only, no S2/D, timeline
    455,000 ms.
 3. Activity: per-pattern 80 ± 9 bands; shared:exclusive duty 2:1.
-4. E6-β arithmetic: streaming P-… (E7's registered active-E6
-   idiom): φ_shared ≈ 2×φ_excl; β_shared < 1 < β_excl, both in
-   [0.5, 2], with the ≈2/3–≈4/3 expectation for the 1:2 mix.
+4. E6 engagement (A-3): replay the frozen EMA on the exact E8
+   streams; assert φ is structured (channel spread ≫ 0 — mechanism
+   engaged), mechanism β values differ across channels and lie
+   exactly within the frozen [0.5, 2] clamp. No static ratio or
+   <1/>1 assertions.
 5. Deterministic repeated generation (existing integration idiom,
    e8 layout).
 6. Organism freeze: non-pattern/stage sections byte-identical to
@@ -242,9 +250,18 @@ is diagnosed.
 
 ## Appendix (filled at execution time)
 
-- Config hashes: e8 `…`; e8-seed9001 `…`; e8-seed424242 `…`
-  (recorded at creation, before runs).
+- Config hashes (sha256 of raw file, recorded at creation before any
+  run): e8 `7dfa8d48a260b00ec5b2b4c69c0b8a710f08ef85aa796e84dd732a3553d63ae6`;
+  e8-seed9001 `9a0b6ac54d8e236a985b264f58d59826eaaf32a0ef9438608d4a3ee2a81a3723`;
+  e8-seed424242 `102f2ee7386d1d452dc2b8a48f2d55b38f95680b77d6a357d5cf5a0a7854d70a`.
 - E6-full reference (verbatim): A-B 0.078, B-C 0.792, A-C 0.046;
   selectivity 0.116; established 5,332; 0 failures
   (`runs/e6-20260914T204947Z`).
+- Amendment A-3 (2026-09-16, user-approved): §2/§9.4 φ/β arithmetic
+  corrected — static 2:1/2:3–4:3 claim superseded by the measured
+  EMA dynamics (equilibrium compression ≈1.1–1.3, tail-dominated
+  end state, β time-varying in [0.5, 2], no static invariant).
+  Applies also to the E7 A-1 P-condition arithmetic (same dynamics;
+  E7's recorded outcome A is unaffected — no endpoint depended on
+  the β constants).
 - Commit: `…` (recorded at run time).

@@ -539,6 +539,154 @@ order = "interleaved"
 off_ms = 300
 "#;
 
+// ---- E8 (docs/anima-e8-protocol.md §9.5): deterministic repeat on the
+// ---- 3-way overlap layout (A = {0-7}, B = {4-11}, C = {8-15}).
+
+const E8_SHORT_TOML: &str = r#"
+[run]
+exp_id = "e8it"
+seed = 20260912
+viz_port = 8797
+ticks_per_sec = 1000.0
+stats_decimate = 10
+
+[organism]
+n_input_channels = 24
+group_size = 8
+n_internal = 12
+n_output = 4
+connectivity = 0.038
+w_init = 0.2
+amplitude = 52.0
+adaptation_tau_ms = 200.0
+adaptation_gain = 0.05
+
+[plasticity]
+rule = "stdp-pairwise"
+tau_plus_ms = 20.0
+tau_minus_ms = 20.0
+a_plus = 0.005
+a_minus = 0.0053
+w_min = 0.0
+w_max = 1.0
+decay = 1e-6
+silence_w = 0.02
+silence_ticks = 60000
+min_age_ticks = 30000
+gate = "always"
+
+[structural]
+birth_trigger = "none"
+dormancy_rate_hz = 0.1
+dormancy_ms = 30000
+recovery_rate_hz = 1.0
+retirement_ms = 300000
+wiring_synapses = 5
+
+[resources]
+max_neurons = 200
+max_synapses = 2000
+births_per_window = 4
+runaway_rate_hz = 50.0
+runaway_sustained_ms = 5000
+fragmentation_min_component = 0.6
+
+[v2]
+enabled = true
+p_in = 0.5
+w_in_lo = 0.02
+w_in_hi = 0.06
+p_rec = 0.2
+w_rec_lo = 0.005
+w_rec_hi = 0.02
+t_e = 0.8
+c_slots = 6
+w_c_init = 0.01
+delta_perm = 0.01
+decay_c = 0.99
+theta_permanent = 0.05
+w_c_permanent = 0.02
+theta_die = 0.005
+p_cand_in = 0.5
+p_cand_rec = 0.5
+theta_prune = 0.005
+prune_windows = 10
+b_e = 40
+b_i = 10
+p_inh = 0.3
+w_inh_lo = 0.01
+w_inh_hi = 0.03
+a_inh = 0.005
+decay_inh = 0.98
+w_inh_max = 0.10
+window_ticks = 100
+
+[e6]
+enable = true
+alpha = 0.04
+phi_init = 0.02
+phi_min = 0.001
+beta_min = 0.1
+beta_max = 10.0
+
+[[pattern]]
+id = "A"
+channels = []
+channel_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[pattern]]
+id = "B"
+channels = []
+channel_ids = [4, 5, 6, 7, 8, 9, 10, 11]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[pattern]]
+id = "C"
+channels = []
+channel_ids = [8, 9, 10, 11, 12, 13, 14, 15]
+rate_hz = 20.0
+duration_ms = 300
+jitter_ms = 2.0
+
+[[stage]]
+id = "S0"
+present = []
+reps = 0
+order = "interleaved"
+off_ms = 0
+silence_ms = 300
+
+[[stage]]
+id = "S1"
+present = ["A", "B", "C"]
+reps = 4
+order = "interleaved"
+off_ms = 300
+
+[[stage]]
+id = "S3"
+present = ["A", "B", "C"]
+reps = 2
+order = "interleaved"
+off_ms = 300
+"#;
+
+#[test]
+fn e8_overlap_layout_deterministic_repeated_run() {
+    let d1 = run_config("e8d1", E8_SHORT_TOML);
+    let d2 = run_config("e8d2", E8_SHORT_TOML);
+    let h1 = sha256_dir(&d1.join("telemetry"));
+    let h2 = sha256_dir(&d2.join("telemetry"));
+    assert_eq!(h1, h2, "same seed + e8 overlap layout => byte-identical telemetry");
+    let _ = std::fs::remove_dir_all(d1.parent().unwrap());
+    let _ = std::fs::remove_dir_all(d2.parent().unwrap());
+}
+
 #[test]
 fn e7_abs_layout_deterministic_repeated_run() {
     let d1 = run_config("e7d1", E7_SHORT_TOML);
