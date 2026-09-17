@@ -101,7 +101,7 @@ preceded it / followed it" (event-ordered) is claimable; "caused"
 never is.
 
 ## 6. Verdict (D1 — user-approved: JOINT-READING, no numerical
-## dominance cutoff)
+dominance cutoff)
 
 Per seed, letter assigned by joint reading of that seed's raw
 quantities:
