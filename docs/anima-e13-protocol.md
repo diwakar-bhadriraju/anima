@@ -192,3 +192,93 @@ aggregate table above — full sha256 list appended at freeze commit)| seed | fi
 | seed424242 | runs/e12-seed424242-20260916T202822Z/telemetry/chunk-00012.parquet | ffbe8d5b55929a59e991d2866c3a35f41b1e3aba5a9c7ba310e2e49fdd85bd30 |
 | seed424242 | runs/e12-seed424242-20260916T202822Z/telemetry/chunk-00013.parquet | 5524daf8f03271df9b771ca4efab20b90d7b5d4b17e854cb60b3e966c50d3457 |
 | seed424242 | runs/e12-seed424242-20260916T202822Z/telemetry/index.json | 9e1a2a725c4b425d0995623385d3e5dad1647bc85a53ef494899af7590c1fd84 |
+
+---
+
+## E13 execution record (2026-09-17)
+
+Instrument `431fdcc` (e13_trajectory, telemetry-only, deterministic);
+127 tests green, 0 warnings. Analysis-only over the pinned E12 run
+dirs (telemetry + snapshot hashes re-verified byte-identical to the
+freeze table; failures 0 everywhere; permanence per window 421-692).
+
+### Full trajectory per seed (Wk = 10 rounds; L1 == raw everywhere;
+### selectivity = windowed median; perm = candidate-permanence events)
+
+seed 20260912 (REV-B positions round 61:0, round 120:1):
+
+| cp | A-B | B-C | A-C | indep | align | sel | perm |
+|---|---|---|---|---|---|---|---|
+| T0 | 0.680 | 0.075 | 0.000 | F | C | 0.590 | 669 |
+| T10 | 0.242 | 0.918 | 0.000 | F | A | 0.869 | 585 |
+| T20 | 0.218 | 0.914 | 0.000 | F | A | 0.840 | 499 |
+| T30 | 0.263 | 0.885 | 0.000 | F | A | 0.863 | 564 |
+| T40 | 0.259 | 0.819 | 0.000 | F | A | 0.852 | 526 |
+| T50 | 0.316 | 0.773 | 0.000 | F | A | 0.825 | 571 |
+| T60 | 0.316 | 0.721 | 0.001 | F | A | 0.852 | 586 |
+
+seed 9001 (positions round 61:2, round 120:2):
+
+| cp | A-B | B-C | A-C | indep | align | sel | perm |
+|---|---|---|---|---|---|---|---|
+| T0 | 0.760 | 0.097 | 0.000 | F | C | 0.831 | 692 |
+| T10 | 0.211 | 0.637 | 0.000 | F | A | 0.836 | 601 |
+| T20 | 0.189 | 0.707 | 0.000 | F | A | 0.857 | 507 |
+| T30 | 0.232 | 0.648 | 0.000 | F | A | 0.855 | 528 |
+| T40 | 0.225 | 0.625 | 0.000 | F | A | 0.866 | 525 |
+| T50 | 0.219 | 0.653 | 0.000 | F | A | 0.851 | 640 |
+| T60 | 0.217 | 0.622 | 0.001 | F | A | 0.830 | 455 |
+
+seed 424242 (positions round 61:2, round 120:2):
+
+| cp | A-B | B-C | A-C | indep | align | sel | perm |
+|---|---|---|---|---|---|---|---|
+| T0 | 0.554 | 0.065 | 0.000 | **T** | C | 0.962 | 560 |
+| T10 | 0.148 | 0.712 | 0.000 | F | A | 0.907 | 488 |
+| T20 | 0.177 | 0.622 | 0.000 | F | A | 0.897 | 441 |
+| T30 | 0.168 | 0.532 | 0.000 | **T** | A | 0.961 | 415 |
+| T40 | 0.183 | 0.613 | 0.002 | F | A | 0.936 | 498 |
+| T50 | 0.199 | 0.544 | 0.000 | **T** | A | 0.934 | 474 |
+| T60 | 0.188 | 0.595 | 0.000 | **T** | A | 0.918 | 421 |
+
+Rates: no failures in any window in any seed; internal mean 7.4-10.8
+Hz, max 73-102 Hz (all below the 250 Hz gate).
+
+### Frozen classification (letter rule)
+
+Per-seed classes: 20260912 = **none**; 9001 = **none**; 424242 = **C**
+(T30 independence with non-independent neighbors T20/T40; T50 fails
+the strict rule because T60 is also independent; T60 nominal
+independence 0.595 < 0.60 is reported, is not part of the C
+signature). Not unanimous => **OUTCOME D — seed-dependent dynamics**
+(frozen rule), minority shape C. E absent (alignment flipped in all
+three seeds by T60). F absent (gates clean: hashes pinned,
+determinism verified, zero failures, engagement non-zero at every
+checkpoint).
+
+### Registered facts (no mechanism claims)
+
+1. **The C->A transfer completes within the first 10 REV
+   presentations in every seed.** Interval F1 carries 77.1% (seed
+   20260912), 87.3% (9001), 83.6% (424242) of the total A-B movement;
+   every seed's first post-T0 checkpoint already shows the final
+   alignment. The registered grid therefore bounds the transfer
+   interval at <= 10 presentations (60,000 sim-ms) — a measured upper
+   bound, not an instantaneous-transfer claim.
+2. After the flip the A-side association persists with mild drift:
+   A-B stays 0.19-0.32 in all seeds; B-C softens monotonically in
+   seed 20260912 (0.918 -> 0.721) and drifts 0.62-0.71 in 9001;
+   424242 alone passes through an intermediate coexistence region
+   (T30/T50) and ends nominally independent.
+3. Selectivity jumps at the flip (20260912: 0.590 -> 0.869) and
+   stays high — the reorganized representation is sharper, matching
+   E12's T0->T1 selectivity rise.
+4. T0 local-window anchors are consistent with the E12 whole-block
+   values for A-B (0.680 vs 0.682; 0.760 vs 0.655; 0.554 vs 0.562);
+   B-C local windows are more side-absorbed than the block means
+   (0.075/0.097/0.065 vs 0.228/0.339/0.193) — the last-10-round state
+   is the most absorbed, consistent with progressive absorption
+   through the SEQ block (direction: toward C).
+5. No new thresholds or endpoints were introduced; verdict uses only
+   the frozen 0.60 independence rule, argmin alignment, and the
+   registered Fk majority-movement rule.

@@ -241,3 +241,17 @@ tracking the current trailing order, not an irreversible or
 inert association; recovery to independence did not occur at this
 scale. Outcome C preserved as distinct, no mechanism, no claims
 beyond the tested quantities.
+
+### U9b / E13 reversal dynamics (2026-09-17, E13 result)
+
+E13 (analysis-only over E12 artifacts, instrument 431fdcc): OUTCOME
+D (seed-dependent dynamics per frozen rule; minority/coexistence
+shape C in 424242 only). Registered facts: the C->A transfer
+completes within the first 10 REV presentations in ALL seeds (F1 =
+77-87% of total movement; grid-bounded upper bound, not
+instantaneous-transfer); after the flip A-side association persists
+with mild drift; selectivity jumps at the flip; 424242 alone passes
+through mid-trajectory independence (T30, T50) — the coexistence
+signature — and ends nominally independent (T60). No mechanism
+claims; the flip's internal structure is faster than the 10-round
+grid resolution.
