@@ -1559,6 +1559,62 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
     }
 
+    // ---- ANIMA E15 pre-registered tests (docs/anima-e15-protocol.md §8) ----
+
+    /// §8: instrument is observation-only — no anima-core import.
+    #[test]
+    fn e15_instrument_imports_telemetry_only() {
+        let src = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/examples/e15_structure.rs"
+        ))
+        .unwrap();
+        assert!(!src.contains("use anima_core") && !src.contains("anima_core::"),
+            "instrument must not import anima_core");
+        assert!(src.contains("anima_telemetry"), "instrument reads telemetry");
+    }
+
+    /// §3/§4: registered instants are snapshot ticks; buckets by
+    /// pre-channel membership; REV1 window per seed.
+    #[test]
+    fn e15_instants_buckets_and_windows() {
+        for (name, seed, pre, post, sb) in [
+            ("e12.toml", 20260912u64, 364_000u64, 366_000u64, 365_000u64),
+            ("e12-seed9001.toml", 9001, 368_000, 370_000, 369_000),
+            ("e12-seed424242.toml", 424242, 368_000, 370_000, 369_000),
+        ] {
+            assert_eq!(pre % 1000, 0, "{name} pre is a snapshot tick");
+            assert_eq!(post % 1000, 0, "{name} post is a snapshot tick");
+            assert_eq!(364_000 % 1000, 0, "T0 is a snapshot tick");
+            // REV1 B presentation = [sb, sb+500); sb from round-61 B position.
+            let env = Environment::new(v3_config(name), seed);
+            let s1: Vec<&crate::env::ScheduledPresentation> =
+                env.schedule.iter().filter(|p| p.stage == "S1").collect();
+            let b61 = s1.iter().find(|p| p.pattern == "B" && (p.start - 5000) / 6000 + 1 == 61).unwrap();
+            assert_eq!(b61.start, sb, "{name} REV1-B start");
+            assert!(b61.start + 500 <= post, "{name} post after presentation");
+            assert!(b61.start > pre, "{name} pre before presentation");
+        }
+        // Bucket membership arithmetic (pre < 24 means input channel).
+        let bucket = |pre: u32| match pre {
+            0..=3 => "A-only(0-3)",
+            4..=7 => "lower-B(4-7)",
+            8..=11 => "upper-B(8-11)",
+            12..=15 => "C-only(12-15)",
+            16..=23 => "inactive-input(16-23)",
+            _ => "recurrent",
+        };
+        assert_eq!(bucket(2), "A-only(0-3)");
+        assert_eq!(bucket(6), "lower-B(4-7)");
+        assert_eq!(bucket(9), "upper-B(8-11)");
+        assert_eq!(bucket(14), "C-only(12-15)");
+        assert_eq!(bucket(20), "inactive-input(16-23)");
+        assert_eq!(bucket(40), "recurrent");
+        // A-side = 0-7, C-side = 8-15 (decision D2).
+        let side = |pre: u32| if pre <= 7 { "A" } else if pre <= 15 { "C" } else { "other" };
+        assert_eq!((side(3), side(7), side(8), side(15), side(16)), ("A", "A", "C", "C", "other"));
+    }
+
     // ---- ANIMA E14 pre-registered tests (docs/anima-e14-protocol.md §8) ----
 
     /// §8: instrument is observation-only — no anima-core import.

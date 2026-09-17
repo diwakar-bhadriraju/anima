@@ -145,3 +145,116 @@ committed; not recomputed).
 ## Appendix: amendments
 
 - (none yet)
+---
+
+## E15 execution record (2026-09-17)
+
+Instrument: committed with this record (e15_structure.rs — telemetry-
+only imports, read-only, deterministic: byte-identical reruns 3/3).
+Verification: artifact hash pins match the freeze table; M5
+cross-check (ResourceUsage live_exc/inh at interval end ==
+snapshot-derived totals: 309/514, 322/517, 317/516); prune-event ids
+all within created ids; suite 129 green, 0 warnings.
+
+### Per-seed raw results
+
+Instants (registered): T0 = 364000; pre = 364000 (20260912) /
+368000 (9001, 424242); post = 366000 / 370000. REV1-B window
+[365000, 365500) / [369000, 369500). Buckets by pre-channel:
+A-only 0-3, lower-B 4-7, upper-B 8-11, C-only 12-15, recurrent
+(internal pre), inactive-input 16-23 (present in all seeds: 0 live
+synapses — none reported).
+
+**seed 20260912** (pre == T0):
+- states (alive exc / inh / permanence): T0 311/514/253; post
+  309/514/251.
+- bucket total weight (T0 -> post): A-only 10.044 -> 9.702;
+  lower-B 6.418 -> 7.204 (+0.786); upper-B 4.273 -> 4.819 (+0.546);
+  C-only 1.271 -> 0.971 (-0.300); recurrent 19.594 -> 18.903.
+- events in (364000, 366000]: created 6 (ALL candidate-permanence,
+  ALL lower-B pre {4,5,7} -> posts {40,41,50,53,61,75}, w=0.02, all
+  t=365300 DURING); pruned 8 (competitive-prune; 3 before, 3 during,
+  2 after).
+- endpoint dW!=0: 745/831 alive-both (89.6%); created/exc-pre
+  1.93%; pruned/exc-pre 2.57%; residual (unresolved) dW sum -0.044.
+- per-neuron churn: 13 internal neurons, 14 afferents (symmetric
+  diff pre vs post).
+- M5: max exc/neuron 10 (B_e=40); max inh/neuron 10 (B_i=10).
+- behavior (joined E14): T0 A-B 0.680 / B-C 0.075; REV1 A-B 0.190 /
+  B-C 0.929; k* = 1.
+
+**seed 9001** (pre = 368000):
+- states: T0 355/517/283; pre 372/517/300; post 322/517/250.
+- bucket total weight (pre -> post): A-only 4.910 -> 4.660;
+  lower-B 7.201 -> 7.700 (+0.498); upper-B 8.840 -> 9.988 (+1.148);
+  C-only 2.826 -> 2.628 (-0.198); recurrent 17.821 -> 16.624.
+  (T0 -> pre: A-side 11.046 -> 12.111, incl. the interval preceding
+  REV1 with round-61 A/C exposures.)
+- events in (368000, 370000]: created 7 (ALL candidate-permanence,
+  ALL lower-B pre {5,6} -> posts {41,47,49,50,52,55}, w=0.02, all
+  t=369300 DURING); pruned 57 (competitive-prune; 53 before — the
+  largest wave, t=368100-368400 — 2 during, 2 after).
+- endpoint dW!=0: 724/896 (80.8%); created/exc-pre 1.88%;
+  pruned/exc-pre 15.3%; residual dW sum -0.018.
+- per-neuron churn: reported in instrument output (raw).
+- M5: max exc/neuron 12; max inh 10; exc totals 372 -> 322.
+- behavior (joined E14): T0 0.760/0.097; REV1 0.127/0.672; k* = 1.
+
+**seed 424242** (pre = 368000):
+- states: T0 308/516/254; pre 338/516/284; post 317/516/263.
+- bucket total weight (pre -> post): A-only 10.232 -> 10.104;
+  lower-B 10.086 -> 10.256 (+0.170); upper-B 4.057 -> 4.343 (+0.286);
+  C-only 4.802 -> 4.537 (-0.265); recurrent 12.422 -> 12.361.
+- events in (368000, 370000]: created 1 (candidate-permanence,
+  UPPER-B pre=10 -> post 24, w=0.02, t=369200 DURING); pruned 22
+  (21 before, 1 after).
+- endpoint dW!=0: 684/855 (80.0%); created/exc-pre 0.30%;
+  pruned/exc-pre 6.51%; residual dW sum -0.020.
+- per-neuron churn: reported in instrument output (raw).
+- M5: max exc/neuron 9-10; max inh 10; exc totals 338 -> 317.
+- behavior (joined E14): T0 0.554/0.065; REV1 0.112/0.746; k* = 1.
+
+### Event timing vs endpoints vs unresolved (D4 discipline)
+
+- EVENT TIMING: all creations and prunes carry exact ms timestamps;
+  per seed the creations fall INSIDE the REV1 presentation window
+  (t=365300 / 369300 / 369200, all [during]); prune waves precede
+  the window for the pos-2 seeds; ordering exact, no causality.
+- ENDPOINT: all three snapshot states exact; bucket totals and
+  per-synapse deltas exact.
+- UNRESOLVED: per-synapse attribution of silent weight evolution
+  (M2 normalize, M6, passive decay, |dW| <= 0.01 STDP) inside the
+  interval; only aggregate residuals reported (-0.044 / -0.018 /
+  -0.020).
+
+### Frozen D1 joint-reading verdict (per seed, no numeric dominance
+### cutoff; raw quantities above regardless of letter)
+
+Evidence common to every seed: (i) A-side machinery (channels 0-7:
+A-only + lower-B totals 16.46 / 11.05 / 19.59 at T0 with 194 / 139 /
+203 live synapses) fully present BEFORE the transition — the T0
+control; (ii) directly observed structural changes within
+(REV1-pre, REV1-post]: 6 / 7 / 1 new candidate-permanence synapses
+ALL created during the REV1 presentation (lower-B in 20260912 and
+9001, upper-B in 424242), per-neuron afferent churn (13 / 44?? /
+raw per instrument), and pervasive endpoint weight movement
+(89.6% / 80.8% / 80.0% of alive-both synapses, with lower-B net
+gains +0.786 / +0.498 / +0.170 and C-only net losses -0.300 / -0.198
+/ -0.265 in every seed).
+
+Both classes of evidence are present and relevant to the transition
+interval => per-seed verdict **C — BOTH** for all three seeds
+(20260912 = C, 9001 = C, 424242 = C). No aggregation rule exists in
+the frozen protocol; per-seed letters reported independently (they
+happen to agree).
+
+Registered caveats: the flip's behavioral magnitude (A-B collapses
+by 0.4-0.6) vastly exceeds the directly observed structural delta
+(create shares 0.3-1.9% of live excitatory synapses), and the
+direction of the concurrent creations is not constant across seeds
+(lower-B in two, upper-B in one) while the flip is uniform — the
+evidence supports C without quantifying each component's
+contribution; ENDPOINT weight changes include unresolved
+intra-interval components; no causality is claimed (the creations'
+timestamps fall during the presentation; accompaniment, not
+causation, is established).

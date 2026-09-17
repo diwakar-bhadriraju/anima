@@ -269,3 +269,17 @@ differ in the post-flip tail only — transient B-independence episodes
 seed-dependent classification reflected intermediate dynamics
 (coexistence episodes under-sampled by 10-round windows), not
 transition timing. No mechanism claims; analysis-only, zero reruns.
+
+### U9d / E15 structural basis (2026-09-17, E15 result)
+
+E15 (analysis-only over E12 artifacts): per-seed verdict C — BOTH,
+3/3. T0 control passes: A-side (channels 0-7) structure fully
+present before REV1 (bucket totals 16.46/11.05/19.59; 194/139/203
+live A-side synapses). Directly observed changes in (REV1-pre,
+REV1-post]: 6/7/1 candidate-permanence creations all DURING the
+REV1 presentation, endpoint weight movement on ~80-90% of live
+synapses with lower-B (4-7) net gains and C-only (12-15) net losses
+in every seed. Caveats: creations' direction varies (lower-B in
+20260912/9001, upper-B in 424242) while the flip is uniform; create
+shares 0.3-1.9% vs behavioral delta ~0.4-0.6; silent intra-interval
+weight components unresolved. No causality.
