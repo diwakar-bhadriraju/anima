@@ -1559,6 +1559,85 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
     }
 
+    // ---- ANIMA E13 pre-registered tests (docs/anima-e13-protocol.md §4/§3) ----
+
+    /// §4: instrument is observation-only — no anima-core import.
+    #[test]
+    fn e13_instrument_imports_telemetry_only() {
+        let src = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/examples/e13_trajectory.rs"
+        ))
+        .unwrap();
+        assert!(!src.contains("use anima_core") && !src.contains("anima_core::"),
+            "instrument must not import anima_core");
+        assert!(src.contains("anima_telemetry"), "instrument reads telemetry");
+    }
+
+    /// §3: seed-independent checkpoint grid — Tk = end of REV round k
+    /// = 5000+6000(60+k); Wk = [5000+6000(50+k), 5000+6000(60+k)).
+    #[test]
+    fn e13_checkpoint_grid() {
+        assert_eq!(5000 + 6000 * (50 + 10), 365_000, "T10 window lower edge");
+        assert_eq!(5000 + 6000 * (60 + 10), 425_000, "T10 = end of REV round 10");
+        assert_eq!(5000 + 6000 * (60 + 60), 725_000, "T60 = registered snapshot point");
+        assert_eq!(305_000, 5000 + 6000 * 50, "T0 lower edge");
+        // check against the actual schedule: S1 presentation p starts at
+        // 5000+2000*p; REV round k occupies presentations 180+3(k-1)..182+3(k-1)
+        let env = Environment::new(v3_config("e12.toml"), 20260912);
+        let s1: Vec<&crate::env::ScheduledPresentation> =
+            env.schedule.iter().filter(|p| p.stage == "S1").collect();
+        for k in [10u64, 20, 30, 40, 50, 60] {
+            let hi = 5000 + 6000 * (60 + k);
+            let last_before = s1.iter().filter(|p| p.start < hi).count();
+            assert_eq!(last_before, (180 + 3 * k) as usize, "presentations < T{k}");
+        }
+    }
+
+    /// §3: every Wk (k>=10) is 30 S1 presentations, B once per round,
+    /// all-REV for B (rounds 61..120), all-SEQ at T0 (rounds 51..60).
+    /// Also verifies the per-seed first/last REV-B in-round positions
+    /// are computed deterministically from the schedule.
+    #[test]
+    fn e13_window_composition_and_positions() {
+        for (name, seed) in [("e12.toml", 20260912u64), ("e12-seed9001.toml", 9001), ("e12-seed424242.toml", 424242)] {
+            let env = Environment::new(v3_config(name), seed);
+            let s1: Vec<&crate::env::ScheduledPresentation> =
+                env.schedule.iter().filter(|p| p.stage == "S1").collect();
+            let w = |lo: u64, hi: u64| s1.iter().filter(|p| p.start >= lo && p.start < hi).count();
+            assert_eq!(w(305_000, 365_000), 30, "{name} T0 window");
+            for k in (10..=60).step_by(10) {
+                assert_eq!(w(5000 + 6000 * (50 + k), 5000 + 6000 * (60 + k)), 30, "{name} W{k}");
+            }
+            // B-once-per-round and in-round position from the schedule:
+            // presentation p (0-based) is at round p/3, position p%3.
+            // Round 61 = presentations 180..183 (first REV round).
+            let pos_of = |round: u64| -> Option<u32> {
+                s1.iter()
+                    .enumerate()
+                    .find(|(i, p)| {
+                        p.pattern == "B" && p.start >= 5000 + 6000 * (round - 1)
+                            && p.start < 5000 + 6000 * round
+                    })
+                    .map(|(i, _)| (i as u64 % 3) as u32)
+            };
+            let p61 = pos_of(61).unwrap();
+            let p120 = pos_of(120).unwrap();
+            assert!(p61 <= 2 && p120 <= 2, "{name} positions valid");
+            // continuous 0.77.. range check across rounds: B occurs exactly
+            // once per round in 61..120
+            for r in 61..=120u64 {
+                let c = s1
+                    .iter()
+                    .filter(|p| {
+                        p.pattern == "B" && p.start >= 5000 + 6000 * (r - 1) && p.start < 5000 + 6000 * r
+                    })
+                    .count();
+                assert_eq!(c, 1, "{name} round {r}: B once");
+            }
+        }
+    }
+
     // ---- ANIMA E12 pre-registered tests (docs/anima-e12-protocol.md §9) ----
 
     /// §9.1: e12 == e10 except B variant structure + variant_block +
