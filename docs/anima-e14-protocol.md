@@ -117,3 +117,144 @@ no mechanism claims.
 ## Appendix: amendments
 
 - (none yet)
+---
+
+## E14 execution record (2026-09-17)
+
+Instrument: af3794d + two output-side fixes at HEAD (both
+definition-neutral): (1) trailing-window selectivity loop sized
+per-neuron arrays before patterns were fully collected -> index
+out-of-bounds panic after the per-REV table (fixed by two-pass
+collection); (2) A-C comparison used matched-index pairs instead of
+E13's full pairwise mean (424242 T40 0.003 -> 0.002, now
+E13-identical). Raw/L1 both printed (identical at every checkpoint,
+as in E12/E13). No measurement definition, threshold, checkpoint, or
+reference-window change.
+
+### Verification (all pass)
+
+1. Hash pins: telemetry + snapshot aggregates byte-identical to the
+   E13 freeze table for all three run dirs.
+2. Determinism: every run's instrument output byte-identical on
+   rerun (3/3).
+3. T0 anchors bit-identical to E13's record: 20260912 0.680/0.075,
+   9001 0.760/0.097, 424242 0.554/0.065 (raw == L1).
+4. Supporting columns at T10..T60 byte-identical to E13's record
+   (selectivity, permanence, failures=0, rates; A-C now exact).
+5. REV-B in-round positions match E13 (round 61: 0/2/2; round 120:
+   1/2/2).
+
+### Per-REV trajectory (reference-anchored; raw == L1 everywhere)
+
+T0 values are the E13 anchor (B rounds 51-60 vs A/C refs 51-60);
+REV k = the k-th REV-B presentation (rounds 61-120).
+
+seed 20260912 (k* = 1):
+
+| cp | A-B | B-C | align | indep |
+|---|---|---|---|---|
+| T0 | 0.680 | 0.075 | C | F |
+| REV1 | 0.190 | 0.929 | A | F |
+| REV2 | 0.265 | 0.901 | A | F |
+| REV3 | 0.166 | 0.936 | A | F |
+| REV4 | 0.216 | 0.938 | A | F |
+| REV5 | 0.205 | 0.941 | A | F |
+| REV6 | 0.177 | 0.908 | A | F |
+| REV7 | 0.196 | 0.936 | A | F |
+| REV8 | 0.243 | 0.918 | A | F |
+| REV9 | 0.287 | 0.888 | A | F |
+| REV10 | 0.230 | 0.905 | A | F |
+| REV20 | 0.223 | 0.894 | A | F |
+| REV30 | 0.208 | 0.878 | A | F |
+| REV40 | 0.360 | 0.816 | A | F |
+| REV50 | 0.279 | 0.822 | A | F |
+| REV60 | 0.270 | 0.837 | A | F |
+
+seed 9001 (k* = 1):
+
+| cp | A-B | B-C | align | indep |
+|---|---|---|---|---|
+| T0 | 0.760 | 0.097 | C | F |
+| REV1 | 0.127 | 0.672 | A | F |
+| REV2 | 0.239 | 0.625 | A | F |
+| REV3 | 0.125 | 0.663 | A | F |
+| REV4 | 0.189 | 0.628 | A | F |
+| REV5 | 0.174 | 0.634 | A | F |
+| REV6 | 0.249 | 0.619 | A | F |
+| REV7 | 0.213 | 0.642 | A | F |
+| REV8 | 0.199 | 0.642 | A | F |
+| REV9 | 0.178 | 0.632 | A | F |
+| REV10 | 0.317 | 0.495 | A | **T** |
+| REV20 | 0.169 | 0.600 | A | **T** |
+| REV30 | 0.123 | 0.676 | A | F |
+| REV40 | 0.237 | 0.614 | A | F |
+| REV50 | 0.199 | 0.600 | A | F |
+| REV60 | 0.158 | 0.610 | A | F |
+
+seed 424242 (k* = 1):
+
+| cp | A-B | B-C | align | indep |
+|---|---|---|---|---|
+| T0 | 0.554 | 0.065 | C | F |
+| REV1 | 0.112 | 0.746 | A | F |
+| REV2 | 0.113 | 0.790 | A | F |
+| REV3 | 0.146 | 0.801 | A | F |
+| REV4 | 0.146 | 0.750 | A | F |
+| REV5 | 0.146 | 0.749 | A | F |
+| REV6 | 0.097 | 0.775 | A | F |
+| REV7 | 0.136 | 0.763 | A | F |
+| REV8 | 0.156 | 0.766 | A | F |
+| REV9 | 0.114 | 0.771 | A | F |
+| REV10 | 0.130 | 0.700 | A | F |
+| REV20 | 0.183 | 0.529 | A | **T** |
+| REV30 | 0.204 | 0.604 | A | F |
+| REV40 | 0.246 | 0.484 | A | **T** |
+| REV50 | 0.153 | 0.608 | A | F |
+| REV60 | 0.225 | 0.516 | A | **T** |
+
+Supporting columns (trailing-window; permanence = candidate-
+permanence events; rates = internal mean/max): selectivity jumps at
+the first full REV window and stays high (20260912: 0.527 -> 0.869;
+9001: 0.685 -> 0.836; 424242: 0.933 -> 0.907 at REV10; E13-identical
+at T10..T60). Permanence monotone through the early REV windows
+(716..1256) then settles 415-640/10-rounds — structural engagement
+active at every checkpoint. Failures 0 everywhere; rates 7.4-10.8
+mean / 73-102 max Hz (inside the 250 Hz gate). A-C <= 0.002 at all
+T10..T60.
+
+### D2 result (frozen rule)
+
+k* = 1 for ALL THREE seeds (first REV presentation is already
+A-aligned, and alignment stays A through REV10 and through REV60 in
+every seed; first unsustained flip = REV1 == k*, i.e. the flip never
+wobbles back at this resolution). Registered transition interval per
+seed: **(T0, REV1]** — the entire C->A re-anchoring completes within
+the first REV presentation (presentation-level bound; no in-
+presentation claim).
+
+### E13 comparison and frozen interpretation
+
+E13's coarse bound (<= 10 REV presentations, F1-majority) is
+resolved: the transfer is complete at the FIRST REV presentation in
+all seeds (A-B collapses 0.680/0.760/0.554 -> 0.190/0.127/0.112; B-C
+rises to 0.929/0.672/0.746 — already past the crossing).
+
+E13's D (seed-dependent dynamics) re-examined with the raw per-REV
+facts (frozen protocol section 6): k* is identical across seeds =>
+E13's seed dependence does NOT reflect transition timing. The per-REV
+shapes disagree only in the post-flip tail: transient B-independence
+episodes in 9001 (REV10, REV20) and 424242 (REV20, REV40, REV60),
+absent in 20260912. E13's minority-C signature (424242) is confirmed
+and extended at presentation resolution (recurring coexistence
+episodes; 9001 shows the same feature weakly). Reading recorded:
+**E13's seed-dependent classification reflects different
+intermediate (post-flip) representation dynamics — transient
+coexistence episodes — not transition timing, and not merely coarse
+sampling of the flip** (the flip itself was fully captured at the
+first E13 post-T0 checkpoint; what the coarse grid under-sampled was
+the episodic independence windows, which E13's 10-round windows saw
+once in 424242 and never in 9001).
+
+Final E14 verdict (frozen machinery only, no new category):
+transition bound **(T0, REV1], uniform 3/3 seeds**; E13's D resolved
+to intermediate-dynamics origin with timing excluded.

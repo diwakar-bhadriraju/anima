@@ -120,8 +120,8 @@ fn main() {
         }
     }
     assert_eq!(b_t0.len(), 10, "T0 B window");
-    let (ab0, bc0) = ab_bc(b_t0.iter().map(|p| vec_of(p)).collect(), &a_ref_v, &c_ref_v);
-    println!("T0 (B rounds 51-60): A-B {ab0:.3}, B-C {bc0:.3}");
+    let (ra0, rb0, ab0, bc0) = ab_bc(b_t0.iter().map(|p| vec_of(p)).collect(), &a_ref_v, &c_ref_v);
+    println!("T0 (B rounds 51-60): A-B raw {ra0:.3} L1 {ab0:.3}, B-C raw {rb0:.3} L1 {bc0:.3}");
 
     // Per-REV trajectory: REV k = B of global round 60+k.
     let mut b_rev: Vec<(&(String, String, u64, u64), u64)> = vec![];
@@ -135,11 +135,11 @@ fn main() {
     println!("round-61 B position: {}", pos_of(&b_rev[0].0));
     println!("round-120 B position: {}", pos_of(&b_rev[59].0));
 
-    let mut rows: Vec<(u64, f64, f64, u64)> = vec![];
+    let mut rows: Vec<(u64, f64, f64, f64, f64, u64)> = vec![];
     for (p, k) in &b_rev {
         let v = vec_of(p);
-        let (_ab, _bc) = ab_bc(vec![v.clone()], &a_ref_v, &c_ref_v);
-        rows.push((*k, _ab, _bc, v.values().sum::<f64>() as u64));
+        let (ra, rb, la, lb) = ab_bc(vec![v.clone()], &a_ref_v, &c_ref_v);
+        rows.push((*k, ra, rb, la, lb, v.values().sum::<f64>() as u64));
     }
 
     // Earliest-movement point: k* = first k with alignment A sustained
@@ -147,16 +147,16 @@ fn main() {
     let mut k_star: Option<u64> = None;
     let mut first_flip: Option<u64> = None;
     for i in 0..rows.len() {
-        let (k, ab, bc, _) = rows[i];
-        if ab < bc {
+        let (k, _, _, la, lb, _) = rows[i];
+        if la < lb {
             if first_flip.is_none() {
                 first_flip = Some(k);
             }
             let sustained = rows
                 .iter()
                 .skip(i)
-                .take_while(|(kk, _, _, _)| *kk <= 10)
-                .all(|(_, a, b, _)| a < b);
+                .take_while(|(kk, _, _, _, _, _)| *kk <= 10)
+                .all(|(_, _, _, a, b, _)| a < b);
             if sustained && k_star.is_none() {
                 k_star = Some(k);
             }
@@ -177,11 +177,11 @@ fn main() {
     // Checkpoint table: T0, REV1..REV10, REV20..60 (trailing window
     // columns: selectivity, permanence, failures, rates).
     println!("===== per-REV trajectory (ab_k, bc_k, spikes) =====");
-    for (k, ab, bc, nsp) in &rows {
+    for (k, ra, rb, la, lb, nsp) in &rows {
         if *k <= 10 || *k % 10 == 0 {
-            println!("REV{k}: A-B {ab:.3}, B-C {bc:.3}, alignment {}, indep {}, spikes {nsp}",
-                if *ab < *bc { "A" } else { "C" },
-                if *ab < 0.60 && *bc < 0.60 { "true" } else { "false" });
+            println!("REV{k}: A-B raw {ra:.3} L1 {la:.3}, B-C raw {rb:.3} L1 {lb:.3}, alignment {}, indep {}, spikes {nsp}",
+                if *la < *lb { "A" } else { "C" },
+                if *la < 0.60 && *lb < 0.60 { "true" } else { "false" });
         }
     }
 
@@ -193,16 +193,18 @@ fn main() {
             .filter(|p| p.2 >= lo && p.2 < hi)
             .copied()
             .collect();
-        let mut per_neuron: BTreeMap<u32, Vec<f64>> = BTreeMap::new();
         let mut pats: Vec<&str> = vec![];
         for p in &win {
             if !pats.contains(&p.0.as_str()) {
                 pats.push(p.0.as_str());
             }
+        }
+        let mut per_neuron: BTreeMap<u32, Vec<f64>> = BTreeMap::new();
+        for p in &win {
             let v = vec_of(p);
+            let pi = pats.iter().position(|x| *x == p.0.as_str()).unwrap();
             for (n, &c) in &v {
                 let e = per_neuron.entry(*n).or_insert_with(|| vec![0.0; pats.len()]);
-                let pi = pats.iter().position(|x| *x == p.0.as_str()).unwrap();
                 e[pi] += c;
             }
         }
@@ -243,11 +245,9 @@ fn main() {
         let (lo, hi) = (BASE + 6000 * (50 + k), BASE + 6000 * (60 + k));
         let win: Vec<&(String, String, u64, u64)> = s1.iter().filter(|p| p.2 >= lo && p.2 < hi).copied().collect();
         let mut ac = Vec::new();
-        for (i, pa) in win.iter().filter(|p| p.0 == "A").enumerate() {
-            for (j, pc) in win.iter().filter(|p| p.0 == "C").enumerate() {
-                if i == j {
-                    ac.push(cos(&vec_of(pa), &vec_of(pc), true));
-                }
+        for pa in win.iter().filter(|p| p.0 == "A") {
+            for pc in win.iter().filter(|p| p.0 == "C") {
+                ac.push(cos(&vec_of(pa), &vec_of(pc), true));
             }
         }
         let m = ac.iter().sum::<f64>() / ac.len().max(1) as f64;
@@ -259,19 +259,23 @@ fn ab_bc(
     b_vecs: Vec<BTreeMap<u32, f64>>,
     a_ref: &[BTreeMap<u32, f64>],
     c_ref: &[BTreeMap<u32, f64>],
-) -> (f64, f64) {
+) -> (f64, f64, f64, f64) {
+    let mut raw_ab = Vec::new();
+    let mut raw_bc = Vec::new();
     let mut ab = Vec::new();
     let mut bc = Vec::new();
     for vb in &b_vecs {
         for va in a_ref {
+            raw_ab.push(cos(vb, va, false));
             ab.push(cos(vb, va, true));
         }
         for vc in c_ref {
+            raw_bc.push(cos(vb, vc, false));
             bc.push(cos(vb, vc, true));
         }
     }
     let m = |c: &[f64]| c.iter().sum::<f64>() / c.len().max(1) as f64;
-    (m(&ab), m(&bc))
+    (m(&raw_ab), m(&raw_bc), m(&ab), m(&bc))
 }
 
 fn cos(a: &BTreeMap<u32, f64>, b: &BTreeMap<u32, f64>, norm_l1: bool) -> f64 {

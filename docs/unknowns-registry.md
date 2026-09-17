@@ -255,3 +255,17 @@ through mid-trajectory independence (T30, T50) — the coexistence
 signature — and ends nominally independent (T60). No mechanism
 claims; the flip's internal structure is faster than the 10-round
 grid resolution.
+
+### U9c / E14 transition resolution (2026-09-17, E14 result)
+
+E14 (analysis-only, per-REV reference-anchored estimator, commit =
+execution record): k* = 1 in ALL three seeds — the C->A re-anchoring
+completes within the FIRST REV presentation in every seed
+(A-B 0.680/0.760/0.554 -> 0.190/0.127/0.112 at REV1), alignment stays
+A through REV60. Registered bound (T0, REV1]; no in-presentation
+claim. E13's D resolved: k* uniform => not timing; per-REV shapes
+differ in the post-flip tail only — transient B-independence episodes
+(424242 REV20/40/60, 9001 REV10/20, none in 20260912) - E13's
+seed-dependent classification reflected intermediate dynamics
+(coexistence episodes under-sampled by 10-round windows), not
+transition timing. No mechanism claims; analysis-only, zero reruns.
