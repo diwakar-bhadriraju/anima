@@ -1559,6 +1559,66 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
     }
 
+    // ---- ANIMA E14 pre-registered tests (docs/anima-e14-protocol.md §8) ----
+
+    /// §8: instrument is observation-only — no anima-core import.
+    #[test]
+    fn e14_instrument_imports_telemetry_only() {
+        let src = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/examples/e14_resolution.rs"
+        ))
+        .unwrap();
+        assert!(!src.contains("use anima_core") && !src.contains("anima_core::"),
+            "instrument must not import anima_core");
+        assert!(src.contains("anima_telemetry"), "instrument reads telemetry");
+    }
+
+    /// §4/§3: REV k = S1 B of global round 60+k (one per round);
+    /// reference window = rounds 51-60 = exactly 10 A + 10 C
+    /// presentations (E13 T0 window); A/C refs excluded from the
+    /// REV rounds; T0 window = 10 B presentations.
+    #[test]
+    fn e14_grid_and_reference_windows() {
+        for (name, seed) in [("e12.toml", 20260912u64), ("e12-seed9001.toml", 9001), ("e12-seed424242.toml", 424242)] {
+            let env = Environment::new(v3_config(name), seed);
+            let s1: Vec<&crate::env::ScheduledPresentation> =
+                env.schedule.iter().filter(|p| p.stage == "S1").collect();
+            // Reference window: rounds 51-60 — 10 A and 10 C.
+            let (mut na, mut nc, mut nb) = (0usize, 0usize, 0usize);
+            for p in &s1 {
+                let r = (p.start - 5000) / 6000 + 1;
+                if (51..=60).contains(&r) {
+                    match p.pattern.as_str() {
+                        "A" => na += 1,
+                        "B" => nb += 1,
+                        "C" => nc += 1,
+                        _ => {}
+                    }
+                }
+            }
+            assert_eq!((na, nb, nc), (10, 10, 10), "{name} reference window composition");
+            // REV k: exactly one B per round 61..120, k = round - 60.
+            let mut count = 0usize;
+            for p in &s1 {
+                let r = (p.start - 5000) / 6000 + 1;
+                if (61..=120).contains(&r) && p.pattern == "B" {
+                    assert_eq!(r - 60, (count + 1) as u64, "{name} REV k order");
+                    let round_start = 5000 + 6000 * ((p.start - 5000) / 6000);
+                    let pos = (p.start - round_start) / 2000;
+                    assert!(pos < 3 && p.start == round_start + 2000 * pos,
+                        "{name} grid consistency");
+                    assert!(round_start >= 5000 + 6000 * 60, "{name} REV rounds start >= 365000");
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 60, "{name} 60 REV presentations");
+            // Reference rounds (51-60) and REV rounds (61-120) are
+            // disjoint by construction; the REV B presentations are the
+            // sole B of each REV round (checked above).
+        }
+    }
+
     // ---- ANIMA E13 pre-registered tests (docs/anima-e13-protocol.md §4/§3) ----
 
     /// §4: instrument is observation-only — no anima-core import.
