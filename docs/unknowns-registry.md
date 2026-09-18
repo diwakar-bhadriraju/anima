@@ -283,3 +283,17 @@ in every seed. Caveats: creations' direction varies (lower-B in
 20260912/9001, upper-B in 424242) while the flip is uniform; create
 shares 0.3-1.9% vs behavioral delta ~0.4-0.6; silent intra-interval
 weight components unresolved. No causality.
+
+### U9e / E16 causal necessity (2026-09-18, E16 result)
+
+E16 3-arm x 3-seed (canonical / M2-off / STDP-off): k* = 1 in all
+9 runs — NEITHER M2 NOR STDP is individually necessary for the REV1
+re-anchoring at the tested scale/seeds. STDP-off reproduces the
+canonical regime near-verbatim (flip with zero Hebbian updates =>
+re-expression of pre-existing weights under reversed input
+statistics). M2-off also flips but never develops the canonical
+T0 separation (A-B ~0.99, selectivity 0.48-0.51, permanence starved)
+- M2 required for the separated regime, not for the reversal. No
+sufficiency/joint/interaction claims; remaining operative set
+unidentified (M3/M6/activity-statistics); no mechanism identity
+beyond non-necessity.

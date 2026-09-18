@@ -112,3 +112,85 @@ No repair by tuning; no parameter sweeps; no E17 proposal.
   (Note: initial generation reused the base exp_id across arms of a
   seed — run-dir collision; corrected with per-arm exp_ids and
   re-recorded before any arm ran.)
+---
+
+## E16 execution record (2026-09-18)
+
+Implementation `f133ab1` (arm configs + isolation tests); cross-seed
+configs `19d44be` (+ correction for per-arm exp_ids, hashes
+re-recorded pre-run). 132 tests green at execution, 0 warnings.
+
+### Canonical reproduction gate — PASSED (all three seeds)
+
+Snapshot frame hash of the canonical rerun == committed E12 run
+(`005acea9a7f671a4`, 20260912); telemetry differs ONLY in the
+registered exp_id provenance (per-chunk meta + RunStarted; per-file
+sizes identical, diff clusters = the `e12`->`e16` character).
+Endpoints identical to the committed E14 record for every canonical
+arm (20260912 REV1 0.190/0.929 ... 0.230/0.905; 9001 0.127/0.672;
+424242 0.112/0.746; k* = 1 all).
+
+### Per-arm endpoint matrix (E14 frozen machinery; k*: sustained
+### A-alignment; all arms k* = 1, bound (T0, REV1])
+
+| seed | arm | T0 A-B / B-C | REV1 A-B / B-C | REV60 A-B / B-C | R10 sel / perm / rates | failures |
+|---|---|---|---|---|---|---|
+| 20260912 | canon | 0.680 / 0.075 | 0.190 / 0.929 | 0.270 / 0.837 | 0.869 / 585 / 9.3-77.1 | 0 |
+| 20260912 | m2off | 0.992 / 0.766 | 0.741 / 0.992 | 0.779 / 0.942 | 0.476 / 94 / 30.9-163.2 | 0 |
+| 20260912 | stdpoff | 0.638 / 0.199 | 0.162 / 0.686 | 0.171 / 0.651 | 0.875 / 530 / 3.9-31.1 | 0 |
+| 9001 | canon | 0.760 / 0.097 | 0.127 / 0.672 | 0.158 / 0.610 | 0.836 / 601 / 9.6-94.2 | 0 |
+| 9001 | m2off | 0.989 / 0.766 | 0.740 / 0.987 | 0.868 / 0.884 | 0.507 / 93 / 27.8-162.7 | 0 |
+| 9001 | stdpoff | 0.671 / 0.231 | 0.179 / 0.801 | 0.182 / 0.725 | 0.724 / 572 / 4.0-32.5 | 0 |
+| 424242 | canon | 0.554 / 0.065 | 0.112 / 0.746 | 0.225 / 0.516 | 0.907 / 488 / 8.7-81.8 | 0 |
+| 424242 | m2off | 0.991 / 0.781 | 0.798 / 0.982 | 0.842 / 0.932 | 0.487 / 115 / 30.5-154.1 | 0 |
+| 424242 | stdpoff | 0.744 / 0.228 | 0.215 / 0.772 | 0.190 / 0.694 | 0.603 / 544 / 3.8-28.5 | 0 |
+
+Gates: 0 failures everywhere; rate maxima 28.5-163.2 Hz (in the
+frozen [20,250] band); engagement (candidate-permanence per 10-round
+window) nonzero in every arm (93-601). Analysis deterministic
+(byte-identical reruns).
+
+### Decision logic (frozen section 7) — per mechanism, per seed
+
+k* = 1 in EVERY arm of EVERY seed: canonical flips AND both
+ablation arms flip => **neither M2 nor STDP is individually
+necessary for the REV1 re-anchoring at the tested scale/seeds
+(9/9 runs)**.
+
+Mechanistic observations (registered, no causal claims):
+- STDP-off reproduces the canonical regime almost verbatim: T0
+  side-absorption present (weaker: 0.638/0.199, 0.671/0.231,
+  0.744/0.228), REV1 A-absorption near-canonical, selectivity and
+  permanence healthy (0.60-0.88; 469-921/window), activity low
+  (3.6-4.0 mean / 28-32 max Hz) but engaged. The flip therefore does
+  NOT require Hebbian weight updates: with STDP zeroed the only
+  weight-moving processes are M3 maturations, M2 re-pinning, M6,
+  and passive decay — the A-side readout re-expresses pre-existing
+  weights under the reversed input statistics.
+- M2-off does NOT prevent the alignment reversal, but it destroys
+  the canonical SEPARATION regime: T0 A-B ~0.99 / B-C ~0.77-0.78 in
+  all seeds (B near-identical to both sides — the canonical
+  C-absorbed state never develops), selectivity drops (0.48-0.51),
+  permanence starves (93-170/window vs 488-601), rates rise
+  (28-31/154-163 Hz). The "flip" in this arm is a C->A reversal of a
+  degenerate representation (REV60 A-B 0.78-0.87 — still entangled).
+  M2 is not necessary for the reversal but is demonstrably required
+  for the canonical separated regime (consistent with the v2-M2
+  collapse knowledge, now at E12 scale).
+- Common to all arms: A-C separated throughout; B-independence never
+  achieved at REV1 in any arm (frozen 0.60 rule).
+
+### Stop-condition check
+
+No implementation change outside the registered ablations (isolation
+tests green); telemetry/determinism clean; P2 clean; ablation
+isolation proven by config-diff tests and the deterministic initial
+conditions. No tuning, no thresholds, no new mechanisms.
+
+Interpretation boundaries: this establishes NON-NECESSITY (of M2 and
+STDP individually) at the tested scale/seeds — not sufficiency, not
+joint structure, not interaction, not universal claims. The
+flip's survival under both ablations leaves the remaining machinery
+(M3 maturations + M6 + M2-invariant-free dynamics + activity
+statistics on existing weights) as the operative set; no mechanism
+identity is claimed beyond non-necessity.
