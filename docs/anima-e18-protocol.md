@@ -174,3 +174,30 @@ execution require a separate release.
 ## Appendix: amendments
 
 - (none yet)
+---
+
+## PRE-EXECUTION AMENDMENT A-1 (user-approved, 2026-09-18)
+
+- ORIGINAL CONSTRAINT (protocol sections 3-4): "Trial cadence:
+  2000 ms throughout"; trial template ITI = 2000 - 500 - G - 500.
+- CONFLICT: G1 = 1600 ms forces ITI = -600 ms with a 2000 ms
+  cadence; the approved G1 and the cadence constraint cannot both
+  hold.
+- SELECTED AMENDMENT: G1 stays 1600 ms. S1/S2 trials remain exactly
+  2000 ms (antecedent 500 + gap 800 + probe 500 + ITI 200). S3
+  trials are 2600 ms (antecedent 500 + gap 1600 + probe 500 + ITI
+  0). No other protocol variable changes.
+- RATIONALE: G1 = 1600 ms is the essential persistence manipulation
+  (reducing it would change the approved question); the cadence
+  constraint exists to prevent trial-type timing cues WITHIN blocks,
+  which still holds (all trial types share one template per block).
+- TIMING (exact): S1/S2 trial k: antecedent at T_k, probe B at
+  T_k + 1300, next trial at T_k + 2000, T_0 = 5000, T_k = 5000 +
+  2000k. S3 trial k (k = 161..200): antecedent at T_k, probe B at
+  T_k + 2100, next trial at T_k + 2600, T_161 = 5000 + 320000.
+  Timeline: 5000 + 120*2000 + 40*2000 + 40*2600 = 429,000 ms.
+- RECORDED (not a protocol-variable change): B's registered
+  variant_block is set to 100000 so all 200 probe presentations are
+  the SEQ variant (byte-identical probe content after A and after
+  C); the protocol's approved decision 6 authorizes variant_blocks
+  divergence as registered.
