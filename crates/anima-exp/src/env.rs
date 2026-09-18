@@ -270,6 +270,20 @@ impl Environment {
             if t >= sch.start + sch.duration_ms {
                 self.cursor += 1;
                 self.current = None;
+                // Contiguous boundary (ITI = 0): the next presentation
+                // starts at this same tick — emit its marker now, else the
+                // start tick is consumed by the advance and the marker is
+                // lost (observed in E18 S3 antecedents).
+                if let Some(nxt) = self.schedule.get(self.cursor) {
+                    if t == nxt.start {
+                        presented = Some((
+                            nxt.stage.clone(),
+                            nxt.pattern.clone(),
+                            nxt.duration_ms,
+                        ));
+                        self.current = Some(nxt.clone());
+                    }
+                }
             }
         }
         // Spikes this tick: from the active train window.
@@ -1790,6 +1804,33 @@ fn e6_configs_freeze_source_with_e6_only() {
                 }
             }
         }
+    }
+
+    /// Marker completeness at contiguous boundaries (E18 S3 ITI=0).
+    #[test]
+    fn e18_contiguous_boundary_markers() {
+        let mut cfg = v3_config("e18.toml");
+        let env = Environment::new(cfg.clone(), 20260912);
+        // Walk all boundaries; every presentation start tick must yield a
+        // presented marker (including contiguous S3 transitions).
+        let expect: Vec<u64> = env.schedule.iter().map(|p| p.start).collect();
+        let mut got: Vec<u64> = Vec::new();
+        let mut e = Environment::new(cfg.clone(), 20260912);
+        loop {
+            let pre = e.tick;
+            let (_, presented) = e.step();
+            if let Some((_, _, _)) = presented {
+                got.push(pre);
+            }
+            if e.tick >= env.duration() {
+                break;
+            }
+        }
+        assert_eq!(got, expect, "every scheduled start emits a marker (env ticks)");
+        // sanity: S3 trail has 40 antecedent + 40 probe markers.
+        let n_s3_ante = got.iter().zip(env.schedule.iter())
+            .filter(|(_, p)| p.stage == "S3" && p.pattern != "B").count();
+        assert_eq!(n_s3_ante, 40, "S3 antecedents marked");
     }
 
     // ---- ANIMA E18 instrument import check (protocol §10) ----

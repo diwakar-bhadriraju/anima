@@ -80,6 +80,10 @@ fn main() {
 
     // Trial grid: trial k in S1/S2: antecedent at 5000+2000k, probe at
     // +1300; S3: probe at T_k + 2100 (amendment A-1).
+    // Registered delivery-tick convention: telemetry timestamps sit at
+    // env-scheduled + 1 (harness emits/delivers on the tick after the
+    // env boundary). All windows use [scheduled + 1, scheduled + 501).
+    let off: u64 = 1;
     let vec_of = |lo: u64, hi: u64| -> BTreeMap<u32, f64> {
         let mut v: BTreeMap<u32, f64> = BTreeMap::new();
         for &(t, n) in &spikes {
@@ -96,7 +100,8 @@ fn main() {
         let probe = base + 500 + gap;
         let ant = stims
             .iter()
-            .find(|(p, _, t)| *t == base && (p == "A" || p == "C"))
+            .find(|(p, _, t)| *t == base + off && (p == "A" || p == "C"))
+            .or_else(|| stims.iter().find(|(p, _, t)| *t == base && (p == "A" || p == "C")))
             .map(|(p, _, _)| p == "A");
         (ant, base, probe)
     };
@@ -128,22 +133,23 @@ fn main() {
 
     // Probe vectors + pairwise divergence per window.
     for (label, lo, hi) in WINDOWS {
+        let ep_lo = |k: u64| 5000 + 2000 * k + off;
+        let gap = if lo >= 160 { 1600 } else { 800 };
         let a_vecs: Vec<BTreeMap<u32, f64>> = (lo..hi)
             .filter(|&k| seq[k as usize] == 0)
-            .map(|k| vec_of(5000 + 2000 * k, 5000 + 2000 * k + 500))
+            .map(|k| vec_of(ep_lo(k), ep_lo(k) + 500))
             .collect();
         let c_vecs: Vec<BTreeMap<u32, f64>> = (lo..hi)
             .filter(|&k| seq[k as usize] == 1)
-            .map(|k| vec_of(5000 + 2000 * k, 5000 + 2000 * k + 500))
+            .map(|k| vec_of(ep_lo(k), ep_lo(k) + 500))
             .collect();
-        let gap = if lo >= 160 { 1600 } else { 800 };
         let b_a: Vec<BTreeMap<u32, f64>> = (lo..hi)
             .filter(|&k| seq[k as usize] == 0)
-            .map(|k| vec_of(5000 + 2000 * k + 500 + gap, 5000 + 2000 * k + 500 + gap + 500))
+            .map(|k| vec_of(ep_lo(k) + 500 + gap, ep_lo(k) + 500 + gap + 500))
             .collect();
         let b_c: Vec<BTreeMap<u32, f64>> = (lo..hi)
             .filter(|&k| seq[k as usize] == 1)
-            .map(|k| vec_of(5000 + 2000 * k + 500 + gap, 5000 + 2000 * k + 500 + gap + 500))
+            .map(|k| vec_of(ep_lo(k) + 500 + gap, ep_lo(k) + 500 + gap + 500))
             .collect();
         let n = |v: &[BTreeMap<u32, f64>]| v.iter().map(|m| m.values().sum::<f64>() as u64).sum::<u64>() / v.len().max(1) as u64;
         let (ab, abl1) = pair_mean(&b_a, &a_vecs);
@@ -158,11 +164,11 @@ fn main() {
     // A-C sanity in S2 (pair defined below at module level).
     let ac_vals = (120..160u64)
         .filter(|&k| seq[k as usize] == 0)
-        .map(|k| vec_of(5000 + 2000 * k, 5000 + 2000 * k + 500))
+        .map(|k| vec_of(5000 + 2000 * k + off, 5000 + 2000 * k + off + 500))
         .collect::<Vec<_>>();
     let cc_vals = (120..160u64)
         .filter(|&k| seq[k as usize] == 1)
-        .map(|k| vec_of(5000 + 2000 * k, 5000 + 2000 * k + 500))
+        .map(|k| vec_of(5000 + 2000 * k + off, 5000 + 2000 * k + off + 500))
         .collect::<Vec<_>>();
     let (ac, _acl1) = pair_mean(&ac_vals, &cc_vals);
     println!("A-C sanity (S2): mean cos = {:.4} (criterion < 0.60)", ac);
