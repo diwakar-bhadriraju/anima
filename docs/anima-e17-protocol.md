@@ -110,3 +110,93 @@ mechanism identity, universal claims, interaction.
 ## Appendix: amendments
 
 - (none yet)
+---
+
+## E17 execution record (2026-09-18)
+
+Implementation `10faf45` (config e17-m3m4off.toml, hash
+`6000aa7c04ba805f` recorded pre-run; isolation test). Run
+`runs/e17-m3m4off-20260918T135900Z` (seed 20260912). 133 tests
+green at execution, 0 warnings.
+
+### Ablation isolation check — ALL PASS
+
+- STDP kind 8/9 events in interval: 0 (strengthened=0, weakened=0).
+- M3 maturations: 0 (kind 6 candidate-permanence, whole run: 0
+  permanence alive at any snapshot; permanence column 0).
+- M4 competitive-prunes in interval: 0 (0 churn: symmetric-diff 0
+  neurons / 0 synapses pre vs post).
+- M5 budget-evictions: 0.
+- M2 active: per-neuron exc sum invariant mean|sum-0.8| <= 4e-6 at
+  all measured instants (52 neurons).
+- M6 active: 431/514 inhibitory synapses endpoint-changed, net dW
+  -1.389.
+- E6/M5/adaptation semantics unchanged (config isolation test).
+- Config diff vs control (e16-stdpoff) = exp_id + disable_m3_m4
+  only (suite test e17_arm_isolated_topology_ablation).
+
+### Primary endpoint (frozen E14 machinery)
+
+| cp | A-B | B-C | align | indep | sel | perm | rates |
+|---|---|---|---|---|---|---|---|
+| T0 | 0.628 | 0.207 | C | F | — | 0 | — |
+| REV1 | 0.167 | 0.689 | A | F | 0.779 | 0 | 3.6/28.3 |
+| REV2 | 0.152 | 0.664 | A | F | 0.673 | 0 | 3.6/28.3 |
+| REV3 | 0.173 | 0.628 | A | F | 0.645 | 0 | 3.6/30.8 |
+| REV4 | 0.194 | 0.646 | A | F | 0.638 | 0 | 3.7/30.8 |
+| REV5 | 0.170 | 0.683 | A | F | 0.632 | 0 | 3.7/30.8 |
+| REV6 | 0.145 | 0.633 | A | F | 0.623 | 0 | 3.7/30.8 |
+| REV7 | 0.184 | 0.666 | A | F | 0.610 | 0 | 3.7/30.8 |
+| REV8 | 0.216 | 0.615 | A | F | 0.625 | 0 | 3.7/30.8 |
+| REV9 | 0.177 | 0.668 | A | F | 0.603 | 0 | 3.8/30.8 |
+| REV10 | 0.168 | 0.670 | A | F | 0.859 | 0 | 3.9/30.8 |
+| REV20 | 0.138 | 0.649 | A | F | 0.882 | 0 | 4.0/31.2 |
+| REV30 | 0.182 | 0.665 | A | F | 0.889 | 0 | 3.9/32.8 |
+| REV40 | 0.168 | 0.643 | A | F | 0.889 | 0 | 3.9/31.9 |
+| REV50 | 0.195 | 0.582 | A | T | 0.890 | 0 | 3.8/33.0 |
+| REV60 | 0.177 | 0.651 | A | F | 0.920 | 0 | 4.0/34.4 |
+
+First A-alignment REV1; sustained k* = 1 through REV10 and through
+REV60; A-B/B-C raw == L1; A-C separated throughout; failures 0;
+rates 3.6-4.0 mean / 28.3-34.4 max Hz (in band); engagement by the
+registered arm semantics (live viability: 1,108 live exc / 514 inh
+at all instants, no collapse, selectivity rising to 0.920).
+
+### Frozen decision outcome
+
+The test arm ACHIEVES the frozen REV1 re-anchoring criterion
+(k* = 1, trajectory near-identical to the committed STDP-off
+control: control T0 0.638/0.199 -> REV1 0.162/0.686 -> REV60
+0.171/0.651; arm T0 0.628/0.207 -> REV1 0.167/0.689 -> REV60
+0.177/0.651).
+
+=> **M3/M4 topology dynamics are NOT NECESSARY for the STDP-free
+REV1 flip at this tested scale/seed (20260912).**
+
+Permitted interpretation (per approval): the flip survives removal
+of both Hebbian STDP and excitatory topology dynamics; pre-existing
+afferent structure plus the remaining active non-topological
+processes (M2 re-pinning, M6, passive decay, adaptation, network
+dynamics; E6 beta active but M3-absent) constitute the operative
+system. NOT claimed: passive re-expression alone is sufficient.
+
+### Secondary observations (descriptive; no causal inference)
+
+- Bucket pools at T0 (arm): A-side 14.12 (A-only 8.033 + lower-B
+  6.091), C-side 14.35 (7.138 + 7.214), inactive 13.124, recurrent
+  n=491 w=0.000 (initial recurrent wiring persists at the weight
+  floor — with no LTP and no M3/M4 the prunes that collapsed
+  recurrence in the control never occur; control had n=1).
+- Endpoint movement: 38% of alive-both synapses (vs 89% control) —
+  only decay + M2 re-pin + M6 move weights; per-bucket |dW| <= 0.03.
+- M6: net -1.389 (inhibitory, activity-mediated).
+- Activity: 471 internal spikes in the REV1 window (q1 250, q2 196,
+  q3 25, q4 0) — phase-reversal-driven, matches control profile.
+- The flip occurs with ZERO topology events, ZERO STDP events, and
+  ~0.03 total bucket weight drift.
+
+### Stop condition
+
+Cross-seed gate: STOP after the 20260912 arm. Requesting approval
+before extension to 9001/424242 (isolation passed, gates passed,
+outcome interpretable).

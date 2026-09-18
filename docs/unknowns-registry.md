@@ -297,3 +297,16 @@ T0 separation (A-B ~0.99, selectivity 0.48-0.51, permanence starved)
 sufficiency/joint/interaction claims; remaining operative set
 unidentified (M3/M6/activity-statistics); no mechanism identity
 beyond non-necessity.
+
+### U9f / E17 STDP-free topology necessity (2026-09-18, E17 result)
+
+E17 single arm (STDP-off + M3M4-off, seed 20260912): M3/M4 topology
+dynamics NOT NECESSARY for the STDP-free REV1 flip (k*=1; trajectory
+near-identical to the stdpoff control). Isolation proven (0 STDP /
+0 M3 / 0 M4 / 0 M5 events; M2 invariant active; M6 active -1.389
+net; config diff = flag + exp_id only). Arm keeps the initial
+recurrent wiring alive at the weight floor (491 synapses at w=0, vs
+control collapsed to 1) and shows the flip with zero topology and
+~0.03 total bucket drift; selectivity rises higher than control
+(0.920 at REV60). NOT claimed: re-expression sufficiency (M2/M6/E6/
+decay/adaptation remain active). Cross-seed pending approval.
