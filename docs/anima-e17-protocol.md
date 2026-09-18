@@ -104,8 +104,8 @@ mechanism identity, universal claims, interaction.
 
 ## 10. Config hash (raw file, recorded pre-run)
 
-- e17-m3m4off.toml: appended at the implementation commit (before
-  run).
+- e17-m3m4off.toml `6000aa7c04ba805f` (recorded at implementation,
+  before the run).
 
 ## Appendix: amendments
 
