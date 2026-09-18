@@ -320,3 +320,19 @@ control comparisons near-identical). Isolation all-pass both seeds
 0 failures; rates <= 33.4 Hz). Recurrent wiring persists at weight
 floor (560/519, w=0) in both. Combined M3/M4 subsystem not required
 for the STDP-free flip; seed-specific endpoints not universalized.
+
+### U10 / E18 developmental capability (2026-09-18, E18 result)
+
+E18 (first developmental-capability experiment; canonical organism,
+200 balanced A|C -> gap -> B trials, G0 800 / G1 1600): verdict
+PARTIAL - strong claim FAILED. No developmental growth (L-E =
+-0.249, S3-E = -0.237 vs 0.05 margins); divergence flat 0.011-0.040
+(M/L/S2/S3) = probe-after-A == probe-after-C (cos 0.96-0.99); the
+only divergence was the E-window initial transient (0.260, decaying;
+fresh settling + A11/C9 slice). A-C separation intact (0.0000);
+trace-level activity asymmetry (probeA spikes > probeC ~15-20%)
+without vector divergence = trace without organization. Gates clean
+(0 failures, 146 Hz max, 3,504 permanence). No triggered control.
+The organism does not develop the tested temporal-state capability
+at this scale; informative negative for the developmental research
+line (no mechanism changes).

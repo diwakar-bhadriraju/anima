@@ -93,9 +93,17 @@ fn main() {
         }
         v
     };
+    // A-1: S3 trials run at 2600 ms cadence (G1 = 1600, ITI = 0).
+    let trial_base = |k: u64| -> u64 {
+        if k >= S1_TRIALS + S2_TRIALS {
+            5000 + TRIAL_MS * (S1_TRIALS + S2_TRIALS) + (k - S1_TRIALS - S2_TRIALS) * 2600
+        } else {
+            5000 + TRIAL_MS * k
+        }
+    };
     let trial_info = |k: u64| -> (Option<bool>, u64, u64) {
         // (antecedent_is_A: None if not found, antecedent_start, probe_start)
-        let base = 5000 + TRIAL_MS * k;
+        let base = trial_base(k);
         let gap = if k >= S1_TRIALS + S2_TRIALS { 1600 } else { 800 };
         let probe = base + 500 + gap;
         let ant = stims
@@ -133,7 +141,7 @@ fn main() {
 
     // Probe vectors + pairwise divergence per window.
     for (label, lo, hi) in WINDOWS {
-        let ep_lo = |k: u64| 5000 + 2000 * k + off;
+        let ep_lo = |k: u64| trial_base(k) + off;
         let gap = if lo >= 160 { 1600 } else { 800 };
         let a_vecs: Vec<BTreeMap<u32, f64>> = (lo..hi)
             .filter(|&k| seq[k as usize] == 0)
@@ -164,11 +172,11 @@ fn main() {
     // A-C sanity in S2 (pair defined below at module level).
     let ac_vals = (120..160u64)
         .filter(|&k| seq[k as usize] == 0)
-        .map(|k| vec_of(5000 + 2000 * k + off, 5000 + 2000 * k + off + 500))
+        .map(|k| vec_of(trial_base(k) + off, trial_base(k) + off + 500))
         .collect::<Vec<_>>();
     let cc_vals = (120..160u64)
         .filter(|&k| seq[k as usize] == 1)
-        .map(|k| vec_of(5000 + 2000 * k + off, 5000 + 2000 * k + off + 500))
+        .map(|k| vec_of(trial_base(k) + off, trial_base(k) + off + 500))
         .collect::<Vec<_>>();
     let (ac, _acl1) = pair_mean(&ac_vals, &cc_vals);
     println!("A-C sanity (S2): mean cos = {:.4} (criterion < 0.60)", ac);

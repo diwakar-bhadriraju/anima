@@ -201,3 +201,91 @@ execution require a separate release.
   the SEQ variant (byte-identical probe content after A and after
   C); the protocol's approved decision 6 authorizes variant_blocks
   divergence as registered.
+
+---
+
+## E18 execution record (2026-09-18)
+
+Implementation `e8bdd48` (env trial blocks, config hash
+9145693071e0e389 pre-run, 136 tests) + marker fix `59600ab`
+(env.step contiguous-boundary marker emission; registered
+delivery-tick convention: telemetry timestamps = env-scheduled + 1;
+analysis windows [scheduled+1, scheduled+501); 137 tests green).
+Canonical run: `runs/e18-20260918T164838Z` (seed 20260912); telemetry
+hash ce8ebfc57ce0f6d7; snapshots c82bae834e0c93f5; analysis
+byte-deterministic on rerun.
+
+### Registered verification (all pass)
+
+Probe B byte-identical after A and C (same committed pattern;
+variant_block 100000 keeps all 200 probes SEQ; antecedent has no
+influence on the B train tuple); no trial-type labels in the
+schedule (env representation carries none; verified); A/C exposure
+balanced (schedule audit: S1/S2/S3 all 20/20 per 40-trial window,
+exact 100/100 overall); cadence 2000/2600 per A-1; seeded schedule
+deterministic (same seed -> same sequence, different seed ->
+different); no trial-type timing cues (one template per block);
+canonical substrate unchanged (organism/plasticity/structural/
+resources/v2/e6 json-identical vs e12; only exp_id, stages,
+variant_block registered); no unintended differences (isolation
+tests green, 137 total).
+
+### Results (frozen windows; D = 1 - pairwise-mean cos(B-after-A,
+### B-after-C) probe vectors; raw == L1 everywhere)
+
+| window | trials | D | L1 cos | Ba-A | Bc-C | ante spikes | probeA | probeC |
+|---|---|---|---|---|---|---|---|---|
+| E 1-20 | A11 C9 | 0.2599 | 0.7401 | 0.714 | 0.702 | 1339 | 577 | 393 |
+| M 51-70 | A10 C10 | 0.0136 | 0.9864 | 0.045 | 0.801 | 985 | 187 | 146 |
+| L 101-120 | A10 C10 | 0.0112 | 0.9888 | 0.009 | 0.850 | 889 | 169 | 145 |
+| S2 121-160 | A20 C20 | 0.0400 | 0.9600 | 0.042 | 0.826 | 958 | 185 | 143 |
+| S3 161-200 | A20 C20 | 0.0228 | 0.9772 | 0.018 | 0.844 | 1089 | 194 | 160 |
+
+Endpoints: L - E = -0.249 (criterion > 0.05 FAILED); S3 - E =
+-0.237 (criterion > 0.05 FAILED); A-C sanity = 0.0000 (< 0.60
+PASS). Gates: failures 0; snapshot max internal rate 146.3 Hz
+(<= 250); permanence events 3,504 (> 0); selectivity present.
+Schedule audit: lag-1 autocorr S1 -0.025, all -0.035 (no structure
+artifact).
+
+### Frozen verdict: PARTIAL (strong claim FAILED)
+
+Per section 8: divergence is flat across M/L/S2/S3 (0.011-0.040,
+all <= 0.05) with an S1-early vs S2 difference (E = 0.260 transient)
+— PARTIAL category. The developmental-growth criterion is REJECTED:
+L - E < 0 and S3 - E < 0. The only nonzero divergence was the E
+window's decaying initial transient (fresh-organism settling; E's
+A11/C9 slice imbalance compounds it); once settled, probe-after-A
+and probe-after-C responses converge to near-identity (cos 0.96-
+0.99) at both gaps. Basic representation is intact (A-C separation
+0.0000); the failure is specifically the temporal-state capability.
+
+Fixed/transient trace vs developed state: a trace-level activity
+asymmetry IS present (probeA spike totals consistently ~15-20%
+above probeC, M onward), but it does not translate into represent-
+ational divergence — trace without organization.
+
+Triggered-control condition: L - E > 0.05 NOT met -> the shuffled
+control is NOT run (registered trigger rule).
+
+### Answers (release section 8)
+
+1. Did antecedent-dependent probe divergence develop? NO — flat at
+   0.011-0.040 across M/L/S2/S3; L - E = -0.249.
+2. Did it persist across the longer gap? N/A (nothing developed);
+   S3 = 0.0228, flat.
+3. Does the evidence distinguish developmental internal state from
+   a fixed/transient trace? YES: the only divergence was a decaying
+   initial transient; the settled state shows activity-level
+   asymmetry without vector divergence — fixed traces, no developed
+   organization. The E17-style instant re-expression expectation
+   (flat, present-from-trial-1) is what the data show.
+4. What does E18 establish for the research objective? The frozen
+   organism, given 200 balanced A|C -> B trials at 800/1600 ms
+   gaps under the canonical mechanism stack, does NOT develop an
+   antecedent-dependent probe response under the registered
+   criterion; representation capabilities are intact; the
+   developmental capability question receives a clean negative at
+   this scale/organism — an informative registered negative. No
+   mechanism was modified, no thresholds changed, no control arm
+   triggered.
