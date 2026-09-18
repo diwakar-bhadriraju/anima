@@ -95,8 +95,9 @@ No repair by tuning; no parameter sweeps; no E17 proposal.
 
 ## 10. Config hashes (sha256, raw files, recorded pre-run)
 
-- e16.toml / e16-m2off.toml / e16-stdpoff.toml: appended at
-  implementation commit (before any run).
+- e16.toml `47a4ff96aed72cfa`; e16-m2off.toml `20479de8c2e8eefc`;
+  e16-stdpoff.toml `965bc7776f6ef82d` (recorded at implementation,
+  before any run).
 
 ## Appendix: amendments
 

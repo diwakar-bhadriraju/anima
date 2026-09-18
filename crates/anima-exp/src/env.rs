@@ -1559,6 +1559,64 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(env.duration(), 813_500, "timeline unchanged from E10");
     }
 
+    // ---- ANIMA E16 pre-registered tests (docs/anima-e16-protocol.md §3/§10) ----
+
+    /// §3: arm configs differ from e12 ONLY by the registered ablation
+    /// fields (exp_id + [v2] disable_m2 / plasticity a_plus+a_minus).
+    /// §10: config hashes recorded pre-run.
+    #[test]
+    fn e16_arm_configs_isolated_ablations() {
+        let c = v3_config("e12.toml");
+        let cn = v3_config("e16.toml");
+        let m2 = v3_config("e16-m2off.toml");
+        let sp = v3_config("e16-stdpoff.toml");
+        assert_eq!((cn.run.seed, m2.run.seed, sp.run.seed), (c.run.seed, c.run.seed, c.run.seed),
+            "all arms keep the frozen seed");
+        // canonical == e12 except exp_id
+        let strip = |t: &str| t.lines().filter(|l| !l.starts_with("exp_id")).collect::<Vec<_>>().join("\n");
+        assert_eq!(strip(&toml::to_string(&cn).unwrap()), strip(&toml::to_string(&c).unwrap()),
+            "e16 canonical == e12 except exp_id");
+        // M2-off: everything identical to canonical except one v2 field.
+        let cm = toml::to_string(&m2).unwrap();
+        assert!(cm.contains("disable_m2"), "m2-off carries the flag");
+        let strip_flag = |t: &str| t.lines().filter(|l| !l.starts_with("disable_m2")).collect::<Vec<_>>().join("\n");
+        // canonical itself also carries disable_m2 = false; strip exp_id too.
+        let strip_both = |t: &str| t.lines()
+            .filter(|l| !l.starts_with("disable_m2") && !l.starts_with("exp_id"))
+            .collect::<Vec<_>>().join("\n");
+        assert_eq!(strip_both(&cm), strip_both(&toml::to_string(&cn).unwrap()),
+            "m2-off differs from canonical ONLY by disable_m2");
+        // STDP-off: identical except a_plus/a_minus zeroed (line-level;
+        // float text formatting of f32->f64 serialization is not
+        // literal-round-trip, so compare sans the two lines + parse check).
+        let cs = toml::to_string(&sp).unwrap();
+        assert!(cs.contains("a_plus = 0.0") && cs.contains("a_minus = 0.0"), "STDP zeroed");
+        let strip_stdp = |t: &str| t.lines()
+            .filter(|l| !l.starts_with("a_plus") && !l.starts_with("a_minus") && !l.starts_with("exp_id"))
+            .collect::<Vec<_>>().join("\n");
+        assert_eq!(strip_stdp(&cs), strip_stdp(&toml::to_string(&cn).unwrap()),
+            "stdp-off differs from canonical ONLY by a_plus/a_minus");
+        // structural/resources untouched in both arms; e6 compared at
+        // field level (serde toml cannot serialize Option None values).
+        for arm in [&m2, &sp] {
+            assert_eq!(toml::to_string(&arm.structural).unwrap(), toml::to_string(&c.structural).unwrap());
+            assert_eq!(toml::to_string(&arm.resources).unwrap(), toml::to_string(&c.resources).unwrap());
+            let (a, b) = (arm.e6.as_ref().unwrap(), c.e6.as_ref().unwrap());
+            assert_eq!(
+                (a.enable, a.alpha, a.phi_init, a.phi_min, a.beta_min, a.beta_max),
+                (b.enable, b.alpha, b.phi_init, b.phi_min, b.beta_min, b.beta_max),
+                "e6 untouched"
+            );
+            assert_eq!(serde_json::to_string(&arm.pattern).unwrap(), serde_json::to_string(&c.pattern).unwrap());
+            assert_eq!(serde_json::to_string(&arm.stage).unwrap(), serde_json::to_string(&c.stage).unwrap());
+        }
+        // mechanism flags actually wired
+        assert!(m2.v2.as_ref().unwrap().disable_m2, "disable_m2 set");
+        assert!(!cn.v2.as_ref().unwrap().disable_m2, "canonical M2 on");
+        assert!(sp.plasticity.a_plus == 0.0 && sp.plasticity.a_minus == 0.0, "STDP off");
+        assert!(cn.plasticity.a_plus > 0.0, "canonical STDP on");
+    }
+
     // ---- ANIMA E15 pre-registered tests (docs/anima-e15-protocol.md §8) ----
 
     /// §8: instrument is observation-only — no anima-core import.
