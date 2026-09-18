@@ -310,3 +310,13 @@ control collapsed to 1) and shows the flip with zero topology and
 ~0.03 total bucket drift; selectivity rises higher than control
 (0.920 at REV60). NOT claimed: re-expression sufficiency (M2/M6/E6/
 decay/adaptation remain active). Cross-seed pending approval.
+
+### U9g / E17 cross-seed replication (2026-09-18, E17 result)
+
+M3/M4 non-necessity for the STDP-free REV1 flip REPRODUCED 3/3 seeds
+(9001: k*=1, REV1 0.188/0.807; 424242: k*=1, REV1 0.230/0.785;
+control comparisons near-identical). Isolation all-pass both seeds
+(STDP/M3/M4/M5 = 0 events; M2 invariant <= 6e-6; M6 net -1.05/-1.29;
+0 failures; rates <= 33.4 Hz). Recurrent wiring persists at weight
+floor (560/519, w=0) in both. Combined M3/M4 subsystem not required
+for the STDP-free flip; seed-specific endpoints not universalized.

@@ -206,3 +206,69 @@ system. NOT claimed: passive re-expression alone is sufficient.
 Cross-seed gate: STOP after the 20260912 arm. Requesting approval
 before extension to 9001/424242 (isolation passed, gates passed,
 outcome interpretable).
+
+---
+
+## E17 cross-seed replication record (2026-09-18)
+
+Configs `44204d8d5ef091e9` (9001) / `1a8103aeb52b84ea` (424242)
+registered pre-run; isolation test `e17_replication_arms_isolated`
+(green); runs `runs/e17s9001-m3m4off-20260918T155612Z`,
+`runs/e17s424242-m3m4off-20260918T155612Z`. 134 tests green, 0
+warnings. (Note: an initial commit shipped a red test — missing
+.toml in v3_config names — fixed in `944eeee` before interpretation;
+no effect on runs.)
+
+### Isolation check (both seeds) — ALL PASS
+
+STDP events 0; M3 maturations 0; M4 prunes 0; M5 evictions 0; M2
+invariant (mean|sum-0.8| <= 4e-6 at every instant, 52 neurons); M6
+active (9001: 410/517, net -1.049; 424242: 451/516, net -1.293);
+0 failures; rates 24.5-33.4 Hz max; config diff vs the same-seed
+committed stdpoff control = exp_id + disable_m3_m4 only.
+
+### Primary endpoint (frozen E14 machinery)
+
+- seed 9001: T0 0.671/0.239 (C) -> REV1 0.188/0.807 (A), first
+  A-alignment REV1, sustained k* = 1 (REV10 0.236/0.715; REV60
+  0.210/0.734 all A); selectivity 0.662 -> 0.822; A-C separated;
+  failures 0; rates 3.8-4.4/29.9-32.7 Hz.
+- seed 424242: T0 0.742/0.242 (C) -> REV1 0.230/0.785 (A), k* = 1
+  (REV10 0.218/0.770; REV60 0.201/0.696 all A); selectivity 0.549
+  -> 0.806; A-C separated; failures 0; rates 3.5-4.5/24.5-33.4 Hz.
+
+Control comparisons (committed stdpoff arms, never rerun): 9001
+T0 0.671/0.231 -> REV1 0.179/0.801 -> REV60 0.182/0.725 vs arm
+0.671/0.239 -> 0.188/0.807 -> 0.210/0.734; 424242 0.744/0.228 ->
+0.215/0.772 -> 0.190/0.694 vs arm 0.742/0.242 -> 0.230/0.785 ->
+0.201/0.696. Trajectories near-identical; B-independence episodes
+unchanged in pattern (never at REV1).
+
+### Replication decision (per seed, frozen rule)
+
+- 9001: k* = 1, sustained A-alignment -> **REPRODUCED**.
+- 424242: k* = 1, sustained A-alignment -> **REPRODUCED**.
+- (20260912: REPRODUCED, prior record.)
+
+**Three-seed replication: 3/3 — M3/M4 topology dynamics are NOT
+NECESSARY for the STDP-free REV1 flip under the tested conditions.**
+Seed-dependent boundary: all three flip at REV1 with k* = 1; final
+A-B values differ slightly per seed (0.177 / 0.210 / 0.201) — not
+collapsed into a universal claim.
+
+### Secondary observations (descriptive only)
+
+9001: recurrent n=560 at w=0 persists (control collapsed to 1);
+A-side 13.41 / C-side 14.20 at T0; per-bucket drift <= 0.03.
+424242: recurrent n=519 at w=0; A-side 13.08 / C-side 15.04; drift
+<= 0.02. Spike profiles match controls (q1 149/190, q2 265/210,
+q3 45/26, q4 0). Endpoint movement on 38-63% of recurrent-bucket
+synapses (decay + M2 re-pin + M6 paths).
+
+### Stop condition
+
+STOPPED as registered. No further ablation proposed. Limitations
+held: M3/M4 non-necessity refers to the COMBINED topology subsystem
+in the STDP-free regime; NOT claimed — re-expression sufficiency,
+individual M3 or M4 non-necessity, M6 necessity/sufficiency,
+universal mechanism identity.
