@@ -87,3 +87,14 @@ integration (same-seed rerun byte-identical telemetry+snapshots).
 ## Appendix: amendments
 
 - (none yet)
+
+## Appendix: implementation notes (pre-run)
+
+- Config e19.toml hash c4918e786f176277 (recorded pre-run).
+- Env trial-block stage: S1 trials=200, gap 800, ITI 1200. The env
+  sees ante 500 + gap 800 + probe 500 + ITI 1200 = 3000 ms cadence
+  (the protocol template); the world's action window [1800, 2300)
+  and consequence epoch [2300, 2800) live inside the 1200 ms ITI
+  (200 ms residual). Timeline = 5000 + 199*3000 + 1800 = 603,800 ms
+  (test-asserted). All frozen epoch durations exact (500/800/500/
+  500/500); the closed loop adds no organism-visible timing.

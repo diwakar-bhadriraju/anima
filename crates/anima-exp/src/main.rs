@@ -2,6 +2,7 @@
 //! Subcommands: run | replay | report.
 
 mod config;
+mod e19_world;
 mod env;
 mod harness;
 

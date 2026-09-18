@@ -118,6 +118,25 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
     }
 
     let env = Environment::new(cfg.clone(), seed);
+    // E19 (docs/anima-e19-protocol.md §2): closed loop, harness-layer
+    // only. Built when the curriculum is the E19 trial block (stage S1
+    // in trials mode with probe B); otherwise None — all prior
+    // experiments byte-identical.
+    let e19 = cfg.stage.iter().any(|st| {
+        st.mode.as_deref() == Some("trials") && st.probe.as_deref() == Some("B") && st.gap_ms == Some(800) && st.iti_ms == Some(1200) && st.trials == Some(200)
+    });
+    let mut world = if e19 {
+        let ants: Vec<(bool, u64)> = env
+            .schedule
+            .iter()
+            .filter(|p| p.stage == "S1" && (p.pattern == "A" || p.pattern == "C"))
+            .map(|p| (p.pattern == "A", p.start))
+            .collect();
+        assert_eq!(ants.len(), 200, "E19 world: 200 antecedents");
+        Some(crate::e19_world::World::new(&ants, seed, false))
+    } else {
+        None
+    };
     let mut traces = Traces::new(&net, cfg.plasticity.tau_plus_ms);
     // ANIMA v2 structural plasticity (M2–M6). None when the [v2] section
     // is absent or disabled — behavior identical to E1–E4f.
@@ -271,6 +290,8 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
     let mut unemit: Vec<f32> = vec![0.0; net.synapses.len()];
 
     let mut tick_index: u64 = 0;
+    // E19: previous tick's output spikes (world observation buffer).
+    let mut out_prev: Vec<u32> = Vec::new();
     while end_reason.is_none() && recorder_error.is_none() {
         // Controls.
         if let Some(sv) = &server {
@@ -301,11 +322,22 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             }
         }
 
-        // 1. environment
-        let (frame, presented) = env.step();
+        // 1. environment (+ E19 world: consequence injection; the
+        // world observes output spikes at the network step below).
+        let (mut frame, presented) = env.step();
+        if let Some(w) = world.as_mut() {
+            let obs = std::mem::take(&mut out_prev);
+            let inj = w.step(net.tick.0, &obs);
+            for ch in inj {
+                if !frame.spikes.contains(&anima_core::network::InputChannelId(ch)) {
+                    frame.spikes.push(anima_core::network::InputChannelId(ch));
+                }
+            }
+        }
 
         // 2. network dynamics
         let step = net.step(&frame);
+        out_prev = step.output_spikes.iter().map(|n| n.0).collect();
 
         // ANIMA v2: per-tick firing accumulation; structural window at the
         // frozen cadence (M4 → M3 → M2 → M6 → M5), events → telemetry.
@@ -606,6 +638,14 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             end_reason = Some("curriculum-complete".into());
         }
         tick_index += 1;
+    }
+
+    // E19: world log (analysis-side artifact; never enters telemetry).
+    if let Some(w) = world.as_ref() {
+        let _ = std::fs::write(
+            dir.join("e19-world.log"),
+            format!("{}\n{}\n", w.summary(), w.trial_lines().join("\n")),
+        );
     }
 
     // RunEnded + flush.
