@@ -2,7 +2,7 @@
 # All frozen parameters identical; exactly the mechanism(s) above disabled.
 
 [run]
-exp_id = "e16s424242"
+exp_id = "e16s424242-m2off"
 seed = 424242          # frozen seed
 viz_port = 8788
 ticks_per_sec = 1000.0
