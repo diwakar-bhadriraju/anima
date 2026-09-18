@@ -72,13 +72,16 @@ fn main() {
     // World log: per-trial votes.
     let world_log = std::fs::read_to_string(std::path::Path::new(&dir).join("e19-world.log"))
         .expect("e19-world.log");
-    let mut votes: Vec<(bool, String)> = Vec::new(); // (is_A, vote)
+    let mut votes: Vec<(bool, String)> = Vec::new(); // (is_A, vote-line)
     for line in world_log.lines() {
         if line.starts_with("trial=") {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            let is_a = parts[1].ends_with('A');
-            let vote = parts[3].split_whitespace().next().unwrap_or("").to_string();
-            let _ = &parts;
+            let is_a = parts[1].split('=').nth(1) == Some("A");
+            let vote = if line.contains("vote") {
+                line.split("vote").nth(1).unwrap_or("").trim().to_string()
+            } else {
+                String::new() // trial whose action window never closed
+            };
             votes.push((is_a, vote));
         }
     }
@@ -86,12 +89,11 @@ fn main() {
     let voted_g1 = |v: &str| v.ends_with("g1>") || v.contains("g1=") && v.contains("-> ");
     // parse "vote g1=N g2=M -> Decision"
     let parse = |line_v: &str| -> (u32, u32, String) {
-        let l = line_v.trim();
-        let l = l.strip_prefix("vote ").unwrap_or(l);
-        let g1: u32 = l.split_whitespace().nth(0).unwrap_or("g1=0").split('=').nth(1).unwrap_or("0").parse().unwrap_or(0);
-        let g2: u32 = l.split_whitespace().nth(1).unwrap_or("g2=0").split('=').nth(1).unwrap_or("0").parse().unwrap_or(0);
-        let d = l.split("-> ").nth(1).unwrap_or("NoAction").trim().to_string();
-        (g1, g2, d)
+        let l = line_v.trim().trim_start_matches("vote").trim();
+        let g1: u32 = l.split_whitespace().next().and_then(|t| t.split('=').nth(1)).and_then(|v| v.parse().ok()).unwrap_or(0);
+        let g2: u32 = l.split_whitespace().nth(1).and_then(|t| t.split('=').nth(1)).and_then(|v| v.parse().ok()).unwrap_or(0);
+        let d = l.split("->").nth(1).unwrap_or("NoAction").trim().to_string();
+        if d.is_empty() { (g1, g2, "NoVote".to_string()) } else { (g1, g2, d) }
     };
 
     // Antecedent identity per trial from the world log (analysis-side).
@@ -129,10 +131,9 @@ fn main() {
         let mut no_action = 0u32; let mut benign = 0u32;
         let mut g1_spikes = 0u64; let mut g2_spikes = 0u64;
         for k in lo..hi {
-            let line = world_log.lines().filter(|l| l.starts_with(&format!("trial={} ", k + 1))).next().unwrap();
-            let vote_str = line.split("vote").nth(1).unwrap_or("");
-            let (g1, g2, d) = parse(&format!("vote{}", vote_str));
-            if d == "NoAction" {
+            let line = world_log.lines().find(|l| l.starts_with(&format!("trial={} ", k + 1))).unwrap_or("");
+            let (g1, g2, d) = parse(line);
+            if d == "NoAction" || d == "NoVote" {
                 no_action += 1;
             } else if is_a[k as usize] {
                 a_n += 1;
@@ -144,6 +145,7 @@ fn main() {
             if d == "Match" {
                 benign += 1;
             }
+            let _ = (g1, g2);
             // output spikes in this trial's action window
             let b = base_of(k) + OFF;
             g1_spikes += out_spikes.iter().filter(|(t, n)| *t >= b + 1800 && *t < b + 2300 && (64..70).contains(n)).count() as u64;

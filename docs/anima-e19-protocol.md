@@ -98,3 +98,96 @@ integration (same-seed rerun byte-identical telemetry+snapshots).
   (200 ms residual). Timeline = 5000 + 199*3000 + 1800 = 603,800 ms
   (test-asserted). All frozen epoch durations exact (500/800/500/
   500/500); the closed loop adds no organism-visible timing.
+---
+
+## E19 execution record (2026-09-19)
+
+Implementation `dfd3e26` (world, config c4918e786f176277 recorded
+pre-run, 138 tests green, 0 warnings). Canonical run:
+`runs/e19-20260918T172211Z` (seed 20260912), telemetry
+896221d44a250e77, snapshots 72c16f64dd204595; world log complete
+(200 trials); analysis deterministic.
+
+### Verification (all pass)
+
+Substrate JSON-identical to e12; probe at +1300; exact 20/20
+balance in all five windows; antecedent sequence deterministic
+(same seed) and seed-dependent; world trains deterministic; world
+logic (A->g1 match / C->g2 / no-action punished / action-window
+gating) unit-verified; probe spikes in-window; schedule audit clean
+(lag-1 autocorr -0.075); disruption delivered: 61,399 spikes on
+channels 16-23, 100% inside consequence epochs (the loop closed:
+every trial's consequence reached the organism); failures 0; max
+internal rate 178.1 Hz (gate); permanence 7,544 (engaged); A-C
+sanity 0.0011.
+
+### Anomaly (recorded, not tuned): output neurons are
+### stimulus-locked followers
+
+Output-neuron spike distribution across trial epochs (committed
+architecture, untouched): ante 54,375; gap 660; probe 31,467;
+ACTION WINDOW 0 (across 200 trials = 100 s of silence); consequence
+3,253; ITI 125. The 12 output neurons fire driven by the network's
+response to input; in the SILENT action window they never cross
+threshold. The world therefore read 200 consecutive NoAction votes
+(decisions[NoAction=199]; trial 200's window closes at run end) —
+the frozen protocol's quiescent-policy category, but with a
+structural rather than motivational cause: no output activity is
+available to read in silence.
+
+### Results (E/M/L)
+
+| window | BD | no-action | BR | out-spikes (g1/g2) | internal D |
+|---|---|---|---|---|---|
+| E | 0.000 (n=0/0) | 40/40 | 0.000 | 0/0 | 0.2844 |
+| M | 0.000 (n=0/0) | 40/40 | 0.000 | 0/0 | 0.1139 |
+| L | 0.000 (n=0/0) | 40/40 | 0.000 | 0/0 | 0.0747 |
+
+BD_L - BD_E = 0.000 (criterion > 0.30 FAILED — no behavioral
+signal exists to condition). Internal: D_E 0.284 -> D_M 0.114 ->
+D_L 0.075 (the E18 settling transient, decaying; D_L - D_E =
+-0.210, flat-negative as in E18). A-C sanity 0.0011 (PASS).
+
+### Preregistered verdict: PROTOCOL-DEGENERATE / FAILURE (grid F,
+### quiescent readout; see limitations)
+
+Per the frozen criteria: BD_L - BD_E <= 0.30 AND internal D flat =>
+FAILURE (grid D). The shortcut detector "no-action rate > 0.5 in L"
+fired (1.00) — but the audit shows it is not a policy the organism
+could avoid: zero output spikes exist in ANY silent window in this
+architecture (verified epoch histogram). The consequence pressure
+was delivered every trial (disruption 100% of NoAction trials) and
+the organism's input-side responded (rates/permanence healthy), but
+the action channel is structurally silent in the absence of
+stimulus drive. Behavioral pressure cannot act on an action that
+the readout epoch cannot produce.
+
+Open-loop control trigger: BD_L - BD_E > 0.30 NOT met -> control
+NOT run (registered rule).
+
+### Interpretation (bounded)
+
+What E19 establishes: (1) the closed loop itself is implemented and
+verified end-to-end (vote -> decision -> consequence -> sensory
+delivery, deterministic, leak-free by the Section-6 tests); (2)
+under the frozen architecture, consequence pressure at the E18
+timescale produces NO behavioral development — because the organism
+has no stimulus-independent output activity for consequences to
+reinforce: outputs are driven followers, not endogenously active
+decision states; (3) internal organization remains E18-like
+(settling transient, no antecedent divergence). The E18/E19 pair
+now bounds the problem precisely: passive exposure gives no
+temporal state (E18), and consequences cannot reach the action
+channel in silence (E19) — the missing ingredient is an
+output/decision channel capable of endogenous (stimulus-independent)
+activity, which the frozen LIF-followers-with-silent-windows
+design does not provide.
+
+What E19 does NOT establish: that consequences would fail with an
+endogenous action channel; that the organism cannot condition
+actions under a different readout convention (e.g. action window
+during probe-driven activity); anything about memory mechanisms,
+growth, or reward (all excluded by design).
+
+No mechanism was modified, no threshold changed, no post-hoc arm
+added. The world, tests, and instrument are committed as run.

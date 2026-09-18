@@ -336,3 +336,22 @@ without vector divergence = trace without organization. Gates clean
 The organism does not develop the tested temporal-state capability
 at this scale; informative negative for the developmental research
 line (no mechanism changes).
+
+### U11 / E19 closed-loop pressure (2026-09-19, E19 result)
+
+E19 (closed loop; frozen organism; hidden-bit world; binary vote
+read from output groups in a SILENT 500 ms window; disruption on
+mismatch/no-action via virgin channels 16-23 @ 80 Hz): verdict
+FAILURE (grid D) with the quiescent detector firing for a
+STRUCTURAL reason — output neurons fire only when stimulus-driven
+(epoch histogram: ante 54,375 / probe 31,467 / action window 0 of
+100 s; committed architecture). The loop closed and pressure was
+delivered every trial (61,399 disruption spikes, 100% in-window);
+rates/permanence/gates healthy; internal state E18-like (settling
+transient 0.28 -> 0.07, no antecedent divergence; A-C 0.0011).
+E18+E19 bound the gap: no temporal state from exposure; no
+behavioral channel for consequences in silence. Next-ingredient
+candidate (NOT implemented): an endogenous-activity action channel
+or a readout convention that overlaps stimulus-driven output
+activity — a design question, not a mechanism repair. Registry
+entry only; no claims beyond the tested scale/seed.
