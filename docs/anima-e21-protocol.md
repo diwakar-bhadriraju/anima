@@ -65,3 +65,43 @@ from this experiment's table ONLY, before any E22 run.
 ## Appendix: amendments
 
 - (none)
+---
+
+## E21 execution record (2026-09-19)
+
+Implementation `ca185aa` (6 configs, hashes pre-run; identical
+seeded antecedent sequences across arms — registered, tested).
+Runs e21-g{0,50,100,200,400,800}-20260918T1817{26,28,30,32,34,36}Z.
+140 tests green, 0 warnings; analysis deterministic. Verification:
+substrate JSON-isolated vs e12; grids/cadence/balance verified;
+A-C sanity <= 0.09 all arms; gates clean (0 failures, max rate
+120.1-184.0 Hz, permanence 8,757-12,446).
+
+### Capacity table (frozen metric: D_L vs split-half noise floor NF)
+
+| gap | D_E | D_M | D_L | NF | D_L-NF | RETAINED (>0.05) |
+|---|---|---|---|---|---|---|
+| 0 | 0.2929 | 0.1251 | 0.1889 | 0.1074 | 0.0815 | **YES** |
+| 50 | 0.3785 | 0.0930 | 0.0337 | 0.0351 | -0.0014 | no |
+| 100 | 0.2416 | 0.1191 | 0.1030 | 0.0996 | 0.0034 | no |
+| 200 | 0.1896 | 0.0900 | 0.0804 | 0.0844 | -0.0040 | no |
+| 400 | 0.3012 | 0.2685 | 0.0966 | 0.0579 | 0.0386 | no |
+| 800 | 0.3532 | 0.0830 | 0.0235 | 0.0217 | 0.0018 | no |
+
+### Verdict: MEASURED — temporal capacity < 50 ms
+
+Only gap 0 retains antecedent information (D_L - NF = 0.0815 >
+0.05); every gap >= 50 ms shows D_L statistically at its own
+split-half noise floor (|D_L - NF| <= 0.04). The gap-0 reference
+shows divergence (paradigm valid). The cliff sits between 0 and
+50 ms — consistent with, but now MEASURED rather than assumed
+from, the ~100 ms synaptic-decay envelope.
+
+### E22 dependency resolution (preregistered rule B.2)
+
+g_B = largest RETAINED gap >= 50 ms: **NONE EXISTS**. Therefore
+E22 is NOT EXECUTED. Registered outcome: "temporal capacity
+insufficient for a closed-loop retention task in the frozen
+substrate." This is a valid E21-derived result, not an E22
+failure. No E22 protocol will be frozen on this substrate for a
+retention task.

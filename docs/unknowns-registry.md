@@ -370,3 +370,21 @@ ANY silent readout time; category-A silent/post-stimulus interface
 corrections are exhausted; stimulus-overlapping reads (sensory
 echo) or an endogenous-activity substrate (category C) are the
 remaining directions — decision deferred, nothing proposed.
+
+### U13 / E21+E23 (2026-09-19)
+
+E21 (temporal capacity, 6-arm gap sweep, split-half NF): MEASURED
+cliff < 50 ms — only gap 0 retains (0.0815); all gaps >= 50 sit at
+their noise floors. E22 dependency rule B.2 => g_B does not exist
+=> E22 NOT EXECUTED (registered outcome: capacity insufficient for
+a closed-loop retention task on this substrate). E23 (reflex
+shaping, closed vs open co-arms): GRID B with inversion — effect
+0.900 >> 0.30 (votes perfectly antecedent-conditioned under
+consequences: A->g2, C->g1, i.e., the EXACT anti-mapping; benign
+0.0), open arm BD_L 0.1; internal D_stim no gain (closed 0.922 vs
+open 0.999). First E-series demonstration that consequences shape
+behavior; punishment-only shaping converged to the punished
+mapping (Hebbian sign-reversal hypothesis flagged, untested).
+Gates clean both experiments (E23 closed max 276.1 Hz slightly
+over 250 in disruption epochs — recorded as the disruption
+response envelope, not a runaway; failures 0).

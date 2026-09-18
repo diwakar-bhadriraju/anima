@@ -71,3 +71,90 @@ A memory experiment (nothing to retain); supervised classification
 ## Appendix: amendments
 
 - (none)
+---
+
+## E23 execution record (2026-09-19)
+
+Implementation `ca185aa` (2 configs, hashes pre-run; identical
+stimulus streams — same seed, arms differ only in the loop).
+Runs e23-closed/e23-open-20260918T1817{38,40}Z. 140 tests green,
+0 warnings; analysis deterministic; schedule lag-1 -0.565
+(anti-correlated seeded shuffle — balanced, no exploitable
+structure); 2 NoAction trials each arm (0.5%).
+
+### Results (vote [100,500) of stimulus; groups 64-69/70-75)
+
+CLOSED arm:
+
+| window | P(g1|A) | P(g1|C) | BD | BR | out g1/g2 | D_stim |
+|---|---|---|---|---|---|---|
+| E | 0.800 | 0.800 | 0.000 | 0.500 | 6332/4309 | 0.5694 |
+| M | 0.200 | 0.900 | 0.700 | 0.150 | 4374/3610 | 0.8494 |
+| L | 0.000 | 1.000 | **1.000** | 0.000 | 4154/3165 | 0.9219 |
+
+OPEN arm (no consequences):
+
+| window | P(g1|A) | P(g1|C) | BD | BR | out g1/g2 | D_stim |
+|---|---|---|---|---|---|---|
+| E | 0.300 | 0.850 | 0.550 | — | 7479/6973 | 0.4761 |
+| M | 0.850 | 1.000 | 0.150 | — | 6472/4643 | 0.9859 |
+| L | 0.950 | 0.850 | 0.100 | — | 5978/4471 | 0.9993 |
+
+Effect of consequences: BD_closed(L) - BD_open(L) = 1.000 - 0.100
+= **0.900 > 0.30 CRITERION MET**. Internal: D_stim_closed(L) -
+D_stim_open(L) = 0.922 - 0.999 = **-0.077 (no gain; open arm's
+stimulus representations MORE separated)**.
+
+Direction check (the crucial pattern): the closed arm's votes
+moved from E's neutral 0.8/0.8 (BD 0.0, BR 0.5 = chance) to L's
+PERFECT ANTI-MAPPED votes: A -> group 2 (P(g1|A)=0.000), C ->
+group 1 (P(g1|C)=1.000) — BD = 1.0 with BR = 0.0. The world's
+registered mapping is A -> g1 correct; the organism converged to
+the EXACT OPPOSITE mapping: every closed-arm trial after
+mid-development chose the punished action. The open arm wandered
+(BD_L = 0.1, benign 81 — vote-logged only).
+
+### Shortcut/leakage audit
+
+Vote window [100,500) reads stimulus-driven activity (the honest,
+registered property); consequence strictly after the vote
+(cannot contaminate); no reward/teacher channel; balanced
+antecedents; deterministic arms; disruption channels virgin. No
+information beyond current stimulus + consequences reaches the
+organism. Shortcut analysis: fixed-action ruled out (BD 1.0 with
+both actions used conditionally); alternation ruled out
+(antecedent-conditioned); quiescence absent (2/200). The
+anti-correct convergence is NOT a leak — it is a systematically
+learned INVERSION of the world's mapping.
+
+### Verdict: GRID (B) — behavioral effect without internal-
+### representational gain... with a critical qualifier
+
+The preregistered effect criterion is met (0.900 >> 0.30): the
+votes became perfectly antecedent-conditioned UNDER consequences
+and only weakly conditioned without them. But the direction is
+ANTI-CORRECT: benign rate fell to 0.0 — the closed-loop organism
+reliably chose disruption. Interpretation (bounded): consequences
+powerfully shaped stimulus-conditioned response routing (the
+reflex-shaping primitive WORKS — this is the first demonstration
+in the E-series that closed-loop consequences alter behavior),
+but the learned routing is inverted relative to the world's
+beneficial mapping. Plausible mechanism hypotheses (NOT tested
+here, flagged for future work): disruption on 16-23 drives
+channels that share M1 input wiring with... C-side (8-15) is
+closer to 16-23 than A-side (0-7) in channel space; punishing a
+wrong A-trial (which voted g1) delivers 16-23 drive that
+potentiates g1-correlated paths — i.e., the punishment itself may
+reinforce the punished mapping via Hebbian co-activity, a
+classic sign-reversal artifact of punishment-only regimes in
+purely Hebbian substrates. No mechanism claim made.
+
+### What E23 establishes / does not
+
+ESTABLISHES: consequences can shape stimulus-driven output
+routing in the frozen organism (behavioral plasticity under
+closed-loop pressure — affirmative); the shaping can invert
+relative to the world's benefit mapping (punishment-only regimes
+in this substrate do not implement gradient-following). DOES NOT:
+anything about retention/memory (no gap); anything about reward
+(no reward signal existed); mechanism identity of the inversion.
