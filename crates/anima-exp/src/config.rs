@@ -278,16 +278,41 @@ pub struct PatternSpec {
 pub struct StageSpec {
     pub id: String,
     /// Pattern ids presented in this stage.
+    #[serde(default)]
     pub present: Vec<String>,
     /// Repetitions per pattern.
+    #[serde(default)]
     pub reps: usize,
     /// "interleaved" | "blocked".
+    #[serde(default = "default_stage_order")]
     pub order: String,
     /// Off-time between presentations (ms).
+    #[serde(default)]
     pub off_ms: u64,
     /// Silence-probe stage: no pattern, just wait (e.g. S0).
     #[serde(default)]
     pub silence_ms: Option<u64>,
+    /// E18 (docs/anima-e18-protocol.md): trial-block stage.
+    /// mode = "trials": each trial = one antecedent (drawn from
+    /// `antecedents`, balanced seeded-random per `balance_window`
+    /// trials) -> gap_ms silence -> the `probe` pattern -> iti_ms
+    /// silence. Deterministic; consumes the environment's seeded RNG;
+    /// carries NO trial-type labels (the schedule representation has
+    /// no field saying which antecedent a probe follows).
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub trials: Option<u64>,
+    #[serde(default)]
+    pub antecedents: Option<Vec<String>>,
+    #[serde(default)]
+    pub probe: Option<String>,
+    #[serde(default)]
+    pub gap_ms: Option<u64>,
+    #[serde(default)]
+    pub iti_ms: Option<u64>,
+    #[serde(default)]
+    pub balance_window: Option<u64>,
 }
 
 /// U1 default adaptation tau (ms): slow enough to integrate bursts,
@@ -450,4 +475,8 @@ impl ExpConfig {
         }
         Ok(cfg)
     }
+}
+
+fn default_stage_order() -> String {
+    "interleaved".into()
 }

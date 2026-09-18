@@ -82,6 +82,56 @@ impl Environment {
                     t += ms;
                 }
                 None => {
+                    if stage.mode.as_deref() == Some("trials") {
+                        // E18 trial block (docs/anima-e18-protocol.md §3-4,
+                        // amendment A-1): balanced seeded-random antecedents,
+                        // gap, probe, ITI. No trial-type labels in the
+                        // schedule representation.
+                        let trials = *stage.trials.as_ref().expect("trials count");
+                        let antecedents = stage.antecedents.as_ref().expect("antecedents");
+                        let probe = stage.probe.as_ref().expect("probe");
+                        let gap_ms = *stage.gap_ms.as_ref().expect("gap_ms");
+                        let iti_ms = *stage.iti_ms.as_ref().expect("iti_ms");
+                        let bw = *stage.balance_window.as_ref().expect("balance_window");
+                        assert_eq!(antecedents.len(), 2, "registered exactly two antecedents");
+                        assert!(bw > 0 && bw % 2 == 0 && trials % bw == 0, "balance window valid");
+                        let mut rng = Xoshiro256PlusPlus::seed_from_u64(
+                            derive_seed(cfg.run.seed, &[hash_str(&stage.id), schedule.len() as u64]),
+                        );
+                        let mut window_bag: Vec<usize> = Vec::new();
+                        for _ in 0..trials {
+                            if window_bag.is_empty() {
+                                window_bag = vec![0; bw as usize / 2];
+                                window_bag.extend(std::iter::repeat(1).take(bw as usize / 2));
+                                for i in (1..window_bag.len()).rev() {
+                                    let j = rng.gen_range(0..=i);
+                                    window_bag.swap(i, j);
+                                }
+                            }
+                            let ai = window_bag.pop().unwrap();
+                            let pid = &antecedents[ai];
+                            let pat = cfg.pattern.iter().find(|p| &p.id == pid)
+                                .unwrap_or_else(|| panic!("trial block {} references unknown antecedent {}", stage.id, pid));
+                            schedule.push(ScheduledPresentation {
+                                stage: stage.id.clone(),
+                                pattern: pat.id.clone(),
+                                rep: rep_of(&schedule, &pat.id),
+                                start: t,
+                                duration_ms: pat.duration_ms,
+                            });
+                            t += pat.duration_ms + gap_ms;
+                            let probe_pat = cfg.pattern.iter().find(|p| &p.id == probe)
+                                .unwrap_or_else(|| panic!("trial block {} references unknown probe {}", stage.id, probe));
+                            schedule.push(ScheduledPresentation {
+                                stage: stage.id.clone(),
+                                pattern: probe_pat.id.clone(),
+                                rep: rep_of(&schedule, &probe_pat.id),
+                                start: t,
+                                duration_ms: probe_pat.duration_ms,
+                            });
+                            t += probe_pat.duration_ms + iti_ms;
+                        }
+                    } else {
                     let order = presentation_order(cfg.run.seed, stage, &schedule.len());
                     for &pi in &order {
                         // stage.present names patterns; the shuffled order holds
@@ -97,6 +147,7 @@ impl Environment {
                             duration_ms: pat.duration_ms,
                         });
                         t += pat.duration_ms + stage.off_ms;
+                    }
                     }
                 }
             }
@@ -356,9 +407,9 @@ mod tests {
                 PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, phase_variants: None, variant_block: 1, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
             ],
             stage: vec![
-                StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200) },
-                StageSpec { id: "S1".into(), present: vec!["A".into()], reps: 3, order: "interleaved".into(), off_ms: 100, silence_ms: None },
-                StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None },
+                StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200), mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
+                StageSpec { id: "S1".into(), present: vec!["A".into()], reps: 3, order: "interleaved".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
+                StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
             ],
             v2: None,
             e6: None,
@@ -1616,6 +1667,143 @@ fn e6_configs_freeze_source_with_e6_only() {
             assert_eq!((a.enable, a.alpha, a.phi_init, a.phi_min, a.beta_min, a.beta_max),
                        (b.enable, b.alpha, b.phi_init, b.phi_min, b.beta_min, b.beta_max), "E6 untouched");
         }
+    }
+
+    // ---- ANIMA E18 pre-registered tests (docs/anima-e18-protocol.md,
+    // ---- amendment A-1) ----
+
+    /// §3/§4/A-1: trial grid, cadence, gap placement, timeline, balance,
+    /// determinism, no trial-type labels, B always SEQ.
+    #[test]
+    fn e18_trial_curriculum() {
+        let cfg = v3_config("e18.toml");
+        assert_eq!(cfg.run.exp_id, "e18");
+        // organism sections byte-identical to e12 (except exp_id /
+        // variant_block / stages).
+        let c12 = v3_config("e12.toml");
+        let strip = |t: &str| t.lines().filter(|l| {
+            !l.starts_with("exp_id") && !l.starts_with("variant_block")
+        }).collect::<Vec<_>>().join("\n");
+        fn j<T: serde::Serialize>(x: &T) -> String {
+            serde_json::to_string(x).unwrap()
+        }
+        assert_eq!(j(&cfg.organism), j(&c12.organism), "organism identical");
+        assert_eq!(j(&cfg.plasticity), j(&c12.plasticity), "plasticity identical");
+        assert_eq!(j(&cfg.structural), j(&c12.structural), "structural identical");
+        assert_eq!(j(&cfg.resources), j(&c12.resources), "resources identical");
+        assert_eq!(j(&cfg.v2), j(&c12.v2), "v2 identical");
+        let (a, b) = (cfg.e6.as_ref().unwrap(), c12.e6.as_ref().unwrap());
+        assert_eq!((a.enable, a.alpha, a.phi_init, a.phi_min, a.beta_min, a.beta_max),
+                   (b.enable, b.alpha, b.phi_init, b.phi_min, b.beta_min, b.beta_max));
+        // Patterns identical except B's registered variant_block.
+        let jp = |c: &ExpConfig| -> Vec<serde_json::Value> {
+            serde_json::to_value(c).unwrap()["pattern"].as_array().unwrap().clone()
+        };
+        let (pa, pb) = (jp(&cfg), jp(&c12));
+        assert_eq!(pa.len(), pb.len(), "same pattern count");
+        for (x, y) in pa.iter().zip(pb.iter()) {
+            if x["id"] == "B" {
+                assert_eq!(x["variant_block"], 100_000, "B variant_block registered");
+                assert_eq!(y["variant_block"], 60, "e12 B unchanged");
+                let (mut x2, mut y2) = (x.clone(), y.clone());
+                x2["variant_block"] = y2["variant_block"].clone();
+                assert_eq!(x2, y2, "B identical except variant_block");
+            } else {
+                assert_eq!(x, y, "non-B patterns identical");
+            }
+        }
+        // B variant_block registered at 100000 => all probes SEQ.
+        let b_pat = cfg.pattern.iter().find(|p| p.id == "B").unwrap();
+        assert_eq!(b_pat.variant_block, 100_000, "B always SEQ");
+
+        let env = Environment::new(cfg.clone(), 20260912);
+        let s1: Vec<&ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S1").map(|p| p).collect();
+        assert_eq!(env.duration(), 429_000, "A-1 timeline");
+        assert_eq!(s1.len(), 240, "S1 = 120 trials x 2 presentations");
+        // trial k: antecedent at 5000+2000k, probe at +1300.
+        for k in 0..120u64 {
+            let ant = *(s1.get((2 * k) as usize)).unwrap();
+            let probe = *(s1.get((2 * k + 1) as usize)).unwrap();
+            assert_eq!(ant.start, 5000 + 2000 * k, "antecedent start");
+            assert_eq!(probe.pattern, "B", "probe is B");
+            assert_eq!(probe.start, ant.start + 500 + 800, "G0 gap placement");
+        }
+        let s2: Vec<&ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S2").collect();
+        assert_eq!(s2.len(), 80);
+        assert_eq!(s2[0].start, 5000 + 240_000, "S2 starts at T_120");
+        assert_eq!(s2[0].start + 800 + 500, s2[1].start, "S2 gap 800");
+        let s3: Vec<&ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S3").collect();
+        assert_eq!(s3.len(), 80);
+        assert_eq!(s3[0].start, 5000 + 320_000, "S3 starts at T_160");
+        assert_eq!(s3[0].start + 500 + 1600, s3[1].start, "S3 gap 1600 (A-1)");
+        // cadence: inter-trial 2000 in S1/S2, 2600 in S3
+        assert_eq!(s1[2].start - s1[0].start, 2000);
+        assert_eq!(s2[2].start - s2[0].start, 2000);
+        assert_eq!(s3[2].start - s3[0].start, 2600);
+        // timeline total (incl. 5000 S0)
+        assert_eq!(env.duration(), 429_000, "A-1 timeline");
+        // balance: 120 antecedents -> 60/60; per-40 windows 20/20
+        let count = |v: &[&ScheduledPresentation], pat: &str| v.iter().filter(|p| p.pattern == pat).count();
+        assert_eq!((count(&s1, "A"), count(&s1, "C")), (60, 60), "S1 balance");
+        for w in 0..3u64 {
+            let win: Vec<&ScheduledPresentation> = s1.iter()
+                .filter(|p| p.start >= 5000 + 2000 * w * 40 && p.start < 5000 + 2000 * (w + 1) * 40)
+                .filter(|p| p.pattern != "B")
+                .copied()
+                .collect();
+            assert_eq!((count(&win, "A"), count(&win, "C")), (20, 20), "S1 window {w} balance");
+        }
+        assert_eq!((count(&s2, "A"), count(&s2, "C")), (20, 20), "S2 balance");
+        assert_eq!((count(&s3, "A"), count(&s3, "C")), (20, 20), "S3 balance");
+        // no trial-type labels: presentations carry only stage/pattern/
+        // rep/start/duration; B presentations carry no antecedent ref.
+        for p in env.schedule.iter().filter(|p| p.pattern == "B") {
+            assert!(p.pattern == "B" && p.stage.len() > 0, "probe presentations are label-free");
+        }
+        // determinism of the antecedent sequence
+        let env2 = Environment::new(cfg.clone(), 20260912);
+        let seq = |e: &Environment| -> Vec<u32> {
+            e.schedule.iter().filter(|p| p.stage == "S1" && p.pattern != "B")
+                .map(|p| if p.pattern == "A" { 0u32 } else { 1 }).collect()
+        };
+        assert_eq!(seq(&env), seq(&env2), "same seed -> same sequence");
+        let mut cfg3 = cfg.clone();
+        cfg3.run.seed = 9001;
+        let env3 = Environment::new(cfg3, 9001);
+        assert_ne!(seq(&env), seq(&env3), "different seed -> different sequence");
+        // B probe stimulus: all presentations resolve to SEQ variant
+        for (si, sch) in env.schedule.iter().enumerate() {
+            if sch.pattern == "B" {
+                let pat = cfg.pattern.iter().find(|p| p.id == "B").unwrap();
+                let block = pat.variant_block.max(1) as usize;
+                let phases = &pat.phase_variants.as_ref().unwrap()[(sch.rep / block) % pat.phase_variants.as_ref().unwrap().len()].phases;
+                assert_eq!(phases[0].channel_ids, vec![4, 5, 6, 7], "SEQ phase 1");
+                assert_eq!(phases[1].channel_ids, vec![8, 9, 10, 11], "SEQ phase 2");
+            }
+        }
+        // probe spike trains are antecedent-independent by construction:
+        // B trains derive from (pattern, rep, channel, phase) tuples only.
+        for (si, sch) in env.schedule.iter().enumerate() {
+            if sch.pattern == "B" {
+                for &(off, ch) in &env.trains[si] {
+                    assert!(off < 500, "probe spikes inside its window");
+                }
+            }
+        }
+    }
+
+    // ---- ANIMA E18 instrument import check (protocol §10) ----
+
+    #[test]
+    fn e18_instrument_imports_telemetry_only() {
+        let src = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/examples/e18_analysis.rs"
+        ))
+        .unwrap();
+        assert!(!src.contains("use anima_core") && !src.contains("anima_core::"),
+            "instrument must not import anima_core");
+        assert!(src.contains("anima_telemetry"), "instrument reads telemetry");
     }
 
     // ---- ANIMA E16 pre-registered tests (docs/anima-e16-protocol.md §3/§10) ----
