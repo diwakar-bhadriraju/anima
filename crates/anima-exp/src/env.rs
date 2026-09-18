@@ -1683,6 +1683,45 @@ fn e6_configs_freeze_source_with_e6_only() {
         }
     }
 
+    // ---- ANIMA E20 pre-registered tests (docs/anima-e20-protocol.md §4/§7) ----
+
+    /// §4/§7: e20 == e19 except exp_id; D1 vote window [1800,1950);
+    /// regression: e19 semantics unchanged (2300).
+    #[test]
+    fn e20_d1_interface_isolation() {
+        let c19 = v3_config("e19.toml");
+        let c20 = v3_config("e20.toml");
+        fn j<T: serde::Serialize>(x: &T) -> String {
+            serde_json::to_string(x).unwrap()
+        }
+        assert_eq!(j(&c20.organism), j(&c19.organism), "organism identical");
+        assert_eq!(j(&c20.plasticity), j(&c19.plasticity), "plasticity identical");
+        assert_eq!(j(&c20.structural), j(&c19.structural));
+        assert_eq!(j(&c20.resources), j(&c19.resources));
+        assert_eq!(j(&c20.v2), j(&c19.v2));
+        assert_eq!(j(&c20.pattern), j(&c19.pattern), "patterns identical");
+        assert_eq!(j(&c20.stage), j(&c19.stage), "curriculum identical");
+        assert_eq!(c20.run.seed, c19.run.seed);
+        assert_ne!(c20.run.exp_id, c19.run.exp_id);
+        // D1 gating: spikes in [1950, 2300) do NOT count for e20.
+        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 1950 };
+        tr.observe_output(64, 5000 + 1949);
+        tr.observe_output(70, 5000 + 1950);
+        tr.observe_output(70, 5000 + 2299);
+        tr.close_vote();
+        assert_eq!(tr.decision, Some(crate::e19_world::Decision::Match), "e20: only pre-1950 echo counts");
+        // E19 regression: same spikes DO count there.
+        let mut tr19 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
+        tr19.observe_output(64, 5000 + 1949);
+        tr19.observe_output(70, 5000 + 1950);
+        tr19.observe_output(70, 5000 + 2299);
+        tr19.close_vote();
+        assert_eq!(tr19.decision, Some(crate::e19_world::Decision::Mismatch), "e19 semantics preserved (2 g2 vs 1 g1)");
+        // Input silence in the vote window (leakage check; measured on the
+        // committed e19 run): probe ends 1800; channels silent [1800,1950)
+        // by construction — verified at execution on e20 telemetry.
+    }
+
     // ---- ANIMA E19 pre-registered tests (docs/anima-e19-protocol.md §8) ----
 
     /// §8: substrate isolation vs e12; E19 trial grid; balance; probe
@@ -1758,24 +1797,24 @@ fn e6_configs_freeze_source_with_e6_only() {
         let ants: Vec<(bool, u64)> = env.schedule.iter()
             .filter(|p| p.stage == "S1" && p.pattern != "B")
             .map(|p| (p.pattern == "A", p.start)).collect();
-        let w1 = crate::e19_world::World::new(&ants, 20260912, false);
-        let w2 = crate::e19_world::World::new(&ants, 20260912, false);
+        let w1 = crate::e19_world::World::new(&ants, 20260912, false, 2300);
+        let w2 = crate::e19_world::World::new(&ants, 20260912, false, 2300);
         for (t1, t2) in w1.trials.iter().zip(w2.trials.iter()) {
             assert_eq!(t1.disruption, t2.disruption, "world trains deterministic");
         }
         // world logic: vote -> decision mapping
-        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![] };
+        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 };
         tr.close_vote();
         assert_eq!(tr.decision, Some(crate::e19_world::Decision::Match), "A-context + g1 = match");
-        let mut tr2 = crate::e19_world::Trial { antecedent_is_a: false, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![] };
+        let mut tr2 = crate::e19_world::Trial { antecedent_is_a: false, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 };
         tr2.close_vote();
         assert_eq!(tr2.decision, Some(crate::e19_world::Decision::Mismatch));
-        let mut tr3 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![] };
+        let mut tr3 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
         tr3.close_vote();
         assert_eq!(tr3.decision, Some(crate::e19_world::Decision::NoAction));
         assert!(tr3.disruption_due(), "no-action punished");
         // action-window gating: spikes outside [base+1800, base+2300) ignored
-        let mut tr4 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![] };
+        let mut tr4 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
         tr4.observe_output(64, 5000 + 1799);
         tr4.observe_output(70, 5000 + 2300);
         tr4.close_vote();

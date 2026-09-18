@@ -48,6 +48,9 @@ pub struct Trial {
     /// None until the consequence decision point (action-window end).
     pub decision: Option<Decision>,
     pub log: Vec<String>,
+    /// E20 (D1 interface): vote window = [1800, 1950) — the post-probe
+    /// echo. E19 semantics: [1800, 2300). Registered per experiment.
+    pub vote_end: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,9 +62,9 @@ pub enum Decision {
 
 impl Trial {
     /// Feed one output spike (neuron id, scheduled ms) to the vote.
-    /// Only spikes inside the action window [1800, 2300) count.
+    /// Only spikes inside the action window [1800, vote_end) count.
     pub fn observe_output(&mut self, n: u32, t: u64) {
-        if t >= self.base + 1800 && t < self.base + 2300 {
+        if t >= self.base + 1800 && t < self.base + self.vote_end {
             if G1.contains(&n) {
                 self.g1 += 1;
             } else if G2.contains(&n) {
@@ -130,13 +133,13 @@ pub struct World {
 }
 
 impl World {
-    /// Build from the environment's E19 schedule (antecedent starts
-    /// in scheduled time) + the run seed for disruption trains.
+    /// Build from the environment's E19/E20 schedule (antecedent
+    /// starts in scheduled time) + the run seed for disruption trains.
     /// Draw order (registered): Xoshiro from derive_seed(seed,
     /// [hash("e19-disruption")]) is consumed in trial order, 8
     /// channels x 40 draws each (Poisson 80 Hz / 500 ms = 40
     /// expected), sorted; independent of the antecedent draws.
-    pub fn new(antecedents: &[(bool, u64)], seed: u64, open_loop: bool) -> Self {
+    pub fn new(antecedents: &[(bool, u64)], seed: u64, open_loop: bool, vote_end: u64) -> Self {
         use rand::Rng;
         use rand::SeedableRng;
         let mut rng =
@@ -173,6 +176,7 @@ impl World {
                     g2: 0,
                     decision: None,
                     log: Vec::new(),
+                    vote_end,
                 }
             })
             .collect();
@@ -191,7 +195,7 @@ impl World {
     pub fn step(&mut self, t: u64, out_spikes: &[u32]) -> Vec<u32> {
         // Advance/close trials whose action window ended.
         for tr in self.trials.iter_mut() {
-            if t == tr.base + 2300 {
+            if t == tr.base + tr.vote_end {
                 tr.close_vote();
                 let d = format!("{:?}", tr.decision.clone().unwrap_or(Decision::NoAction));
                 *self.per_decision.entry(d).or_insert(0) += 1;

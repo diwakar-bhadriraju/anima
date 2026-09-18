@@ -146,10 +146,11 @@ fn main() {
                 benign += 1;
             }
             let _ = (g1, g2);
-            // output spikes in this trial's action window
+            // output spikes in this trial's action window (D1: [1800, v_end))
+            let v_end: u64 = std::env::args().nth(2).map(|x| x.parse().unwrap()).unwrap_or(2300);
             let b = base_of(k) + OFF;
-            g1_spikes += out_spikes.iter().filter(|(t, n)| *t >= b + 1800 && *t < b + 2300 && (64..70).contains(n)).count() as u64;
-            g2_spikes += out_spikes.iter().filter(|(t, n)| *t >= b + 1800 && *t < b + 2300 && (70..76).contains(n)).count() as u64;
+            g1_spikes += out_spikes.iter().filter(|(t, n)| *t >= b + 1800 && *t < b + v_end && (64..70).contains(n)).count() as u64;
+            g2_spikes += out_spikes.iter().filter(|(t, n)| *t >= b + 1800 && *t < b + v_end && (70..76).contains(n)).count() as u64;
         }
         let p_a = if a_n > 0 { a_g1 as f64 / a_n as f64 } else { 0.0 };
         let p_c = if c_n > 0 { c_g1 as f64 / c_n as f64 } else { 0.0 };

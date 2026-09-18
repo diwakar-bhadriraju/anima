@@ -93,4 +93,4 @@ balance; schedule audit. Suite green.
 
 ## Appendix: config hash (pre-run)
 
-- e20.toml: recorded at implementation (before any run).
+- e20.toml `0e7c5ed52efc4b78` (recorded at implementation, before any run; e19.toml byte-identical except exp_id).
