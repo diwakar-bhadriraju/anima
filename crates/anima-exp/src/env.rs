@@ -1595,8 +1595,8 @@ fn e6_configs_freeze_source_with_e6_only() {
     #[test]
     fn e17_replication_arms_isolated() {
         for (arm_name, ctrl_name, seed) in [
-            ("e17s9001-m3m4off", "e16s9001-stdpoff", 9001u64),
-            ("e17s424242-m3m4off", "e16s424242-stdpoff", 424242),
+            ("e17s9001-m3m4off.toml", "e16s9001-stdpoff.toml", 9001u64),
+            ("e17s424242-m3m4off.toml", "e16s424242-stdpoff.toml", 424242),
         ] {
             let arm = v3_config(arm_name);
             let ctrl = v3_config(ctrl_name);
