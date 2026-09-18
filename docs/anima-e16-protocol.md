@@ -102,3 +102,10 @@ No repair by tuning; no parameter sweeps; no E17 proposal.
 ## Appendix: amendments
 
 - (none yet)
+
+## Appendix: cross-seed configs (registered pre-run, hashes raw files)
+
+- e16s9001.toml `a3a56556586b62db`; e16s9001-m2off.toml
+  `8b08d1e6ffe1e27d`; e16s9001-stdpoff.toml `84a390ad2a47d97e`;
+  e16s424242.toml `5829f68bdef584d6`; e16s424242-m2off.toml
+  `816cb9cb309a2eea`; e16s424242-stdpoff.toml `1728fdc803d508a5`.
