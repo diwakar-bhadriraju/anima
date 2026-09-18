@@ -110,6 +110,12 @@ mechanism identity, universal claims, interaction.
 ## Appendix: amendments
 
 - (none yet)
+
+## Appendix: cross-seed replication configs (registered pre-run,
+## raw-file hashes; = committed stdpoff base + disable_m3_m4 + exp_id)
+
+- e17s9001-m3m4off.toml `44204d8d5ef091e9`
+- e17s424242-m3m4off.toml `1a8103aeb52b84ea`
 ---
 
 ## E17 execution record (2026-09-18)

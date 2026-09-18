@@ -1588,6 +1588,36 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(serde_json::to_string(&arm.stage).unwrap(), serde_json::to_string(&ctrl.stage).unwrap());
     }
 
+    // ---- ANIMA E17 cross-seed replication tests (protocol §4) ----
+
+    /// §4: replication arms = committed stdpoff control of the SAME
+    /// seed + disable_m3_m4 + exp_id only.
+    #[test]
+    fn e17_replication_arms_isolated() {
+        for (arm_name, ctrl_name, seed) in [
+            ("e17s9001-m3m4off", "e16s9001-stdpoff", 9001u64),
+            ("e17s424242-m3m4off", "e16s424242-stdpoff", 424242),
+        ] {
+            let arm = v3_config(arm_name);
+            let ctrl = v3_config(ctrl_name);
+            assert_eq!(arm.run.seed, seed, "{arm_name} seed");
+            assert_eq!(ctrl.run.seed, seed, "{ctrl_name} seed");
+            assert!(arm.v2.as_ref().unwrap().disable_m3_m4, "{arm_name} M3M4 off");
+            assert!(!ctrl.v2.as_ref().unwrap().disable_m3_m4, "{ctrl_name} M3M4 on");
+            assert!(arm.plasticity.a_plus == 0.0 && arm.plasticity.a_minus == 0.0, "{arm_name} STDP off");
+            let strip = |t: &str| t.lines()
+                .filter(|l| !l.starts_with("exp_id") && !l.starts_with("disable_m3_m4"))
+                .collect::<Vec<_>>().join("\n");
+            assert_eq!(strip(&toml::to_string(&arm).unwrap()), strip(&toml::to_string(&ctrl).unwrap()),
+                "{arm_name} == {ctrl_name} except exp_id + disable_m3_m4");
+            assert_eq!(serde_json::to_string(&arm.pattern).unwrap(), serde_json::to_string(&ctrl.pattern).unwrap());
+            assert_eq!(serde_json::to_string(&arm.stage).unwrap(), serde_json::to_string(&ctrl.stage).unwrap());
+            let (a, b) = (arm.e6.as_ref().unwrap(), ctrl.e6.as_ref().unwrap());
+            assert_eq!((a.enable, a.alpha, a.phi_init, a.phi_min, a.beta_min, a.beta_max),
+                       (b.enable, b.alpha, b.phi_init, b.phi_min, b.beta_min, b.beta_max), "E6 untouched");
+        }
+    }
+
     // ---- ANIMA E16 pre-registered tests (docs/anima-e16-protocol.md §3/§10) ----
 
     /// §3: arm configs differ from e12 ONLY by the registered ablation
