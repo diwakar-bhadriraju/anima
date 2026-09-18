@@ -355,3 +355,18 @@ candidate (NOT implemented): an endogenous-activity action channel
 or a readout convention that overlaps stimulus-driven output
 activity — a design question, not a mechanism repair. Registry
 entry only; no claims beyond the tested scale/seed.
+
+### U12 / E20 D1 interface (2026-09-19, E20 result)
+
+E20 (D1: 150 ms post-probe echo vote; all E19 variables verbatim):
+FAILURE (grid D) — 0 output spikes in [1800,1950) across all 200
+trials; 199 NoAction; disruption delivered every trial; internal
+trajectory identical to E19 (snapshots equal). ERRATUM to audit
+f3bf699: its epoch histograms were modulo-misaligned; aligned data
+show the probe response ENDS ~1600 (mid-probe) and the claimed
+post-probe echo does not exist — all activity is stimulus-locked
+with ~100 ms offset tail. E19+E20 joint conclusion: no activity at
+ANY silent readout time; category-A silent/post-stimulus interface
+corrections are exhausted; stimulus-overlapping reads (sensory
+echo) or an endogenous-activity substrate (category C) are the
+remaining directions — decision deferred, nothing proposed.
