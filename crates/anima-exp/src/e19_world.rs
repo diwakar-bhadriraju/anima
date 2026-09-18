@@ -51,6 +51,9 @@ pub struct Trial {
     /// E20 (D1 interface): vote window = [1800, 1950) — the post-probe
     /// echo. E19 semantics: [1800, 2300). Registered per experiment.
     pub vote_end: u64,
+    /// E23 reflex mode: vote = [vote_start, vote_end) of the stimulus
+    /// epoch (registered [100,500)); consequence = [500,1000).
+    pub vote_start: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -62,9 +65,9 @@ pub enum Decision {
 
 impl Trial {
     /// Feed one output spike (neuron id, scheduled ms) to the vote.
-    /// Only spikes inside the action window [1800, vote_end) count.
+    /// E19/E20: [1800, vote_end). E23 reflex: [vote_start, vote_end).
     pub fn observe_output(&mut self, n: u32, t: u64) {
-        if t >= self.base + 1800 && t < self.base + self.vote_end {
+        if t >= self.base + self.vote_start && t < self.base + self.vote_end {
             if G1.contains(&n) {
                 self.g1 += 1;
             } else if G2.contains(&n) {
@@ -106,11 +109,12 @@ impl Trial {
 
     /// World input spikes for the scheduled ms `t` (absolute).
     pub fn input_at(&self, t: u64) -> Vec<u32> {
-        if t >= self.base + CONSEQ_START && t < self.base + CONSEQ_END && self.disruption_due() {
+        let (cs, ce) = if self.vote_start < 1000 { (500u64, 1000u64) } else { (CONSEQ_START, CONSEQ_END) };
+        if t >= self.base + cs && t < self.base + ce && self.disruption_due() {
             let mut v: Vec<u32> = self
                 .disruption
                 .iter()
-                .filter(|(o, _)| self.base + CONSEQ_START + o == t)
+                .filter(|(o, _)| self.base + cs + o == t)
                 .map(|(_, c)| *c)
                 .collect();
             v.sort_unstable();
@@ -133,13 +137,15 @@ pub struct World {
 }
 
 impl World {
-    /// Build from the environment's E19/E20 schedule (antecedent
-    /// starts in scheduled time) + the run seed for disruption trains.
+    pub fn new(antecedents: &[(bool, u64)], seed: u64, open_loop: bool, vote_end: u64) -> Self {
+        Self::with_vote_start(antecedents, seed, open_loop, vote_end, 1800)
+    }
+
     /// Draw order (registered): Xoshiro from derive_seed(seed,
     /// [hash("e19-disruption")]) is consumed in trial order, 8
     /// channels x 40 draws each (Poisson 80 Hz / 500 ms = 40
     /// expected), sorted; independent of the antecedent draws.
-    pub fn new(antecedents: &[(bool, u64)], seed: u64, open_loop: bool, vote_end: u64) -> Self {
+    pub fn with_vote_start(antecedents: &[(bool, u64)], seed: u64, open_loop: bool, vote_end: u64, vote_start: u64) -> Self {
         use rand::Rng;
         use rand::SeedableRng;
         let mut rng =
@@ -177,6 +183,7 @@ impl World {
                     decision: None,
                     log: Vec::new(),
                     vote_end,
+                    vote_start,
                 }
             })
             .collect();
@@ -207,7 +214,7 @@ impl World {
         // Observe output spikes (into the CURRENT trial only).
         let mut inj = Vec::new();
         for (i, tr) in self.trials.iter_mut().enumerate() {
-            if t >= tr.base && t < tr.base + TRIAL_MS {
+            if t >= tr.base && t < tr.base + (if tr.vote_start < 1000 { 2000 } else { TRIAL_MS }) {
                 self.cur = i;
                 for &n in out_spikes {
                     tr.observe_output(n, t);

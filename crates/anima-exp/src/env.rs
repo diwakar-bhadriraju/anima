@@ -1683,6 +1683,62 @@ fn e6_configs_freeze_source_with_e6_only() {
         }
     }
 
+    // ---- ANIMA E21/E23 pre-registered tests ----
+
+    /// E21: six gap arms, E18 paradigm, only gap (and ITI) differ; grid;
+    /// balance; determinism. E23: interleaved A/C stimulus trials,
+    /// 2000 ms cadence, balanced; substrate isolation.
+    #[test]
+    fn e21_e23_configs_and_grids() {
+        fn j<T: serde::Serialize>(x: &T) -> String {
+            serde_json::to_string(x).unwrap()
+        }
+        let c12 = v3_config("e12.toml");
+        // E21 arms
+        let mut prev_seq = None;
+        for g in [0u64, 50, 100, 200, 400, 800] {
+            let cfg = v3_config(&format!("e21-g{g}.toml"));
+            assert_eq!(j(&cfg.organism), j(&c12.organism), "g{g} organism frozen");
+            assert_eq!(j(&cfg.plasticity), j(&c12.plasticity));
+            assert_eq!(j(&cfg.v2), j(&c12.v2));
+            let env = Environment::new(cfg.clone(), 20260912);
+            let s1: Vec<&ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S1").collect();
+            assert_eq!(s1.len(), 400, "g{g}: 200 trials x 2");
+            assert_eq!(s1[1].start, s1[0].start + 500 + g, "g{g} probe placement");
+            assert_eq!(s1[2].start - s1[0].start, 2000, "g{g} cadence 2000");
+            let n_a = s1.iter().filter(|p| p.pattern == "A").count();
+            assert_eq!((n_a, 200 - n_a), (100, 100), "g{g} overall balance");
+            let seq: Vec<u32> = s1.iter().filter(|p| p.pattern != "B").map(|p| if p.pattern == "A" { 0 } else { 1 }).collect();
+            for w in 0..5u64 {
+                let win = &seq[(w * 40) as usize..((w + 1) * 40) as usize];
+                assert_eq!(win.iter().filter(|&&x| x == 0).count(), 20, "g{g} window {w} balance");
+            }
+            if let Some(pv) = &prev_seq { assert_eq!(*pv, seq, "same seed => identical antecedent sequence across arms (registered)"); }
+            prev_seq = Some(seq.clone());
+            let env2 = Environment::new(cfg.clone(), 20260912);
+            let seq2: Vec<u32> = env2.schedule.iter().filter(|p| p.stage == "S1" && p.pattern != "B").map(|p| if p.pattern == "A" { 0 } else { 1 }).collect();
+            assert_eq!(seq, seq2, "g{g} deterministic");
+        }
+        // Registered: seed 20260912 per arm => identical antecedent
+        // sequences across all six arms (cross-arm identity asserted).
+        // E23 arms
+        for arm in ["e23-closed.toml", "e23-open.toml"] {
+            let cfg = v3_config(arm);
+            assert_eq!(j(&cfg.organism), j(&c12.organism), "{arm} frozen");
+            let env = Environment::new(cfg.clone(), 20260912);
+            let s1: Vec<&ScheduledPresentation> = env.schedule.iter().filter(|p| p.stage == "S1").collect();
+            assert_eq!(s1.len(), 200, "{arm}: 200 stimuli");
+            assert_eq!(s1[1].start - s1[0].start, 2000, "{arm} cadence");
+            let n_a = s1.iter().filter(|p| p.pattern == "A").count();
+            assert_eq!((n_a, 200 - n_a), (100, 100), "{arm} balance");
+        }
+        let cc = v3_config("e23-closed.toml");
+        let co = v3_config("e23-open.toml");
+        assert_eq!(j(&cc.stage), j(&co.stage), "E23 arms: identical curriculum");
+        assert_eq!(cc.run.seed, co.run.seed);
+        assert_ne!(cc.run.exp_id, co.run.exp_id);
+    }
+
     // ---- ANIMA E20 pre-registered tests (docs/anima-e20-protocol.md §4/§7) ----
 
     /// §4/§7: e20 == e19 except exp_id; D1 vote window [1800,1950);
@@ -1704,14 +1760,14 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert_eq!(c20.run.seed, c19.run.seed);
         assert_ne!(c20.run.exp_id, c19.run.exp_id);
         // D1 gating: spikes in [1950, 2300) do NOT count for e20.
-        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 1950 };
+        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 1950 , vote_start: 1800};
         tr.observe_output(64, 5000 + 1949);
         tr.observe_output(70, 5000 + 1950);
         tr.observe_output(70, 5000 + 2299);
         tr.close_vote();
         assert_eq!(tr.decision, Some(crate::e19_world::Decision::Match), "e20: only pre-1950 echo counts");
         // E19 regression: same spikes DO count there.
-        let mut tr19 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
+        let mut tr19 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 , vote_start: 1800};
         tr19.observe_output(64, 5000 + 1949);
         tr19.observe_output(70, 5000 + 1950);
         tr19.observe_output(70, 5000 + 2299);
@@ -1803,18 +1859,18 @@ fn e6_configs_freeze_source_with_e6_only() {
             assert_eq!(t1.disruption, t2.disruption, "world trains deterministic");
         }
         // world logic: vote -> decision mapping
-        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 };
+        let mut tr = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 , vote_start: 1800};
         tr.close_vote();
         assert_eq!(tr.decision, Some(crate::e19_world::Decision::Match), "A-context + g1 = match");
-        let mut tr2 = crate::e19_world::Trial { antecedent_is_a: false, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 };
+        let mut tr2 = crate::e19_world::Trial { antecedent_is_a: false, base: 5000, disruption: vec![], g1: 5, g2: 2, decision: None, log: vec![], vote_end: 2300 , vote_start: 1800};
         tr2.close_vote();
         assert_eq!(tr2.decision, Some(crate::e19_world::Decision::Mismatch));
-        let mut tr3 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
+        let mut tr3 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 , vote_start: 1800};
         tr3.close_vote();
         assert_eq!(tr3.decision, Some(crate::e19_world::Decision::NoAction));
         assert!(tr3.disruption_due(), "no-action punished");
         // action-window gating: spikes outside [base+1800, base+2300) ignored
-        let mut tr4 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 };
+        let mut tr4 = crate::e19_world::Trial { antecedent_is_a: true, base: 5000, disruption: vec![], g1: 0, g2: 0, decision: None, log: vec![], vote_end: 2300 , vote_start: 1800};
         tr4.observe_output(64, 5000 + 1799);
         tr4.observe_output(70, 5000 + 2300);
         tr4.close_vote();

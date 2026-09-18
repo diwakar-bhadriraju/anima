@@ -135,6 +135,21 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         assert_eq!(ants.len(), 200, "E19 world: 200 antecedents");
         let vote_end = if cfg.run.exp_id == "e20" { 1950 } else { 2300 };
         Some(crate::e19_world::World::new(&ants, seed, false, vote_end))
+    } else if cfg.run.exp_id.starts_with("e23-") && cfg.stage.iter().any(|st| {
+        st.present.len() == 2 && st.reps == 100 && st.off_ms == 1500 && st.silence_ms.is_none()
+    }) {
+        // E23 reflex mode (docs/anima-e23-protocol.md §2): interleaved
+        // A/C stimulus trials; vote [100,500) of the stimulus epoch;
+        // consequence [500,1000); open arm = consequence always silence.
+        let ants: Vec<(bool, u64)> = env
+            .schedule
+            .iter()
+            .filter(|p| p.stage == "S1" && (p.pattern == "A" || p.pattern == "C"))
+            .map(|p| (p.pattern == "A", p.start))
+            .collect();
+        assert_eq!(ants.len(), 200, "E23 world: 200 stimuli");
+        let open = cfg.run.exp_id == "e23-open";
+        Some(crate::e19_world::World::with_vote_start(&ants, seed, open, 500, 100))
     } else {
         None
     };

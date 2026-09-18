@@ -60,7 +60,7 @@ from this experiment's table ONLY, before any E22 run.
 
 ## Appendix: config hashes (pre-run)
 
-- Recorded at implementation, before any run.
+- e21-g0.toml `99334d9daead7bfe`; e21-g50.toml `0e302b16451939c5`; e21-g100.toml `2a54976089e739fc`; e21-g200.toml `875acf72fc341da3`; e21-g400.toml `7a0926452f5ed213`; e21-g800.toml `7e31b86f89b39722` (recorded pre-run).
 
 ## Appendix: amendments
 

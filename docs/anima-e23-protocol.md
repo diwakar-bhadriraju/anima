@@ -66,7 +66,7 @@ A memory experiment (nothing to retain); supervised classification
 
 ## Appendix: config hashes (pre-run)
 
-- Recorded at implementation, before any run.
+- e23-closed.toml `286abe870b6b59a3`; e23-open.toml `1d92dfc3c495e40e` (recorded pre-run; arms identical except exp_id; world differs only in the closed loop).
 
 ## Appendix: amendments
 
