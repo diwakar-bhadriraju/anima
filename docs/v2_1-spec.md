@@ -252,3 +252,124 @@ Each claim requires the previous ones but none implies the next.
 
 STOP after this specification. No implementation, no execution,
 no E-number.
+---
+
+## V2.1 VALIDATION RECORD (2026-09-19)
+
+Commits: `6ec7eb6` Stage A implementation, `1e6ec19` Stage A2
+regression. Tests: anima-core 70 + anima-exp 54 + anima-viz 5 +
+telemetry suites, 0 failed, 0 warnings.
+
+### STAGE A — IDENTITY GATE: PASS
+
+A1 unit: beta=0 => u exactly 0.0 for all neurons over 100k ticks;
+spike sequences byte-identical to default-config V2; beta>0 dense
+drive accumulates u. A2 regression: new binary on the committed
+e12 config reproduces the committed run FUNCTIONALLY IDENTICALLY
+— all 1,145,703 non-marker event rows (kind, t, neuron-id,
+syn-id) equal; spike/output/weight streams identical. Raw byte
+diffs are exactly the three documented additive changes
+(+1 marker = the E18-era contiguous-boundary fix; RunStarted
+params +2 fields; snapshot schema +u_slow). Full E1–E23 suite
+green throughout.
+
+### STAGE B — PERSISTENCE PROBE: B1 PASS; B3 shows a SHARP
+### stability boundary; B2 (endogenous silence-firing) achieved in
+### a NARROW sub-grid window.
+
+Probe schedule: S0 5000 | S1 = 40 x A (cadence 2000) | S2 = 20 s
+silence; total 105,000 ms; seed 20260912.
+
+B1 (u exists + decays): PASS — u accumulates during drive and
+decays with tau_s in silence (stable cells: u_sum(85000) 63.5 →
+u_sum(105000) 48.9 at tau=10 s ≈ exp(-2s/10s) as configured;
+83.0 → 58.1 at tau=5 s). Unit test v21_u_decays_with_tau also
+PASS.
+
+B3 (stability map — all cells, registered grid + boundary
+bracketing):
+
+| beta \ tau | 1000 | 2500 | 5000 | 10000 |
+|---|---|---|---|---|
+| 0.2 | RUNAWAY (288 Hz) | RUNAWAY (361) | RUNAWAY (361) | RUNAWAY (361) |
+| 0.1 | RUNAWAY (152) | RUNAWAY (239) | RUNAWAY (252) | RUNAWAY (252) |
+| 0.05 | RUNAWAY (54) | RUNAWAY (139) | RUNAWAY (167) | RUNAWAY (164) |
+| 0.025 | RUNAWAY (105) | RUNAWAY (132) | RUNAWAY (124) | RUNAWAY (66) |
+| 0.0125 | — | RUNAWAY (55) | — | RUNAWAY (66) |
+| 0.00625 | — | STABLE-SILENT (0 endo) | **STABLE-ENDOGENOUS** (36,982 spikes/20 s, u 83.0→58.1) | RUNAWAY (64) |
+| 0.003125 | — | STABLE-SILENT | — | **STABLE-ENDOGENOUS** (29,707/20 s, u 63.5→48.9) |
+
+(RUNAWAY = existing P2 runaway-activity failure fires at t≈10.2–
+11.0k ms, run aborts — RECORDED, no containment added, per
+mandate. STABLE-SILENT = run completes, zero silence-firing, u
+decays sub-threshold. STABLE-ENDOGENOUS = run completes, zero
+failures, sustained self-generated activity through the entire
+20 s silence.)
+
+Structure of the result: at every tau the runaway threshold sits
+between beta 0.0125 and 0.00625 (i.e., near beta ≈
+adaptation_gain/4); LONGER tau does NOT stabilize — it widens the
+runaway basin at the bracketing beta (0.00625 runs away at
+tau=10 s but is stable at 5 s). The endogenous regime is a NARROW
+WEDGE between silent decay and runaway: (0.00625, 5000) and
+(0.003125, 10000) both sustain population activity (~1.5–1.9
+spikes/neuron/s over the silence, u plateauing near threshold
+rather than decaying to zero — self-sustaining but contained by
+adaptation/M6). No clipping, bounds, or containment were added.
+
+B2 (u sustains activity): ACHIEVED in the two wedge cells —
+36,982 / 29,707 endogenous spikes across the full 20 s silence,
+firing right up to t=105,001 (run end), zero P2 failures, max
+rate within bounds. Claim kept separate: this is "u can sustain
+activity", NOT information-carrying, NOT useful behavior.
+
+### STAGE C — TEMPORAL-CAPACITY REMEASUREMENT
+
+Frozen selection rule (spec Part 3 C1, unresolved decision 2 as
+proposed): "smallest beta with measured endogenous silence-firing
+at the B4-median tau; fallback: the largest-stability cell."
+B4-median tau = 5000 ms (of {1000,2500,5000,10000}).
+Smallest beta with endogenous firing at tau=5000 = 0.00625.
+SELECTED CONFIGURATION (frozen by rule): beta = 0.00625,
+tau_s = 5000 ms.
+
+E21-paradigm gap sweep at (0.00625, 5000): six arms
+gap ∈ {0,50,100,200,400,800}, e21 configs + the two V2.1 fields,
+identical seeds/balance/cadence as E21; metric D_L vs split-half
+NF, RETAINED := D_L − NF > 0.05.
+
+| gap | D_L | NF | D_L−NF | RETAINED | V2 comparison |
+|---|---|---|---|---|---|
+| 0 | 0.2042 | 0.1096 | 0.0946 | YES | 0.0815 YES |
+| 50 | 0.1078 | 0.1004 | 0.0074 | no | −0.0014 no |
+| 100 | 0.1109 | 0.0999 | 0.0110 | no | +0.0034 no |
+| 200 | 0.1094 | 0.1001 | 0.0093 | no | −0.0040 no |
+| 400 | 0.1027 | 0.0966 | 0.0061 | no | +0.0386 no |
+| 800 | 0.1099 | 0.1013 | 0.0086 | no | +0.0018 no |
+
+(arms: runs/v21c-g{0,50,100,200,400,800}-*; all gates clean,
+0 failures, A-C sanity ≤ 0.09.)
+
+STAGE C RESULT: temporal capacity of the V2.1 organism at the
+rule-selected (beta, tau) is UNCHANGED — still < 50 ms. The
+endogenous activity sustains FIRING but, at this operating point,
+does not carry usable antecedent information across any gap ≥ 50
+ms: D_L sits at the split-half noise floor exactly as in V2.
+
+### CLAIM STATUS (taxonomy enforced)
+
+1. u exists: PROVEN (B1).
+2. u can sustain activity: PROVEN (B2, two wedge cells; narrow
+   stability window characterized; runaway recorded, no
+   containment added).
+3. u carries information: NOT ESTABLISHED at the rule-selected
+   operating point (capacity unchanged < 50 ms). The wedge cells
+   that sustain activity were NOT selected by the rule for C;
+   whether THEY extend capacity is an open cell-level question
+   the frozen rule deliberately did not chase (no post-hoc
+   re-selection).
+4. u enables useful behavior: NOT TESTED (out of scope).
+
+STOP — V2.1 validation complete. No next experiment proposed; no
+containment or further DOF added; runaway is on the record as the
+mandate requires.
