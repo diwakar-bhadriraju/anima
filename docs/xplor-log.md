@@ -169,3 +169,91 @@ guarantee, unchanged).
 
 STOP after this log per mandate. No E-number assigned; no
 preregistration made.
+
+---
+
+## 6. X3 — regime boundary map (frozen grid, executed 2026-09-19)
+
+Grid frozen BEFORE execution: seeds {20260912, 424242, 9001,
+123456, 777} × drive {A-only, C-only, A/C interleaved} × β
+{0.003125, 0.0046875, 0.00625}, τ=5000, v21probe schedule. 45 runs
+(`runs/xs-*`, configs `configs/xs-*` via `scripts/gen_xs.py`);
+grid NOT expanded/optimized mid-run. Instrument: `v21bmap`.
+Recorded per run: end reason, silence regime class, drive-end
+top-u (id, magnitude), top-3 u sum, active count, first/last-5 s
+silence spikes.
+
+### 6.1 Full map (regime class; abort cells marked)
+
+| seed | β=0.003125 | β=0.0046875 | β=0.00625 |
+|---|---|---|---|
+| 20260912 A | sparse-core(1 spk) | pacemaker | pacemaker |
+| 20260912 C | silent | pacemaker | **abort@18 s** |
+| 20260912 AC | silent | sparse-core | **abort@40 s** |
+| 424242 A | silent | sparse-core | pacemaker |
+| 424242 C | silent | sparse-core | **abort@10 s** |
+| 424242 AC | silent | silent | **abort@10 s** |
+| 9001 A | silent | sparse-core | **abort@23 s** |
+| 9001 C | silent | silent | pacemaker |
+| 9001 AC | **abort@23 s** | sparse-core(decay) | pacemaker |
+| 123456 A | silent | pacemaker | pacemaker |
+| 123456 C | silent | pacemaker | pacemaker |
+| 123456 AC | silent | sparse-core | pacemaker |
+| 777 A | silent | silent | pacemaker |
+| 777 C | silent | pacemaker | pacemaker |
+| 777 AC | silent | silent | pacemaker |
+
+### 6.2 Observations (separate from interpretation)
+
+- O3.1 β=0.003125: 14/15 silent (one 1-spike exception). Below
+  onset at every seed and every drive tested.
+- O3.2 β=0.00625: 0/15 silent — 10 pacemaker, 5 aborts on the P2
+  runaway detector mid-drive. Above onset at every seed/drive.
+- O3.3 β=0.0046875 is the transition band: 5 pacemaker, 6
+  sparse-core, 4 silent across seeds/drives. Drive composition
+  shifts outcome WITHIN the band at fixed seed (20260912: A→pm,
+  C→pm, AC→sparse; 777: A→silent, C→pm, AC→silent) but not
+  consistently across seeds.
+- O3.4 Drive-end top-u is a strong single-number regime
+  predictor across all 40 complete runs: top-u > 2.0 separates
+  persistent (pacemaker/sparse-core) from silent at 16/22 vs
+  17/17 (accuracy 0.85; all six misclassified persist-cells are
+  marginal sparse-core with ≤96 spikes). Silent runs never
+  exceed top-u 0.92; pacemakers always ≥ 6.
+- O3.5 All 5 aborts are mid-drive runaway-detector crossings at
+  larger β·(drive intensity), not silence instabilities; two
+  anomalous cells (9001) abort in the "wrong" arm for their β,
+  showing the transition band is also abort-fragile.
+- O3.6 Silence trajectory classes: pacemaker = flat or slowly
+  decaying 10 s⁴–10 d spikes/5 s; sparse-core = short tail (≤
+  few hundred spikes, dies < 6 s); silent = zero.
+
+### 6.3 Interpretation (hypothesis)
+
+- The intermediate regime is not a wedge in seed space but a
+  TRANSITION BAND at β≈0.0047 whose outcome per (seed, drive) is
+  set by whether the drive-end winner neuron's u margin exceeds
+  the self-regeneration threshold (~u≈2 at these settings).
+  Drive composition perturbs which neuron wins and its margin —
+  the boundary is history-dependent, exactly the lever a
+  regime-selection capacity experiment needs.
+- The E23-era warning returns at β=0.00625: the P2 detector
+  (50 Hz/5 s) aborts 5/15 mid-drive cells. Any formal experiment
+  at the wedge/above must either target the band or treat the
+  detector threshold as part of the design.
+
+### 6.4 Negative results retained
+
+- No per-trial A/C code in u (X2 §3, permutation-tested) — X3
+  does not revisit it.
+- β=0.003125 universal silence (14/15) — the earlier single-cell
+  silence at τ=2500 generalizes across 5 seeds and 3 drives.
+- Drive-composition effect on regime is REAL but seed-inconsistent
+  in the band (O3.3): 2 seeds shift, 2 do not.
+
+## 7. Standing STOP honored
+
+X3 executed as a frozen exploratory grid; nothing promoted to
+E-number; draft protocol for the regime-selection capacity
+experiment written separately (docs/draft-e24-regime-capacity.md)
+and NOT executed; old Stage C NOT executed; V2.1 not modified.
