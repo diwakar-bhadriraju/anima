@@ -288,3 +288,25 @@ No exploratory runs executed this turn; both open methodological
 questions (blocked-stage semantics env.rs:340-346; silence
 readout window safety) resolved from existing artifacts. V2.1
 not modified. E24 NOT executed.
+
+
+---
+
+## 9. V2.2 architectural spec frozen (not implemented, not executed)
+
+User approved the architectural slate as a candidate direction;
+bundle decision: G1+G2+Y1 (smallest attributable intervention;
+G1-alone untestable as a carrier — homogeneous threshold repeats
+the seed-lottery; G1-without-Y1 unwritable — no return path).
+Frozen: docs/v2_2-spec.md - exact local dynamics (two-variable
+per-neuron state u,z; SET theta / RESET phi gate; plateau added
+to u not replacing it; per-spike eta subtraction), update order,
+LogNormal heterogeneity draws (theta_rel 2.0+/-0.35, U_rel 0.9
++/-0.35, tau-het off), identity nulls (enable=false bit-exact
+V2.1, sd=0 skips RNG draws), stability criteria (P2 unchanged;
+latch-saturation recorded not suppressed), success criteria
+C-S1..C-S5 (decoding>chance, 2s latch-set stability >=80%,
+<300Hz, no new instability, byte-identity), falsifiers F1-F6,
+and the 4-arm x 6-seed x 5-curriculum Stage-2 discrimination
+plan whose BETWEEN-arm paired differences are the component
+attribution. STOP after freeze, per mandate.
