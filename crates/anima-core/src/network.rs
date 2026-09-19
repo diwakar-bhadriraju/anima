@@ -83,6 +83,14 @@ fn default_slow_tau() -> f32 {
     2500.0
 }
 
+fn one_f32() -> f32 {
+    1.0
+}
+
+fn v22_theta_mean() -> f32 { 2.0 }
+fn v22_plateau_mean() -> f32 { 0.9 }
+fn v22_phi_rel() -> f32 { 0.5 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Neuron {
     pub id: NeuronId,
@@ -110,6 +118,20 @@ pub struct Neuron {
     /// into dv as +u. beta = 0 (default) => bit-identical V2.
     #[serde(default)]
     pub u_slow: f32,
+    /// V2.2 (docs/v2_2-spec.md): bistable latch state.
+    /// 0 = unlatched, 1 = latched. SET when decayed u >= theta_i;
+    /// RESET when decayed u < phi_i. Plateau U_i adds to u in dv.
+    #[serde(default)]
+    pub z_latch: u8,
+    /// V2.2 G2: per-neuron heterogeneity draws (LogNormal, frozen
+    /// spec §2; identity 1.0 when heterogeneity sd = 0 — NO RNG
+    /// consumed in that case).
+    #[serde(default = "one_f32")]
+    pub theta_rel: f32,
+    #[serde(default = "one_f32")]
+    pub u_plateau_rel: f32,
+    #[serde(default = "one_f32")]
+    pub tau_het_rel: f32,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -203,6 +225,30 @@ pub struct NetworkConfig {
     pub slow_state_beta: f32,
     #[serde(default = "default_slow_tau")]
     pub slow_state_tau_ms: f32,
+    // ---- V2.2 (docs/v2_2-spec.md §1.3): all defaults = identity. ----
+    /// Master switch: false => code path is V2.1 exactly.
+    #[serde(default)]
+    pub latch_enable: bool,
+    /// SET threshold theta_i = u_reg * theta_rel_i; u_reg is the
+    /// per-neuron regeneration equilibrium beta / (1 - exp(-1000/tau_s)).
+    #[serde(default = "v22_theta_mean")]
+    pub theta_rel_mean: f32,
+    #[serde(default)]
+    pub theta_rel_sd: f32,
+    /// Plateau amplitude U_i = u_reg * u_plateau_rel_i (adds to u).
+    #[serde(default = "v22_plateau_mean")]
+    pub u_plateau_rel_mean: f32,
+    #[serde(default)]
+    pub u_plateau_rel_sd: f32,
+    /// tau_s_i = tau_s * tau_het_rel_i (default 0 = off => rel 1.0).
+    #[serde(default)]
+    pub tau_het_rel_sd: f32,
+    /// RESET release threshold phi_i = theta_i * phi_rel.
+    #[serde(default = "v22_phi_rel")]
+    pub phi_rel: f32,
+    /// Y1 per-spike subtraction eta = beta * eta_rel (0 = off).
+    #[serde(default)]
+    pub eta_rel: f32,
     /// ANIMA v2 (docs/anima-v2-protocol.md): when Some, M1 dense-weak
     /// initialization + the V2Plasticity mechanisms (M2–M6) are active.
     #[serde(default)]
@@ -271,6 +317,14 @@ impl Default for NetworkConfig {
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
+            latch_enable: false,
+            theta_rel_mean: v22_theta_mean(),
+            theta_rel_sd: 0.0,
+            u_plateau_rel_mean: v22_plateau_mean(),
+            u_plateau_rel_sd: 0.0,
+            tau_het_rel_sd: 0.0,
+            phi_rel: v22_phi_rel(),
+            eta_rel: 0.0,
             // V2 default OFF: None must reproduce E1–E4f exactly.
             v2: None,
         }
@@ -322,6 +376,10 @@ impl Network {
                 rate_hz: 0.0,
                 i_adapt: 0.0,
                 u_slow: 0.0,
+                z_latch: 0,
+                theta_rel: 1.0,
+                u_plateau_rel: 1.0,
+                tau_het_rel: 1.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -345,6 +403,10 @@ impl Network {
                 rate_hz: 0.0,
                 i_adapt: 0.0,
                 u_slow: 0.0,
+                z_latch: 0,
+                theta_rel: 1.0,
+                u_plateau_rel: 1.0,
+                tau_het_rel: 1.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -363,6 +425,10 @@ impl Network {
                 rate_hz: 0.0,
                 i_adapt: 0.0,
                 u_slow: 0.0,
+                z_latch: 0,
+                theta_rel: 1.0,
+                u_plateau_rel: 1.0,
+                tau_het_rel: 1.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -447,6 +513,44 @@ impl Network {
                         net.add_synapse(src, post, w, true, Tick(0));
                     }
                 }
+            }
+        }
+
+        // V2.2 G2 (docs/v2_2-spec.md §2/§5): per-neuron LogNormal draws,
+        // appended strictly AFTER all V2/V2.1 construction draws, in neuron-id
+        // order, theta -> U -> T per neuron. SKIPPED ENTIRELY when both
+        // heterogeneity sds are 0 (identity consumes zero RNG draws =>
+        // bit-exact V2.1/V2 baselines).
+        let het_needed = net.cfg.latch_enable
+            && (net.cfg.theta_rel_sd > 0.0
+                || net.cfg.u_plateau_rel_sd > 0.0
+                || net.cfg.tau_het_rel_sd > 0.0);
+        if het_needed {
+            // median-preserving LogNormal: given multiplicative mean m and sd s,
+            // mu = ln(m) - s^2/2, sigma = s (sd of log-space multiplier).
+            let draw_lognormal = |rng: &mut Xoshiro256PlusPlus, m: f32, s: f32| -> f32 {
+                use rand::Rng;
+                let mu = (m.max(1e-9)).ln() - s * s / 2.0;
+                // Box-Muller from two uniforms (deterministic order)
+                let u1: f32 = rng.gen::<f32>().max(1e-9);
+                let u2: f32 = rng.gen::<f32>();
+                let r = (-2.0 * u1.ln()).sqrt();
+                let z = r * (2.0 * core::f32::consts::PI * u2).cos();
+                (mu + s * z).exp()
+            };
+            let ids: Vec<usize> = (0..net.neurons.len()).collect();
+            for &i in &ids {
+                let th = draw_lognormal(&mut net.rng, net.cfg.theta_rel_mean, net.cfg.theta_rel_sd);
+                let up = draw_lognormal(&mut net.rng, net.cfg.u_plateau_rel_mean, net.cfg.u_plateau_rel_sd);
+                let t = if net.cfg.tau_het_rel_sd > 0.0 {
+                    draw_lognormal(&mut net.rng, 1.0, net.cfg.tau_het_rel_sd)
+                } else {
+                    1.0
+                };
+                let n = &mut net.neurons[i];
+                n.theta_rel = th;
+                n.u_plateau_rel = up;
+                n.tau_het_rel = t;
             }
         }
         net
@@ -578,8 +682,33 @@ impl Network {
             // U1: adaptation current decays on the same exponential form.
             neur.i_adapt *= decay_adapt;
             // V2.1: decay-then-read (same convention as i_adapt/i_syn).
-            neur.u_slow *= decay_slow;
-            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext - neur.i_adapt + neur.u_slow) * dt / p.tau_m;
+            // V2.2 G2: per-neuron tau (identity 1.0 when tau_het off).
+            let decay_slow_i = if self.cfg.latch_enable && neur.tau_het_rel != 1.0 {
+                exp_approx(-dt / (self.cfg.slow_state_tau_ms * neur.tau_het_rel))
+            } else {
+                decay_slow
+            };
+            neur.u_slow *= decay_slow_i;
+            // V2.2 G1: latch gate on the DECAYED u (spec §1.2 step 2).
+            let u_eff = if self.cfg.latch_enable {
+                // u_reg = per-neuron regeneration equilibrium (spec §1.3):
+                // beta / (1 - exp(-1000/tau_s_i)) — the equilibrium of the
+                // integrate-and-decay loop at 1000 spikes/s.
+                let tau_i = self.cfg.slow_state_tau_ms * neur.tau_het_rel;
+                let u_reg = self.cfg.slow_state_beta
+                    / (1.0 - exp_approx(-1000.0 / tau_i));
+                let theta = u_reg * neur.theta_rel;
+                if neur.z_latch == 0 && neur.u_slow >= theta {
+                    neur.z_latch = 1;
+                } else if neur.z_latch == 1 && neur.u_slow < theta * self.cfg.phi_rel {
+                    neur.z_latch = 0;
+                }
+                // Plateau ADDS to u (spec §1): u_eff = u + z * U_i.
+                neur.u_slow + (neur.z_latch as f32) * u_reg * neur.u_plateau_rel
+            } else {
+                neur.u_slow
+            };
+            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext - neur.i_adapt + u_eff) * dt / p.tau_m;
             neur.v += dv;
             let spiked = self.tick.0 >= neur.refractory_until.0 && neur.v >= p.v_th;
             if spiked {
@@ -589,6 +718,12 @@ impl Network {
                 neur.i_adapt += self.cfg.adaptation_gain;
                 // V2.1: depolarizing slow kick per spike (spec §1.2-1.3).
                 neur.u_slow += self.cfg.slow_state_beta;
+                // V2.2 Y1: local per-spike subtraction eta = beta*eta_rel,
+                // floored at 0 (spec §3; 0 = off when eta_rel = 0).
+                if self.cfg.latch_enable && self.cfg.eta_rel > 0.0 {
+                    let eta = self.cfg.slow_state_beta * self.cfg.eta_rel;
+                    neur.u_slow = (neur.u_slow - eta).max(0.0);
+                }
                 spikes.push(neur.id());
             }
         }

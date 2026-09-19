@@ -155,6 +155,24 @@ pub struct OrganismSection {
     pub slow_state_beta: f32,
     #[serde(default = "default_slow_tau_ms")]
     pub slow_state_tau_ms: f32,
+    /// V2.2 (docs/v2_2-spec.md §1.3): bistable latch. All defaults =
+    /// identity (latch off => V2.1 exactly).
+    #[serde(default)]
+    pub latch_enable: bool,
+    #[serde(default = "default_v22_theta_mean")]
+    pub theta_rel_mean: f32,
+    #[serde(default)]
+    pub theta_rel_sd: f32,
+    #[serde(default = "default_v22_plateau_mean")]
+    pub u_plateau_rel_mean: f32,
+    #[serde(default)]
+    pub u_plateau_rel_sd: f32,
+    #[serde(default)]
+    pub tau_het_rel_sd: f32,
+    #[serde(default = "default_v22_phi_rel")]
+    pub phi_rel: f32,
+    #[serde(default)]
+    pub eta_rel: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -491,3 +509,6 @@ fn default_stage_order() -> String {
 fn default_slow_tau_ms() -> f32 {
     2500.0
 }
+fn default_v22_theta_mean() -> f32 { 2.0 }
+fn default_v22_plateau_mean() -> f32 { 0.9 }
+fn default_v22_phi_rel() -> f32 { 0.5 }

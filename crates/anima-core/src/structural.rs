@@ -338,11 +338,41 @@ impl StructuralMonitor {
             rate_hz: 0.0,
             i_adapt: 0.0,
             u_slow: 0.0,
+            z_latch: 0,
+            theta_rel: 1.0,
+            u_plateau_rel: 1.0,
+            tau_het_rel: 1.0,
             dormant_since: None,
             retired: false,
         });
         net.incoming.push(Vec::new());
         net.outgoing.push(Vec::new());
+        // V2.2 G2 (spec §1.2 step 6): born neurons draw heterogeneity from
+        // the same seeded distributions, appended to the network RNG stream.
+        if net.cfg.latch_enable
+            && (net.cfg.theta_rel_sd > 0.0
+                || net.cfg.u_plateau_rel_sd > 0.0
+                || net.cfg.tau_het_rel_sd > 0.0)
+        {
+            let draw_lognormal = |rng: &mut rand_xoshiro::Xoshiro256PlusPlus, m: f32, s: f32| -> f32 {
+                use rand::Rng;
+                let mu = (m.max(1e-9)).ln() - s * s / 2.0;
+                let u1: f32 = rng.gen::<f32>().max(1e-9);
+                let u2: f32 = rng.gen::<f32>();
+                let r = (-2.0 * u1.ln()).sqrt();
+                let z = r * (2.0 * core::f32::consts::PI * u2).cos();
+                (mu + s * z).exp()
+            };
+            let th = draw_lognormal(&mut net.rng, net.cfg.theta_rel_mean, net.cfg.theta_rel_sd);
+            let up = draw_lognormal(&mut net.rng, net.cfg.u_plateau_rel_mean, net.cfg.u_plateau_rel_sd);
+            let t = if net.cfg.tau_het_rel_sd > 0.0 {
+                draw_lognormal(&mut net.rng, 1.0, net.cfg.tau_het_rel_sd)
+            } else { 1.0 };
+            let n = &mut net.neurons[id.0 as usize];
+            n.theta_rel = th;
+            n.u_plateau_rel = up;
+            n.tau_het_rel = t;
+        }
         // Wire to partners by coactivity preference. Default (Phase 0):
         // highest-rate (most-recently-coactive) partners. U3/E4
         // (`wiring_avoid_coactive`): lowest-rate — capacity allocated

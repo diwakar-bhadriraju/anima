@@ -29,6 +29,9 @@ pub struct NeuronState {
     /// V2.1: slow depolarizing intrinsic state (None = pre-V2.1 files).
     #[serde(default)]
     pub u_slow: Option<f32>,
+    /// V2.2: bistable latch state (None = pre-V2.2 files).
+    #[serde(default)]
+    pub z_latch: Option<u8>,
     pub dormant: bool,
     pub retired: bool,
     pub born: u64,

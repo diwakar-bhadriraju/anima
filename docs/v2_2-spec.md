@@ -275,3 +275,54 @@ post-hoc decomposition.
   every term is a function of the neuron's own state and its own
   spikes only).
 - Implementation may not alter M1–M6, U1, E6, or the detector.
+
+
+---
+
+# V2.2 STAGE-1 EXECUTION RECORD + SPEC DEFECT (2026-09-19)
+
+Implementation: per frozen spec (network.rs u/z dynamics, G2
+LogNormal draws appended post-wiring + at birth, config surface,
+z_latch telemetry field). All suites green (core 70, exp 55).
+
+## Stage 1 — identity gate (C-S5)
+
+- v22gate-v21replica (latch_enable ABSENT => false): 511,333
+  non-marker event rows, FNV fingerprint e4b018992c97d1a9 —
+  IDENTICAL to committed runs/v21probe-b0.00625-t5000-*
+  (functional-identity standard, V2.1 Stage A precedent).
+  **C-S5 PASS.**
+- Diagnostic arm v22gate-latchid (enable=true, sd=0): diverges
+  from V2.1 by design (gate active). PRESERVED as run.
+
+## SPEC DEFECT FOUND (blocking Stage 2)
+
+The frozen u_reg formula is dimensionally wrong. Spec §1.3:
+u_reg = beta / (1 - exp(-1000/tau_s)) = 0.00625/0.1813 = 0.0345
+— this is the equilibrium at ONE spike per second. Actual u
+margins accumulate at firing-rate f to u* = beta·f·tau_s/1000
+(f=100 Hz => 3.125). With theta = theta_rel_mean·u_reg = 2·0.0345
+= 0.069, every driven neuron latches within ~1 s of drive onset
+(observed in v22gate-latchid: immediate all-latch, divergence
+from V2.1). Stage 2 executed with this constant would test a
+degenerate all-latch gate — its F1 failure would be an artifact
+of the constant, not evidence about the latch hypothesis. The
+spec's own rationale ("theta sits inside the X3-measured band",
+margins 0.5–15) is inconsistent with its formula; the formula is
+the bug, the rationale is the intent.
+
+## Proposed amendment A-1 (NOT applied; requires user approval)
+
+Replace u_reg := beta / (1 - exp(-1000/tau_s)) with
+u_reg := beta · f_ref · tau_s / 1000, f_ref = 100 Hz (the
+pre-existing E3 rate-calibration band [100,200] Hz midpoint —
+chosen from E1–E3 historical calibration, NOT tuned to X3/E24
+results). All frozen multipliers unchanged (theta_rel_mean 2.0,
+U_rel 0.9, phi_rel 0.5, sds 0.35). At the Stage-2 cell:
+u_reg = 3.125, theta = 6.25, phi = 3.125, plateau = 2.81.
+Threshold then sits at the sparse-core/pacemaker boundary of the
+X3 map, matching the spec's stated rationale.
+
+Per the standing mandate ("do not alter thresholds... after
+execution begins"), Stage 2 is HALTED pending A-1 decision.
+Nothing else changed; no E-number; V2.1/history untouched.
