@@ -380,6 +380,8 @@ mod tests {
                 adaptation_tau_ms: 200.0,
                 adaptation_gain: 0.0,
                 inhibition_gain: 0.0,
+                slow_state_beta: 0.0,
+                slow_state_tau_ms: 2500.0,
             },
             plasticity: PlasticitySection {
                 rule: "stdp-pairwise".into(),
