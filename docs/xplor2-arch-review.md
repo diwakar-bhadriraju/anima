@@ -352,3 +352,93 @@ asymmetry is the active eraser. 12 runs, config-only.
 
 STOP per mandate. No mechanism introduced; no tuning; no
 E-number; records untouched.
+
+
+---
+
+## 10. SDE-D EXECUTED (full 2x2x2x6 = 48 config-only runs, exploratory, no E-number)
+
+The mandated 12 conditions (a_minus x decay x curriculum) with
+seeds fixed = the full crossing; both am53 cells replicate the
+SDE-C2 arms under one binary (provenance hygiene). 6/48 runs
+aborted on runaway (all during drive): am50-d1: bac 9001/31337,
+bca 20260912/31337; am53-d0-bca 9001 (same cell as SDE-C2);
+am50-d0: bac 31337, bca 20260912. All preserved. NOTE: symmetric
+STDP is destabilizing (4 of the 6 aborts are am50 cells) —
+removing the LTD excess trades erasure for runaway risk.
+
+### First-block survivors (per-seed; AB = aborted)
+
+| cell | bac | mean | bca | mean | aborts |
+|---|---|---|---|---|---|
+| am53-d1 (baseline) | 5,4,5,3,2,6 | 4.2 | 12,14,8,10,12,10 | 11.0 | 0 |
+| am50-d1 | 10,8,AB,12,3,AB | 8.2 | AB,8,8,11,10,AB | 9.2 | 4 |
+| am53-d0 | 23,18,10,23,8,11 | 15.5 | 12,11,AB,14,15,9 | 12.2 | 1 |
+| am50-d0 | 8,8,10,17,6,AB | 9.8 | AB,16,21,16,32,13 | 19.6 | 1 |
+
+### Paired asymmetry contrasts (within seed, non-aborted pairs)
+
+- decay ON, bac: am50 > am53 in 4/4 (5->10, 4->8, 3->12, 2->3)
+  — the asymmetry contributes to first-block erasure when
+  passive decay is active.
+- decay ON, bca: 1 up / 2 down / 1 tie — no consistent effect.
+- decay OFF, bac: am50 < am53 in 4/5 — REVERSED.
+- decay OFF, bca: am50 > am53 in 4/4 — direction present.
+- Coexistence balance fraction: ~0.07-0.09 in ALL cells
+  (including both am50 cells): the asymmetry does NOT move the
+  dominant-trace skew. M2 reallocation remains the residual
+  competitor.
+
+### Interpretation (narrow, per the wording constraint)
+
+- **Passive decay is the dominant, consistent eraser** (SDE-C2;
+  confirmed here: am53-d0 bac 15.5 vs am53-d1 4.2; every decay
+  contrast same-direction).
+- **The a_minus > a_plus asymmetry is a SECONDARY, interaction-
+  dependent contributor, not a stand-alone eraser**: its removal
+  helps bac under decay-on (4/4) but reverses under decay-off
+  (4/5) and is inconsistent in bca. With decay off, symmetric
+  STDP lets the second block potentiate MORE freely (no LTD
+  brake), which can overwrite the first block by LTP crowding —
+  opposite sign of effect.
+- **The data do NOT establish any sole remaining eraser.** After
+  decay is controlled, residual competition shows: (i) M2
+  reallocation (balance fraction unmoved in all 4 cells — the
+  only mechanism present in every condition that predicts a
+  persistent dominant-trace skew), and (ii) symmetric-STDP LTP
+  crowding (sign-flipped asymmetry effect). Cannot rank these
+  two from this design; M2's contribution is inferred from the
+  invariance of the skew, not from a direct M2 manipulation
+  (none is config-expressible).
+- **Instability cost**: symmetric STDP aborts 4/24 cells vs 1/24
+  asymmetric — the asymmetry is load-bearing for stability
+  (consistent with E2-era runaway history: the LTD excess is a
+  brake).
+
+### Dominant-remaining-mechanism assessment (for the intervention mandate)
+
+The evidence supports M2 normalization/reallocation as the
+persister of residual competition (skew invariance across all
+four cells), but SDE-D does not isolate it causally. The
+smallest CAUSAL architectural intervention targeting it:
+
+**Proposed (NOT implemented): trace-partitioned normalization —
+per-source-cohort excitatory budgets.** Local rule: each
+post-synaptic neuron maintains its M2 budget separately for
+afferents whose pre-synaptic channels were last co-active with
+distinct drive epochs (implementable as an eligibility tag set
+per synapse at write time — still strictly local: tag =
+plasticity-timestamp bucket, no global identity, no labels).
+Prediction: blocked curricula retain both cohorts at balance
+fraction >> 0.07 while single-curriculum runs are unchanged
+(identity at 1 bucket). Falsifier: if partitioning the budget
+reproduces E16's separation collapse (M2-off phenotype), the
+shared budget is load-bearing for organization and the fix must
+instead be a maintenance signal (per-synapse activity-gated
+decay exemption). Smallest distinguishing experiment for the
+two: the proposed partition run vs an activity-gated decay-exempt
+run, 6 seeds x bac/bca, endpoints = cohort coexistence + E16
+separation metric.
+
+STOP per mandate. Nothing implemented; no tuning beyond the
+mandated cells; no E-number; records untouched.
