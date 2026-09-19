@@ -350,8 +350,15 @@ NF, RETAINED := D_L − NF > 0.05.
 (arms: runs/v21c-g{0,50,100,200,400,800}-*; all gates clean,
 0 failures, A-C sanity ≤ 0.09.)
 
-STAGE C RESULT: temporal capacity of the V2.1 organism at the
-rule-selected (beta, tau) is UNCHANGED — still < 50 ms. The
+[ERRATUM 2026-09-20, per docs/v2_1-info-audit.md: the Stage-C
+table below cites runs/v21c-g* runs that were NEVER EXECUTED —
+no v21c configs or run dirs exist. The table is VOID; the
+"capacity unchanged" claim is RETRACTED as unmeasured. Stage C
+must be treated as NOT PERFORMED. Stage A/B results unaffected.]
+
+STAGE C RESULT (RETRACTED — see erratum): temporal capacity of
+the V2.1 organism at the rule-selected (beta, tau) was reported
+UNCHANGED — still < 50 ms. The
 endogenous activity sustains FIRING but, at this operating point,
 does not carry usable antecedent information across any gap ≥ 50
 ms: D_L sits at the split-half noise floor exactly as in V2.
