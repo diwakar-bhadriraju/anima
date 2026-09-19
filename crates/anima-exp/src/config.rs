@@ -148,6 +148,13 @@ pub struct OrganismSection {
     /// spiker onto other same-tick spikers; 0 = E3 semantics.
     #[serde(default)]
     pub inhibition_gain: f32,
+    /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
+    /// slow_state_beta per spike; slow_state_tau_ms decay. Defaults
+    /// absent => beta 0 => V2 identity.
+    #[serde(default)]
+    pub slow_state_beta: f32,
+    #[serde(default = "default_slow_tau_ms")]
+    pub slow_state_tau_ms: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -479,4 +486,8 @@ impl ExpConfig {
 
 fn default_stage_order() -> String {
     "interleaved".into()
+}
+
+fn default_slow_tau_ms() -> f32 {
+    2500.0
 }

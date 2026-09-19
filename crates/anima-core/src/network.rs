@@ -79,6 +79,10 @@ impl Default for LIFParams {
     }
 }
 
+fn default_slow_tau() -> f32 {
+    2500.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Neuron {
     pub id: NeuronId,
@@ -101,6 +105,11 @@ pub struct Neuron {
     /// U1: spike-frequency adaptation current (hyperpolarizing). Decays
     /// with adaptation_tau_ms; injected per spike by adaptation_gain.
     pub i_adapt: f32,
+    /// V2.1: slow depolarizing intrinsic state (docs/v2_1-spec.md).
+    /// u += beta per spike; decays with slow_state_tau_ms; injected
+    /// into dv as +u. beta = 0 (default) => bit-identical V2.
+    #[serde(default)]
+    pub u_slow: f32,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -187,6 +196,13 @@ pub struct NetworkConfig {
     /// U1-inhibition (E3b): inhibitory current each non-input spiker
     /// deposits onto every OTHER same-tick non-input spiker (0 = E3).
     pub inhibition_gain: f32,
+    /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
+    /// slow_state_beta = per-spike increment; slow_state_tau_ms = decay.
+    /// beta = 0 (default) => bit-identical V2.
+    #[serde(default)]
+    pub slow_state_beta: f32,
+    #[serde(default = "default_slow_tau")]
+    pub slow_state_tau_ms: f32,
     /// ANIMA v2 (docs/anima-v2-protocol.md): when Some, M1 dense-weak
     /// initialization + the V2Plasticity mechanisms (M2–M6) are active.
     #[serde(default)]
@@ -252,6 +268,9 @@ impl Default for NetworkConfig {
             adaptation_gain: 0.0,
             // U1-inhibition default OFF: gain 0 must reproduce E3 exactly.
             inhibition_gain: 0.0,
+            // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
+            slow_state_beta: 0.0,
+            slow_state_tau_ms: default_slow_tau(),
             // V2 default OFF: None must reproduce E1–E4f exactly.
             v2: None,
         }
@@ -302,6 +321,7 @@ impl Network {
                 i_ext: 0.0,
                 rate_hz: 0.0,
                 i_adapt: 0.0,
+                u_slow: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -324,6 +344,7 @@ impl Network {
                 i_ext: 0.0,
                 rate_hz: 0.0,
                 i_adapt: 0.0,
+                u_slow: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -341,6 +362,7 @@ impl Network {
                 i_ext: 0.0,
                 rate_hz: 0.0,
                 i_adapt: 0.0,
+                u_slow: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -543,6 +565,9 @@ impl Network {
         // Integration pass over non-input, non-retired neurons.
         let n = self.neurons.len();
         let decay_adapt = exp_approx(-dt / self.cfg.adaptation_tau_ms);
+        // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
+        // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
+        let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
         for i in 0..n {
             if self.neurons[i].class == NeuronClass::Input || self.neurons[i].retired {
                 continue;
@@ -552,7 +577,9 @@ impl Network {
             neur.i_syn *= decay_syn;
             // U1: adaptation current decays on the same exponential form.
             neur.i_adapt *= decay_adapt;
-            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext - neur.i_adapt) * dt / p.tau_m;
+            // V2.1: decay-then-read (same convention as i_adapt/i_syn).
+            neur.u_slow *= decay_slow;
+            let dv = (-(neur.v - p.v_rest) + neur.i_syn + neur.i_ext - neur.i_adapt + neur.u_slow) * dt / p.tau_m;
             neur.v += dv;
             let spiked = self.tick.0 >= neur.refractory_until.0 && neur.v >= p.v_th;
             if spiked {
@@ -560,6 +587,8 @@ impl Network {
                 neur.refractory_until = Tick(self.tick.0 + p.refractory);
                 // U1: hyperpolarizing kick per spike.
                 neur.i_adapt += self.cfg.adaptation_gain;
+                // V2.1: depolarizing slow kick per spike (spec §1.2-1.3).
+                neur.u_slow += self.cfg.slow_state_beta;
                 spikes.push(neur.id());
             }
         }
@@ -881,6 +910,93 @@ mod tests {
             tot_pos[0] + tot_pos[1] > 0,
             "inhibition must not silence the neurons entirely"
         );
+    }
+
+    /// V2.1 Stage A (docs/v2_1-spec.md §14): beta = 0 => u stays
+    /// exactly 0.0 and trajectories are byte-identical to V2.
+    #[test]
+    fn v21_identity_gate_beta_zero() {
+        use crate::network::{InputChannelId, InputFrame, NetworkConfig, Tick};
+        let drive = |mut net: crate::network::Network, n: u64| -> (Vec<u32>, Vec<f32>) {
+            use rand::Rng;
+            let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(7);
+            let mut spikes = Vec::new();
+            for t in 0..n {
+                let mut chs = Vec::new();
+                for c in 0..24u32 {
+                    if rng.gen::<f32>() < 0.02 {
+                        chs.push(InputChannelId(c));
+                    }
+                }
+                let ev = net.step(&InputFrame { tick: Tick(t), spikes: chs });
+                for sp in &ev.spikes { spikes.push(sp.0); }
+            }
+            let us: Vec<f32> = net.neurons.iter().map(|n| n.u_slow).collect();
+            (spikes, us)
+        };
+        let mk = |beta: f32| crate::network::Network::new(
+            NetworkConfig {
+                adaptation_gain: 0.05,
+                slow_state_beta: beta,
+                slow_state_tau_ms: 2500.0,
+                ..NetworkConfig::default()
+            },
+            24, 40, 12, 42,
+        );
+        let (s0, u0) = drive(mk(0.0), 100_000);
+        let (s2, u2) = drive(mk(0.0), 100_000);
+        assert_eq!(s0, s2, "same-beta determinism");
+        assert!(u0.iter().all(|&u| u == 0.0), "beta=0 => u exactly 0.0");
+        // V2 network = config with the fields defaulted (absent semantics)
+        let mut v2cfg = NetworkConfig::default();
+        v2cfg.adaptation_gain = 0.05;
+        let (sv, uv) = drive(crate::network::Network::new(v2cfg, 24, 40, 12, 42), 100_000);
+        assert_eq!(s0, sv, "beta=0 == V2 byte-identical spike sequence");
+        assert!(uv.iter().all(|&u| u == 0.0));
+        // beta > 0 => u becomes nonzero (dense-drive sanity arm)
+        {
+            use rand::Rng;
+            let mut net = mk(0.05);
+            let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(9);
+            for t in 0..5000u64 {
+                let mut chs = Vec::new();
+                for c in 0..24u32 { if rng.gen::<f32>() < 0.5 { chs.push(InputChannelId(c)); } }
+                net.step(&InputFrame { tick: Tick(t), spikes: chs });
+            }
+            let max_u = net.neurons.iter().map(|n| n.u_slow).fold(0.0f32, f32::max);
+            assert!(max_u > 0.0, "beta>0 dense drive => u accumulates (max {max_u})");
+        }
+    }
+
+    /// V2.1 Stage B sanity: u decays with tau_s after activity stops.
+    #[test]
+    fn v21_u_decays_with_tau() {
+        use crate::network::{InputChannelId, InputFrame, NetworkConfig, Tick};
+        let mut net = crate::network::Network::new(
+            NetworkConfig {
+                adaptation_gain: 0.05,
+                slow_state_beta: 0.05,
+                slow_state_tau_ms: 2500.0,
+                ..NetworkConfig::default()
+            },
+            24, 40, 12, 42,
+        );
+        // drive 500 ms
+        for t in 0..500u64 {
+            net.step(&InputFrame { tick: Tick(t), spikes: vec![InputChannelId(0), InputChannelId(1)] });
+        }
+        let max_u = net.neurons.iter().map(|n| n.u_slow).fold(0.0f32, f32::max);
+        assert!(max_u > 0.0, "u accumulated during drive");
+        // silence 2500 ms (one tau): sample u at snapshot cadence
+        let u_at = |net: &crate::network::Network| net.neurons.iter().map(|n| n.u_slow).sum::<f32>();
+        let u_t0 = u_at(&net);
+        for t in 500..3000u64 {
+            net.step(&InputFrame { tick: Tick(t), spikes: vec![] });
+        }
+        let u_tau = u_at(&net);
+        // total u after ~1 tau should be < ~45% of start (exp(-1)~0.37 plus
+        // any endogenous replenishment; loose bound, no tuning)
+        assert!(u_tau < 0.45 * u_t0, "u decays: {u_tau} vs {u_t0}");
     }
 
     /// U1-inhibition guard: gain 0 must reproduce E3 trajectories

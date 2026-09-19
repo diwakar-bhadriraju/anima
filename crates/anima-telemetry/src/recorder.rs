@@ -26,6 +26,9 @@ pub struct NeuronState {
     pub class: String,
     pub v: Option<f32>,
     pub rate_hz: Option<f32>,
+    /// V2.1: slow depolarizing intrinsic state (None = pre-V2.1 files).
+    #[serde(default)]
+    pub u_slow: Option<f32>,
     pub dormant: bool,
     pub retired: bool,
     pub born: u64,
