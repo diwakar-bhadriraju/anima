@@ -196,3 +196,85 @@ feasibility checked: structural.rs implements non-none birth
 triggers (HomeostaticSaturation, PersistentError exist as
 BirthTrigger impls) — a config-only Y3 scout is possible later
 if routing proves binding.
+
+
+---
+
+## 8. SDE-B EXECUTED (12 config-only runs, exploratory, no E-number)
+
+Design: t_e {0.8, 1.6} x {bac, bca} x 6 pre-declared seeds;
+otherwise frozen e24 substrate (V2.1 null — no latch, no V2.2).
+Primary question: does doubling the shared excitatory budget
+reduce second-block overwrite? All 12 runs preserved (incl. one
+runaway abort: te1.6-bca-s424242). Instruments: v22wdiv,
+e24_endpoint.
+
+### Results (within-seed paired, n=6)
+
+COEXISTENCE (balance fraction = balanced-neuron fraction; and
+first-block cohort survivors after the second block):
+- te0.8: bac bal 0.079+-0.060, 4.2 first-block survivors;
+  bca 0.071+-0.042, 11.0.
+- te1.6: bac 0.054+-0.028, 5.5; bca 0.045+-0.058, 7.2.
+- Coexistence DID NOT improve — balance fraction slightly
+  DECREASED at te1.6 in both curricula. Doubling the budget does
+  not let two traces coexist.
+
+BUDGET OCCUPANCY: plastic input synapse count rose ~45-25%
+(112->163 bac; 214->266 bca) — the extra budget is consumed by
+the DOMINANT trace's expansion, not shared.
+
+RETENTION (M, paired within seed):
+- bac: te1.6 > te0.8 in 6/6 seeds (median delta +0.96 log10).
+- bca: 6/6 (median +2.93; one te1.6 abort = +inf rank).
+- Retention INCREASED uniformly — but by amplifying the
+  single-trace outcome, not by preserving both.
+
+DOWNSTREAM: te1.6 shifts regimes upward (more pacemakers, one
+runaway abort) — consistent with M2's known role of setting the
+separation regime (E16); more budget = stronger winner.
+
+### Interpretation (separate from observations)
+
+**SDE-B does NOT support H-A as formulated** ("budget
+partitioning will enable coexistence"): giving the network more
+total excitatory capacity does not soften second-block overwrite
+— the dominant trace absorbs the surplus and the subordinate
+trace is still erased. The write/maintain failure is NOT a
+resource-scarcity problem; it is a COMPETITION problem (the
+normalization rule itself reallocates, regardless of pool size).
+
+The uniform retention increase at te1.6 is a capacity effect on
+the single surviving trace (stronger winner), orthogonal to
+coexistence — consistent with E16's M2-off result (no
+normalization -> no separation) bracketing the other side.
+
+### What remains unexplained in the write/maintain transition
+
+The erase mechanism itself: WHY does the second block's
+plasticity decrement the first block's afferents? Candidates
+not yet discriminated: (i) STDP decay/renormalization real-
+location (shared-budget is one implementation; the probe shows
+pool size is not the lever, but the RULE may still be), (ii)
+silent-synapse decay (silence_w=0.02 after silence_ticks=60000
+— unused during drive; unlikely), (iii) pre-synaptic rate
+competition (A- and C-channels firing into the same post-
+neurons; second block's higher recent correlation wins the
+correlation-based rule outright). The evidence now points at
+(iii) or (i-as-rule-not-pool): competition is active, total-
+capacity-independent.
+
+### Follow-up (smallest causal experiment, NOT executed)
+
+**SDE-C2 — decay-isolation probe**: one exploratory arm with
+plasticity decay set to 0 (decay = 1e-6 -> 0.0 exists as
+config) under bac/bca, 6 seeds = 12 runs, config-only. If
+second-block erase persists with decay off, the erase is
+active reallocation (STDP LTP/LTD competition) — pointing to
+the RULE, and the architectural fix would be eligibility-
+tagged or per-trace-partitioned plasticity (H-A refined). If
+erase vanishes, passive decay is the eraser and the fix is a
+per-synapse maintenance signal (closer to H-B's write path).
+
+STOP per mandate. No mechanism introduced; no tuning after
+observation; no E-number; records untouched.
