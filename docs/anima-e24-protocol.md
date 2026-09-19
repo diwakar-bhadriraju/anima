@@ -149,12 +149,15 @@ c=3.998; 9001: a=1.58, c=0.000 — opposite directions).
   runs — M tracks the u-margin mechanism almost perfectly
   (falsifiable prediction of the u-margin hypothesis held).
 - S2. Winner identity is curriculum-dependent WITHIN seed: each
-  seed's five arms recruit 3–4 distinct winner neurons. Blocked
-  arms show a consistent PRIMACY effect: bac's winner matches the
-  a-arm winner in 4/6 seeds; bca's winner matches the c-arm
-  winner in 5/6 seeds (both beyond the 2/6 chance expectation;
-  simple binomial on 6 trials, one-sided: 4/6 p≈0.34, 5/6 p≈0.11
-  — descriptive only, not a preregistered test).
+  seed's five arms recruit 3–4 distinct winner neurons. [ERRATUM
+  2026-09-20: original text overstated the primacy counts as 4/6
+  and 5/6; re-verified from the run table: bac's winner matches
+  the a-arm winner in 3/6 seeds (20260912, 424242, 123456);
+  bca's winner matches the c-arm winner in 4/6 (424242, 123456,
+  777, 31337) — 7/12 first-block matches vs 0/12 second-block
+  matches. Among the 12 blocked comparisons, discordant pairs
+  favor primacy 7:0 (sign-test p≈0.008, POST-HOC — not
+  preregistered, descriptive only; motivates O-E24-1/E25).]
 - S3. The winner-recruitment structure exists but does not
   propagate to a consistent M effect: when the recruited winner
   differs, its margin crosses or misses the regeneration
@@ -181,8 +184,9 @@ c=3.998; 9001: a=1.58, c=0.000 — opposite directions).
 ## Observations motivating future work (not designed here)
 
 - O-E24-1: winner PRIMACY (first-recruited set dominates the
-  drive-end state) — visible in 9/12 blocked comparisons, would
-  be the natural endpoint of a discrete-winner-code experiment.
+  drive-end state) — 7/12 first-block vs 0/12 second-block winner
+  matches [corrected; see S2 erratum], the natural endpoint of a
+  discrete-winner-code experiment.
 - O-E24-2: endogenous output activity (11/30 runs) makes the
   closed-loop question (E19 paradigm under V2.1) newly reachable.
 - O-E24-3: per-run margin variability under identical curriculum
