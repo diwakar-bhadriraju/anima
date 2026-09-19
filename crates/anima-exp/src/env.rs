@@ -1685,6 +1685,70 @@ fn e6_configs_freeze_source_with_e6_only() {
         }
     }
 
+    // ---- V2.1 integrity regression (docs/v2_1-spec.md erratum) ----
+
+    /// Execution records must not cite nonexistent run artifacts:
+    /// every `runs/<dir>` reference in docs/*protocol*.md and
+    /// docs/v2_1-spec.md must resolve to an existing runs/ entry.
+    /// (Added after the Stage-C erratum: a table cited v21c runs
+    /// that were never executed.)
+    #[test]
+    fn execution_record_integrity() {
+        let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs");
+        let runs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runs");
+        let mut checked = 0u32;
+        let mut failures: Vec<String> = Vec::new();
+        let mut entries: Vec<_> = std::fs::read_dir(&docs_dir)
+            .expect("docs dir")
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                let n = p.file_name().and_then(|x| x.to_str()).unwrap_or("");
+                n.ends_with("-protocol.md") || n == "v2_1-spec.md"
+            })
+            .collect();
+        entries.sort();
+        for doc in entries {
+            let text = std::fs::read_to_string(&doc).unwrap_or_default();
+            // Skip erratum blocks: lines within [ERRATUM ... ] markers may
+            // legitimately name nonexistent runs (that is their content).
+            let mut in_erratum = false;
+            for line in text.lines() {
+                if line.contains("[ERRATUM") || line.contains("INTEGRITY ERRATUM") { in_erratum = true; }
+                if in_erratum && (line.starts_with("###") || line.starts_with("## ")) && !line.contains("ERRATUM") { in_erratum = false; }
+                if in_erratum { continue; }
+                for token in line.split_whitespace() {
+                    // Strip markdown/punctuation decorations from both ends.
+                    let tok: String = token.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_' && c != '/').to_string();
+                    let Some(id_full) = tok.strip_prefix("runs/") else { continue };
+                    let id = id_full.trim_end_matches(|c: char| c == '*' || c == '/').trim_end_matches(|c: char| !c.is_ascii_alphanumeric() && c != '-').to_string();
+                    let id = id.as_str();
+                    if id.is_empty() || id.contains('{') { continue; } // pattern refs w/o concrete id
+                    let pat = runs_dir.clone().join(id);
+                    if !pat.exists() {
+                        // allow prefix matching for timestamped dirs: runs/e12- matches e12-2026...
+                        let found = std::fs::read_dir(runs_dir.as_path())
+                            .map(|rd| rd.filter_map(|e| e.ok()).any(|e| {
+                                e.file_name().to_string_lossy().starts_with(id)
+                            }))
+                            .unwrap_or(false);
+                        if !found && id.len() > 3 {
+                            failures.push(format!("{}: runs/{} not found", doc.file_name().unwrap().to_string_lossy(), id));
+                        }
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        // Documented failed-and-cleaned first attempts (historical records
+        // of runs that aborted and whose dirs were removed; superseded by
+        // later successful runs recorded in the same document):
+        let documented_failed = ["e2b-20260913T082332Z"];
+        failures.retain(|f| !documented_failed.iter().any(|d| f.contains(d)));
+        assert!(failures.is_empty(), "phantom run references:\n{}", failures.join("\n"));
+        assert!(checked > 50, "integrity scan actually ran (checked {checked} refs)");
+    }
+
     // ---- ANIMA E21/E23 pre-registered tests ----
 
     /// E21: six gap arms, E18 paradigm, only gap (and ITI) differ; grid;

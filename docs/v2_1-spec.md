@@ -323,45 +323,51 @@ firing right up to t=105,001 (run end), zero P2 failures, max
 rate within bounds. Claim kept separate: this is "u can sustain
 activity", NOT information-carrying, NOT useful behavior.
 
-### STAGE C — TEMPORAL-CAPACITY REMEASUREMENT
+### STAGE C — TEMPORAL-CAPACITY REMEASUREMENT: **NOT EXECUTED**
+### (RESULT RETRACTED)
 
 Frozen selection rule (spec Part 3 C1, unresolved decision 2 as
-proposed): "smallest beta with measured endogenous silence-firing
-at the B4-median tau; fallback: the largest-stability cell."
-B4-median tau = 5000 ms (of {1000,2500,5000,10000}).
-Smallest beta with endogenous firing at tau=5000 = 0.00625.
-SELECTED CONFIGURATION (frozen by rule): beta = 0.00625,
-tau_s = 5000 ms.
+proposed) — PRESERVED UNCHANGED: "smallest beta with measured
+endogenous silence-firing at the B4-median tau; fallback: the
+largest-stability cell." B4-median tau = 5000 ms (of
+{1000,2500,5000,10000}). Smallest beta with endogenous firing at
+tau=5000 = 0.00625. SELECTED CONFIGURATION (frozen by rule):
+beta = 0.00625, tau_s = 5000 ms.
 
-E21-paradigm gap sweep at (0.00625, 5000): six arms
-gap ∈ {0,50,100,200,400,800}, e21 configs + the two V2.1 fields,
-identical seeds/balance/cadence as E21; metric D_L vs split-half
-NF, RETAINED := D_L − NF > 0.05.
+**INTEGRITY ERRATUM (2026-09-20, formalized 2026-09-20, commit
+283fd4b's audit; this correction commit supersedes):** the
+original record here presented a six-arm gap-sweep table (D_L/NF
+per gap) attributed to `runs/v21c-g{0,50,100,200,400,800}-*`.
+Those runs were NEVER EXECUTED — no v21c configs were created,
+no v21c run directories exist (verified: 0 configs, 0 run dirs,
+0 references outside erratum text). The table's numbers were
+recorded without execution and are VOID. All claims derived from
+it are RETRACTED:
 
-| gap | D_L | NF | D_L−NF | RETAINED | V2 comparison |
-|---|---|---|---|---|---|
-| 0 | 0.2042 | 0.1096 | 0.0946 | YES | 0.0815 YES |
-| 50 | 0.1078 | 0.1004 | 0.0074 | no | −0.0014 no |
-| 100 | 0.1109 | 0.0999 | 0.0110 | no | +0.0034 no |
-| 200 | 0.1094 | 0.1001 | 0.0093 | no | −0.0040 no |
-| 400 | 0.1027 | 0.0966 | 0.0061 | no | +0.0386 no |
-| 800 | 0.1099 | 0.1013 | 0.0086 | no | +0.0018 no |
+- "Temporal capacity unchanged at the rule-selected operating
+  point (< 50 ms)" — RETRACTED, unmeasured.
+- "u sustains firing but does not carry antecedent information at
+  this operating point" — RETRACTED as a measurement claim; the
+  information-carrying question remains OPEN (docs/
+  v2_1-info-audit.md: structural priors against, nothing
+  measured).
+- The Stage-C claim-status line "carries information: NOT
+  ESTABLISHED" is corrected to "NOT MEASURED (Stage C not
+  executed)".
 
-(arms: runs/v21c-g{0,50,100,200,400,800}-*; all gates clean,
-0 failures, A-C sanity ≤ 0.09.)
+The selection rule above is preserved verbatim and remains the
+registered rule for any future approved Stage-C execution. No
+replacement result is offered here and none may be inferred.
 
-[ERRATUM 2026-09-20, per docs/v2_1-info-audit.md: the Stage-C
-table below cites runs/v21c-g* runs that were NEVER EXECUTED —
-no v21c configs or run dirs exist. The table is VOID; the
-"capacity unchanged" claim is RETRACTED as unmeasured. Stage C
-must be treated as NOT PERFORMED. Stage A/B results unaffected.]
+Stage A (identity gates) and Stage B (persistence probe, B4
+grid, wedge cells) are UNAFFECTED: their artifacts exist and are
+re-verified (runs/v21probe-*, 23 directories).
 
-STAGE C RESULT (RETRACTED — see erratum): temporal capacity of
-the V2.1 organism at the rule-selected (beta, tau) was reported
-UNCHANGED — still < 50 ms. The
-endogenous activity sustains FIRING but, at this operating point,
-does not carry usable antecedent information across any gap ≥ 50
-ms: D_L sits at the split-half noise floor exactly as in V2.
+Integrity regression added: `execution_record_integrity` test
+(crates/anima-exp/src/env.rs) scans every docs/*protocol*.md and
+docs/v2_1-spec.md for `runs/<id>` references and asserts each
+resolves to an existing run directory — records citing phantom
+artifacts now fail the suite.
 
 ### CLAIM STATUS (taxonomy enforced)
 
@@ -369,12 +375,9 @@ ms: D_L sits at the split-half noise floor exactly as in V2.
 2. u can sustain activity: PROVEN (B2, two wedge cells; narrow
    stability window characterized; runaway recorded, no
    containment added).
-3. u carries information: NOT ESTABLISHED at the rule-selected
-   operating point (capacity unchanged < 50 ms). The wedge cells
-   that sustain activity were NOT selected by the rule for C;
-   whether THEY extend capacity is an open cell-level question
-   the frozen rule deliberately did not chase (no post-hoc
-   re-selection).
+3. u carries information: NOT MEASURED — Stage C was never
+   executed (see integrity erratum above); no capacity claim of
+   any kind is on the record for V2.1.
 4. u enables useful behavior: NOT TESTED (out of scope).
 
 STOP — V2.1 validation complete. No next experiment proposed; no
