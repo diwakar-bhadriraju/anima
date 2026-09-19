@@ -378,3 +378,81 @@ Nothing else changed; no E-number; V2.1/history untouched.
    path), a1 = G1 (enable, sds 0), a2 = G1+G2 (+theta/U sd 0.35,
    tau-het off), a3 = G1+G2+Y1 (+eta_rel 1.0). 6 seeds x 5
    curricula x 4 arms = 120 fresh runs under one binary.
+
+
+---
+
+# V2.2 STAGE-2 EXECUTION RECORD (2026-09-20, A-1 amended, commit 8e63f5e freeze)
+
+120 runs (runs/v22s2-{a0,a1,a2,a3}-s{seed}-{cur}-*), arms:
+a0 null (V2.1-exact; M values byte-match the E24 table — second
+independent identity confirmation), a1 = G1 (enable, sd=0),
+a2 = G1+G2 (+theta/U sd 0.35), a3 = G1+G2+Y1 (+eta_rel 1.0,
+pre-declared). All runs preserved incl. aborts.
+
+## Criteria results
+
+- C-S5 identity: PASS (Stage 1 + a0-arm byte-match of E24 Ms).
+- C-S1 decoding (LOSO nearest-centroid on drive-end latch-set,
+  exact binomial vs 20% chance): a1 6/30 = 0.200, p=0.572;
+  a2 7/30 = 0.233, p=0.393; a3 6/30 = 0.200, p=0.572.
+  **ALL AT CHANCE — FAIL.**
+- C-S2 stability (Jaccard >= 0.8 over 2 s): a1 30/30, a2 29/29,
+  a3 26/26 — trivially PASS (see forensics: sets are tiny/empty,
+  stability of an empty/near-empty set is vacuous).
+- C-S3 dynamic range (<300 Hz in >= 5/6 seeds): a0 22/30, a1
+  20/30, a2 18/29, a3 26/26 — **FAIL for a1/a2 (a3 vacuous:
+  nothing latches, nothing fires)**. Latching did NOT fix the
+  refractory-clock regime; a3's Y1 kills latching entirely.
+- C-S4 no new instability: a1 0/30 aborts, a2 1/30, a3 4/30 —
+  marginal pass on aborts (a3's aborts are drive-period
+  runaway, same class as X3's).
+
+**VERDICT (frozen rule C-S1..C-S5 conjunctive): V2.2 as
+specified is NOT a successful carrier.** F1 fired (latch-set
+carries no curriculum information — all arms at chance) and F3's
+antecedent holds (a1/a2 keep ceiling-rate winners).
+
+## Forensics (observations, mechanistic)
+
+- FO-1 Latch sets are TINY: a1 sizes {0:4, 1:9, 2:14, 3:2, 5:1};
+  a2 {0:14, 1:6, 2:6, 3:3, 4:1}. theta=4.6875 sits above typical
+  drive-end u for most neurons (26/30 a1 runs have exactly the
+  single top-u neuron crossing; a2's LogNormal spread RAISES many
+  thresholds, halving latching: 14/29). The latch code as placed
+  is ~1-2 bits per run, seed-determined.
+- FO-2 Within-seed Jaccard across curricula 0.174 (a1): sets
+  shared across curricula at the same seed swamp the
+  curriculum-specific part; cross-seed same-curriculum 0.022.
+  The seed dominates the latch-set — the same failure E24's
+  magnitude endpoint had, now at the bit level.
+- FO-3 Y1 at eta_rel=1.0 exactly cancels the per-spike increment:
+  a3 latches NOTHING in 30/30 runs (u strictly non-increasing
+  under firing). The identity choice was faithful to "no free
+  constant" but makes eta=beta a degenerate off-state — the
+  reset rule as frozen is non-viable at its own default.
+- FO-4 a0's C-S3 22/30 shows the <300 Hz criterion was already
+  marginal for V2.1 itself at this cell (not a regression from
+  V2.2).
+
+## Falsifier mapping (frozen)
+
+- F1 CONFIRMED (all arms chance decoding).
+- F2 not reached (C-S1 failed first).
+- F3 CONFIRMED-antecedent for a1/a2 (ceiling rates persist).
+- F4 not applicable (a1 vs a2 both chance; homogeneity vs
+  heterogeneity indistinguishable at these set sizes).
+- F5 CONFIRMED (Y1-on strictly worse: no latching at all).
+- F6 n/a (identity held throughout).
+
+## Conclusion (within frozen scope)
+
+The bundled G1+G2+Y1 at the frozen constants is falsified as a
+carrier: the SET threshold placement (theta at the sparse/
+pacemaker boundary) yields 1-2-bit, seed-dominated latch codes,
+and the frozen reset default is degenerate. Per the frozen
+falsifier semantics this is a NEGATIVE RESULT, retained in full.
+The bundling decision itself (§0 of the spec) partially collapses:
+F4 could not discriminate G2's contribution because the code
+capacity was ~0 regardless. Stage 3 NOT executed (success gate
+failed). No E-number; V2.1 and history untouched.
