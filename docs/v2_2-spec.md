@@ -326,3 +326,55 @@ X3 map, matching the spec's stated rationale.
 Per the standing mandate ("do not alter thresholds... after
 execution begins"), Stage 2 is HALTED pending A-1 decision.
 Nothing else changed; no E-number; V2.1/history untouched.
+
+
+---
+
+# A-1 FREEZE + STAGE-2 INTEGRITY CHECK (2026-09-20, pre-execution)
+
+1. AMENDED FORMULA RECORDED: u_reg = beta * f_ref * tau_s / 1000,
+   f_ref = 100 Hz. Units: [u] = [u/spike]*[spikes/s]*[s]. Applied in
+   network.rs (const F_REF_HZ = 100.0) with citation comment.
+2. SOURCE: f_ref = 100 Hz is the midpoint of the pre-registered
+   E3 rate-calibration band [100,200] Hz (docs/e3-protocol.md
+   lines 38, 86-89; A2 calibration logged pre-execution there;
+   measured EMA ~148 Hz at gain 0.05 inside band). Pre-V2.2
+   historical record; not tuned to X3/E24/V2.2 data.
+3. RESULTING STAGE-2 VALUES + DISCREPANCY SURFACED: the approval
+   message quotes theta=6.25 / phi=3.125 / plateau=2.81, which
+   are the values at beta=0.00625 (wedge cell). The FROZEN
+   Stage-2 cell is the E24 cell beta=0.0046875, tau=5000, where
+   the amended formula gives EXACTLY:
+     u_reg = 0.0046875*100*5 = 2.34375
+     theta = 2.0 * u_reg = 4.6875
+     phi   = 0.5 * theta  = 2.34375
+     plateau = 0.9 * u_reg = 2.109375
+   "Execute the original 120-run Stage 2" with "all other
+   parameters exactly as frozen" is arithmetically satisfiable
+   ONLY at the frozen cell; executing at beta=0.00625 would
+   relocate the design cell (an alteration). Decision: formula at
+   frozen cell; discrepancy recorded here rather than silently
+   resolved either way. theta=4.6875 sits at the sparse-core/
+   pacemaker boundary of the X3 margin map (sparse 1.2-8.1,
+   silent <=0.92, pacemaker >=6) per the spec's placement
+   rationale.
+4. NO STAGE-2 RUN PRE-EXECUTED: runs/ contains only v22gate-*
+   (2 gate runs). Verified by listing.
+5. STAGE-1 UNCHANGED: v22gate-v21replica fingerprint re-verified
+   post-A-1 code change: 511333 rows, fnv e4b018992c97d1a9
+   (A-1 edits only the latch_enable=true branch; null arm
+   untouched). The halted diagnostic arm v22gate-latchid is
+   preserved as a FAILED SPECIFICATION DIAGNOSTIC (pre-A-1
+   constant), NOT Stage-2 data; excluded from all Stage-2
+   analyses.
+6. AMENDMENT FROZEN PRE-OBSERVATION: no Stage-2 result exists at
+   freeze time (this commit precedes the first v22s2-* run).
+   Y1-ON VALUE PRE-DECLARED: the frozen spec left eta_rel's
+   on-value unspecified; fixed at eta_rel = 1.0 (identity
+   relation: each spike subtracts exactly its own increment; the
+   only value introducing no free constant), declared here
+   before any Stage-2 run.
+7. ARMS: a0 = null (latch absent => V2.1 exactly; C-S5-proven
+   path), a1 = G1 (enable, sds 0), a2 = G1+G2 (+theta/U sd 0.35,
+   tau-het off), a3 = G1+G2+Y1 (+eta_rel 1.0). 6 seeds x 5
+   curricula x 4 arms = 120 fresh runs under one binary.

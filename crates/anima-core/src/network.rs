@@ -695,8 +695,14 @@ impl Network {
                 // beta / (1 - exp(-1000/tau_s_i)) — the equilibrium of the
                 // integrate-and-decay loop at 1000 spikes/s.
                 let tau_i = self.cfg.slow_state_tau_ms * neur.tau_het_rel;
-                let u_reg = self.cfg.slow_state_beta
-                    / (1.0 - exp_approx(-1000.0 / tau_i));
+                // A-1 (approved 2026-09-20, pre-execution): u_reg is the
+                // firing-rate equilibrium beta * f_ref * tau_s / 1000 with
+                // f_ref = 100 Hz (E3 pre-registered rate-calibration band
+                // [100,200] Hz midpoint; docs/anima-e3-protocol.md). Units:
+                // [u] = [u/spike] * [spikes/s] * [s]. Supersedes the frozen
+                // spec's 1 Hz-per-tick formula (scale defect, see spec doc).
+                const F_REF_HZ: f32 = 100.0;
+                let u_reg = self.cfg.slow_state_beta * F_REF_HZ * tau_i / 1000.0;
                 let theta = u_reg * neur.theta_rel;
                 if neur.z_latch == 0 && neur.u_slow >= theta {
                     neur.z_latch = 1;
