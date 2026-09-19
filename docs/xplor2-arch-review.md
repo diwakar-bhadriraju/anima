@@ -442,3 +442,30 @@ separation metric.
 
 STOP per mandate. Nothing implemented; no tuning beyond the
 mandated cells; no E-number; records untouched.
+
+
+---
+
+## 11. V2.3 candidate design (NOT implemented): capacity-matched trace-partitioned M2
+
+Per mandate, the smallest causal test of shared-M2 causality.
+Design doc: docs/v2_3-design.md. Key honesty point recorded
+there: naive partitioning confounds partition with capacity
+(t_e x n_buckets); the design CAPACITY-MATCHES (per-bucket T =
+t_e / n_populated) so total excitatory mass never exceeds
+baseline — and SDE-B already measured that capacity alone does
+nothing, so the partition arm isolates SHARING. No smaller
+clean intervention exists: config-expressible M2 manipulations
+are only disable (E16, organization destroyed — measured) and
+t_e scale (SDE-B, capacity — measured). Bucket = write-epoch
+tag from the synapse's own LTP history + per-neuron epoch
+counter on the existing structural window clock (no labels, no
+input identity; the one global element — the window clock — is
+E1-frozen substrate). 3-arm comparison reuses SDE-D anchors
+(A1=am53-d1, A2=am53-d0 already run): the new contrast is
+partition+no-decay vs shared+no-decay, 12 fresh runs + null
+gate. Endpoints: coexistence (paired sign), E16 separation
+non-collapse (<=0.85 in >=4/6), stability, byte-identity null
+(n_buckets=1). Failure modes F-P1..F-P5 pre-specified,
+including the tag-churn and bucket-monoculture diagnostics.
+STOP: design only; nothing implemented/executed; no E-number.
