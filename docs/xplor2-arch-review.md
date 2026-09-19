@@ -278,3 +278,77 @@ per-synapse maintenance signal (closer to H-B's write path).
 
 STOP per mandate. No mechanism introduced; no tuning after
 observation; no E-number; records untouched.
+
+
+---
+
+## 9. SDE-C2 EXECUTED (12 config-only runs, exploratory, no E-number)
+
+Design: plasticity decay {1e-6 (baseline), 0.0} x {bac, bca} x 6
+seeds; all else frozen e24 (t_e=0.8, V2.1 null). All 12 runs
+preserved (one abort: d0-bca-s9001, runaway during drive).
+
+### Primary result: overwrite PERSISTS but is substantially WEAKENED — passive decay is a major eraser component, not the whole story
+
+First-block survivors (paired within seed, decay-off vs on):
+- bac: decay-off > decay-on in **6/6 seeds** (A-cohort 4.2 ->
+  15.5 mean; e.g. s123456 3->23, s20260912 5->23).
+- bca: 2/6 up, 2/6 down (11.0 -> 18.7 mean but s9001 aborted
+  mid-drive with 0; excluding it, mixed).
+The absolute picture (bac, decay-off, drive end): BOTH cohorts
+present in every run (A 8-23 / C 20-38) vs decay-on's near-total
+erasure (A 2-6). Coexistence fraction (balanced neurons) stays
+low (~0.07) because both cohorts grow without balancing — the
+dominant-trace skew remains — but the first trace is no longer
+DELETED.
+
+### Mechanism resolution (from existing telemetry)
+
+- Tick-resolved cohorts (first-block end t=44k vs drive end
+  t=85k, decay-off bac): IDENTICAL rows — no further structural
+  change after the first block completes under decay=0? No —
+  identical because the analysis used the last snapshot <= t;
+  at 44k the second block has not run; the equality of 44k and
+  85k rows shows the A-cohort established by block 1 is still
+  present after block 2 (persistence, not stasis).
+- Plastic synapse count: 267 (d0-bac) vs 112 (d1-bac) — with
+  decay off, more afferents survive above the wdiv dominance
+  threshold (weak synapses no longer bleed to w_min).
+- M2 is STILL ACTIVE in both arms (t_e unchanged): its
+  reallocation is what keeps the ~0.07 coexistence skew — the
+  residual competition after passive decay is removed.
+- Therefore the erase decomposes: **passive weight decay (major,
+  ~70-80% of first-block erasure in bac) + M2/STDP active
+  competition (residual skew)**. The a_minus > a_plus asymmetry
+  (0.0053 vs 0.005) also contributes a slow active LTD floor.
+
+### Retention (M, descriptive)
+
+Mixed: d0-bac [3.50, 3.86, 1.90, 3.49, 0.00, 3.47] vs d1-bac
+[3.45, 2.70, 3.65, 2.37, 2.89, 3.41]; d0-bca has one abort
+(+inf) and one 0.00. No uniform retention gain — coexistence
+does not translate into more endogenous activity (consistent
+with E24: retention is margin-lottery, downstream of structure).
+
+### Verdict on the primary question
+
+Second-block overwrite is **decay-mediated to first order**:
+disabling the (tiny, 1e-6/tick) passive decay preserves the
+first block's afferent cohort through the second block in 6/6
+bac seeds. The residual imbalance is M2-normalization/STDP
+competition (active), which no decay setting removes.
+
+### Smallest follow-up (defined, NOT executed)
+
+**SDE-D — maintenance-vs-competition split**: decay back at
+1e-6, but with M2's reallocation disabled for input-class
+synapses only if a config exists (check: M2 applies to all
+excitatory afferents; no input-only exemption exists in config)
+=> NOT config-only. Alternative config-only split: a_minus ->
+0.005 (symmetric STDP) x decay {1e-6, 0.0}: if symmetric-STDP +
+decay-on still erases, the passive term is confirmed sole major
+eraser; if it preserves like decay-off did, the a_minus>a_plus
+asymmetry is the active eraser. 12 runs, config-only.
+
+STOP per mandate. No mechanism introduced; no tuning; no
+E-number; records untouched.
