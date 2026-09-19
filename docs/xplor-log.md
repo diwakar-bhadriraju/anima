@@ -257,3 +257,34 @@ X3 executed as a frozen exploratory grid; nothing promoted to
 E-number; draft protocol for the regime-selection capacity
 experiment written separately (docs/draft-e24-regime-capacity.md)
 and NOT executed; old Stage C NOT executed; V2.1 not modified.
+
+
+---
+
+## 8. E24 draft v2 revision (review turn, no new runs)
+
+X3 re-reviewed per mandate; draft protocol rewritten in place
+(docs/draft-e24-regime-capacity.md v2). Decisions:
+- PRIMARY ENDPOINT: two-tier ordinal M (abort = +inf rank;
+  else log10(1 + S10), S10 = endogenous spikes in first 10 s of
+  silence). Grounds: phenotype not mechanism (hard 40/40 silent
+  boundary vs 34/40 for top-u>2; X3 marginal cells resolved only
+  by spiking); keeps 4 decades of magnitude; retains abort info;
+  no new instrumentation.
+- Top-u demoted to secondary/mechanistic (avoids conflating
+  observation with the u-margin hypothesis it is supposed to
+  test).
+- Aborts = distinct divergence outcome class, ranked top; P2
+  detector NOT recalibrated; E24 placed at band beta=0.0046875
+  (0/15 aborts in X3).
+- Seeds 6 (X3 five + 31337), 30 runs, paired within-seed exact
+  permutation tests; cross-seed raw-margin comparison excluded as
+  confounded (10x seed baselines).
+- Arms sharpened to mutually exclusive hypotheses H0 (pure
+  count), H1 (composition), H2 (recency/order), H3 (interleaved
+  interference); blocked pair retained as the only order-
+  isolating contrast.
+No exploratory runs executed this turn; both open methodological
+questions (blocked-stage semantics env.rs:340-346; silence
+readout window safety) resolved from existing artifacts. V2.1
+not modified. E24 NOT executed.
