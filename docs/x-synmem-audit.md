@@ -6,9 +6,25 @@ no tuning, no E-number. New read-only instrument:
 committed runs). Channel groups (committed configs): A = ch 0–7,
 C = ch 8–15; B = ch 4–11 phase variants (never presented in any
 analyzed run); ch 16–23 idle. Internal/output ids 24..75 (52, the
-established instrument convention). Inhibitory = plastic==false
-(M6 creation sets plastic=false, core network.rs:534).
+established instrument convention).
 Snapshots every 1000 ticks; u read directly from NeuronState.u_slow.
+Inhibitory marker: SynapseState lacks an `inhibitory` field, so the
+snapshot proxy is plastic==false — pinned at the creation site:
+M6 inhibitory afferents are created with `add_synapse_full(src,
+post, w, false, true, tick)` (core network.rs:534), while M1/M3
+excitatory afferents are created plastic=true (test-asserted,
+structural_v2_tests.rs). plasticity.rs guards treat the two flags
+as independent (`!s.plastic || s.inhibitory`) but in V2 runs no
+non-inhibitory synapse is created non-plastic; E15's audit used
+the same "inhibitory via plastic flag" mapping. Parse-integrity
+note: an earlier analysis pass keyed MAT rows on tick instead of
+neuron id (all rows collapsed onto one neuron), producing spurious
+cosine 1.0/LOPO 0% numbers; that bug was found via internal
+inconsistency (C-mass > A-mass in the A-trained run), fixed, and
+every number below was re-derived from the corrected parse and
+cross-checked against the independent NEUR rows (e.g. drive-end
+A/C masses 0.290/0.026 match the NEUR time-series k=40 values
+exactly).
 
 ## 0. Runs analyzed (all committed; nothing rerun)
 
@@ -115,13 +131,38 @@ state after each presentation (mean over 52 neurons):
   both groups wired, selectivity each group 0.46 vs +0.91/−0.76
   singly (mass gap ±0.03 vs ±0.26 when isolated).
 
-VERDICT G3: **traces COEXIST in the synaptic store (no
-overwrite) but the resulting state is a shared, near-symmetric
-superposition: neither a mixture of the isolated endpoints nor
-a state that discriminates which episode occurred most recently.
-This is the same class of failure previously measured in u
-(alternating u-cos → 1.0), now demonstrated at the synaptic
-level — the superposition problem is NOT specific to u.**
+VERDICT G3: **traces COEXIST in the synaptic store under
+alternation (no overwrite) but the resulting state is a shared,
+near-symmetric superposition: neither a mixture of the isolated
+endpoints nor a state that discriminates which episode occurred
+most recently. This is the same class of failure previously
+measured in u (alternating u-cos → 1.0), now demonstrated at the
+synaptic level — the superposition problem is NOT specific to u.**
+
+Blocked-order control (same cell, same seed — e24 bac/bca):
+| end state | A-mass | C-mass | selectivity |
+|---|---|---|---|
+| A-only ×40 | 0.290 | 0.026 | +0.835 |
+| C-only ×40 | 0.031 | 0.239 | −0.768 |
+| BAC (20 A → 20 C) | 0.068 | 0.137 | −0.337 |
+| BCA (20 C → 20 A) | 0.234 | 0.105 | +0.382 |
+| alternating 40/40 | 0.239 | 0.162 | +0.193 |
+
+Blocked order OVERWRITES at the synaptic level (recency
+dominance): BAC's A-mass collapses 0.208 → 0.068 when the C
+block lands; BCA's C-mass 0.194 → 0.105 when A lands. End-state
+cosines: cos(BAC, A-only)=0.577, cos(BAC, C-only)=0.151;
+cos(BCA, A-only)=0.244, cos(BCA, C-only)=0.521 — each blocked run
+drifts toward its final block's trained endpoint but lands in
+between (both blocks leave residual mass; selectivity ±0.34–0.38
+vs ±0.77–0.84 singly). Alternation is NOT between them:
+cos(alt, BAC)=0.246, cos(alt, BCA)=0.310, cos(BAC, BCA)=0.161.
+So the regime trichotomy is: blocked = recency overwrite toward
+the last block; alternating = superposition into a third
+configuration; isolated = clean winner selection. This 3-way
+pattern (consistent with SDE-B's balance-fraction loss and
+V2.3's blocked-cohort rescue) is the substrate-level version of
+the u-level result.
 
 ## 4. G4 — plasticity mechanism audit (from committed causal records)
 
@@ -214,9 +255,15 @@ information in weights, not in activity.**
 
 - Raw DOF: 52 × 24 afferent sites + recurrent, continuous
   weights (0..1) — large in principle. Real constraints:
-  - M2 pins total exc weight per neuron to t_e=0.8 (measured:
-    sums 0.79999 in G1 runs) — a hard per-neuron budget shared
-    by all groups.
+  - M2 (baseline m2_buckets=1 path) renormalizes ALL live
+    excitatory incoming (afferent + recurrent) toward t_e=0.8,
+    bidirectionally (`factor = t_e/sum` whenever sum ≠ t_e,
+    structural_v2.rs:300-315; the "never boost" guard exists only
+    in the partitioned path). Measured at drive end (NEUR rows,
+    independent of the MAT parse): aff+rec total mean 0.8002
+    (range 0.8000–0.8044), aff-only 0.3497, recurrent 0.4504.
+    The budget is shared across channel groups AND recurrent
+    wiring.
   - Single-pattern training concentrates the budget on one
     group (11:1 mass ratio), pruning the other — the budget +
     pruning = winner-selection.
