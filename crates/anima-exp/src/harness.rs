@@ -383,6 +383,22 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             v2.tick(&step.spikes);
             // CLLA allocation rule: tracked per tick (no-op when off).
             v2.accumulate_input_current(&net, &step.spikes);
+            if net.tick.0 % 1000 == 0 && v2.dormant_reserve_enabled() {
+                // Candidate-pool instrumentation at snapshot cadence.
+                let mut pools = Vec::new();
+                for (pidx, _) in net.neurons.iter().enumerate() {
+                    if net.neurons[pidx].class == NeuronClass::Input { continue; }
+                    let slots = v2.pool_snapshot(pidx);
+                    pools.push(anima_telemetry::events::PoolEntry {
+                        neuron: pidx as u32,
+                        slots,
+                    });
+                }
+                let mut pe = b.build(net.tick.0, Payload::CandidatePool { pools });
+                if let Err(e) = write_env(&mut recorder, &server, &mut pe, &mut events) {
+                    recorder_error = Some(e);
+                }
+            }
             if net.tick.0 % v2_window_ticks == 0 && net.tick.0 > 0 {
                 let tick = net.tick;
                 for ev in v2.window(&mut net, tick) {
@@ -391,6 +407,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                             Payload::SynapseCreated { syn, pre, post, w: anima_telemetry::events::f32_json(w), reason: ReasonPayload::simple(reason) },
                         anima_core::structural_v2::V2Event::SynapsePruned { syn, reason } =>
                             Payload::SynapsePruned { syn, reason: ReasonPayload::simple(reason) },
+                        anima_core::structural_v2::V2Event::CandidatePool { .. } => continue, // emitted above at snapshot cadence
                     };
                     let mut re = b.build(net.tick.0, payload);
                     if let Err(e) = write_env(&mut recorder, &server, &mut re, &mut events) {
@@ -751,6 +768,7 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         p_max_frac: v.p_max_frac,
         w_consolidate_min: v.w_consolidate_min,
         alloc_residual: v.alloc_residual,
+        dormant_reserve: v.dormant_reserve,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,

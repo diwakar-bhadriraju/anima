@@ -18,6 +18,11 @@ use crate::rate_balance::{E6Params, RateBalance};
 pub struct Candidate {
     pub pre: NeuronId,
     pub w: f32,
+    /// Dormant-candidate reserve (docs/x-clla-dormant-reserve.md §3.1):
+    /// set when this candidate's w first exceeds w_c_init (its pre once
+    /// co-fired with its post). Reserved candidates decay to a floor
+    /// (theta_die) instead of dying; bit is local, no timestamp.
+    pub reserved: bool,
 }
 
 /// Structural mutation reported to the harness for telemetry.
@@ -33,6 +38,13 @@ pub enum V2Event {
     SynapsePruned {
         syn: SynapseId,
         reason: &'static str,
+    },
+    /// Dormant-reserve instrumentation: candidate pool snapshot for one
+    /// neuron (emitted at snapshot cadence when the reserve flag is on).
+    CandidatePool {
+        post: NeuronId,
+        /// (pre, w, reserved, eligible_waiting) per slot, slot order.
+        slots: Vec<(u32, f32, bool, bool)>,
     },
 }
 
@@ -70,6 +82,11 @@ pub struct V2Plasticity {
     res_iw: Vec<f32>,
     /// Allocation gate g per neuron for the current window.
     res_gate: Vec<f32>,
+    /// Dormant reserve (docs/x-clla-dormant-reserve.md): per-neuron set of
+    /// input channels that fired this window (from the R-split delivery
+    /// scan). Used for the pool-pressure test P2 ('co-active input channel
+    /// fired with no pool candidate'). Cleared at window start.
+    fired_channels: Vec<std::collections::BTreeSet<u32>>,
 }
 
 impl V2Plasticity {
@@ -85,7 +102,7 @@ impl V2Plasticity {
             let mut pool = Vec::with_capacity(params.c_slots);
             while pool.len() < params.c_slots {
                 match draw_candidate(net, &pool, post, &params) {
-                    Some(pre) => pool.push(Candidate { pre, w: params.w_c_init }),
+                    Some(pre) => pool.push(Candidate { pre, w: params.w_c_init, reserved: false }),
                     None => break,
                 }
             }
@@ -104,6 +121,7 @@ impl V2Plasticity {
             res_ip: vec![0.0; n],
             res_iw: vec![0.0; n],
             res_gate: vec![1.0; n],
+            fired_channels: (0..n).map(|_| std::collections::BTreeSet::new()).collect(),
         }
     }
 
@@ -151,9 +169,12 @@ impl V2Plasticity {
     /// afferent; excitatory only; post internal). No-op when the rule is
     /// off — accumulators stay zero and res_gate stays 1.0 (identity).
     pub fn accumulate_input_current(&mut self, net: &Network, spikes: &[NeuronId]) {
-        if !self.alloc_residual_enabled() {
+        if !self.alloc_residual_enabled() && !self.dormant_reserve_enabled() {
             return;
         }
+        // Fired input channels this tick (per post neuron) for the reserve
+        // pool-pressure test — tracked when the reserve is on.
+        let track_channels = self.dormant_reserve_enabled();
         for &pre in spikes {
             if pre.0 >= net.channels.len() as u32 {
                 continue; // input-channel afferents only (D8)
@@ -172,6 +193,9 @@ impl V2Plasticity {
                 }
                 let cur = s.amplitude * s.w;
                 let i = s.post.idx();
+                if track_channels && i < self.fired_channels.len() {
+                    self.fired_channels[i].insert(pre.0);
+                }
                 if s.consolidated {
                     self.res_ip[i] += cur;
                 } else {
@@ -179,6 +203,19 @@ impl V2Plasticity {
                 }
             }
         }
+    }
+
+    /// Dormant-reserve flag (docs/x-clla-dormant-reserve.md).
+    pub fn dormant_reserve_enabled(&self) -> bool {
+        self.params.dormant_reserve
+    }
+
+    /// Candidate-pool snapshot for one neuron (instrumentation; emitted at
+    /// snapshot cadence when the reserve flag is on; identity-safe).
+    pub fn pool_snapshot(&self, post: usize) -> Vec<(u32, f32, bool, bool)> {
+        self.candidates[post].iter()
+            .map(|c| (c.pre.0, c.w, c.reserved, c.w >= self.params.theta_permanent))
+            .collect()
     }
 
     /// Compute the allocation gate for every neuron from the JUST-FINISHED
@@ -245,6 +282,7 @@ impl V2Plasticity {
 
         // Reset window firing state for the next window.
         self.fired.iter_mut().for_each(|f| *f = false);
+        for fc in self.fired_channels.iter_mut() { fc.clear(); }
         events
     }
 
@@ -290,6 +328,7 @@ impl V2Plasticity {
         events: &mut Vec<V2Event>,
     ) -> Vec<Candidate> {
         let post_id = NeuronId(post as u32);
+        let reserve = self.dormant_reserve_enabled();
         let mut i = 0;
         while i < pool.len() {
             let pre = pool[i].pre;
@@ -306,10 +345,30 @@ impl V2Plasticity {
                     1.0
                 };
                 pool[i].w += self.params.delta_perm * self.beta(net, post_id, pre) * g;
+                // Dormant reserve: first co-active accumulation marks the
+                // candidate reserved (w > w_c_init is the derivable moment).
+                if reserve && !pool[i].reserved && pool[i].w > self.params.w_c_init {
+                    pool[i].reserved = true;
+                }
+            } else if reserve && pool[i].reserved {
+                // Reserved: decay to the floor theta_die, never below.
+                // Repeated non-coactivity cannot remove a reserved candidate.
+                pool[i].w = (pool[i].w * self.params.decay_c).max(self.params.theta_die);
             } else {
                 pool[i].w *= self.params.decay_c;
             }
             if pool[i].w >= self.params.theta_permanent {
+                let cap_ok = !self.params.assembly_protect
+                    || self.consolidated_mass(net, post_id) + self.params.w_c_permanent
+                        <= self.params.p_max_frac * self.params.t_e;
+                if !cap_ok && reserve {
+                    // Headroom exhausted: eligible-waiting — pin at
+                    // theta_permanent, hold the slot, retry next window.
+                    // (docs/x-clla-dormant-reserve.md §2)
+                    pool[i].w = self.params.theta_permanent;
+                    i += 1;
+                    continue;
+                }
                 // Permanence: needs a free B_e slot; evict lowest-weight
                 // live excitatory synapse otherwise (frozen tie-break).
                 self.evict_for(net, post_id, events);
@@ -339,18 +398,80 @@ impl V2Plasticity {
                 // and redraw fresh (the old pre is now connected).
                 pool.swap_remove(i);
                 if let Some(npre) = draw_candidate(net, &pool, post, &self.params) {
-                    pool.push(Candidate { pre: npre, w: self.params.w_c_init });
+                    pool.push(Candidate { pre: npre, w: self.params.w_c_init, reserved: false });
                 }
-            } else if pool[i].w < self.params.theta_die {
+            } else if (pool[i].w < self.params.theta_die) && !(reserve && pool[i].reserved) {
+                // Death → redraw. Reserved candidates never die on
+                // inactivity (floor at theta_die).
                 pool.swap_remove(i);
                 if let Some(npre) = draw_candidate(net, &pool, post, &self.params) {
-                    pool.push(Candidate { pre: npre, w: self.params.w_c_init });
+                    pool.push(Candidate { pre: npre, w: self.params.w_c_init, reserved: false });
                 }
             } else {
                 i += 1;
             }
         }
+        // Dormant reserve: pool-pressure eviction (P1 ∧ P2) —
+        // all slots reserved/eligible-waiting AND a co-active input
+        // channel fired with no pool candidate. Evict by priority:
+        // un-reserved > reserved-at-floor > eligible-waiting, ties by
+        // lowest pool index; replacement = the missing fired channel.
+        if reserve {
+            self.reserve_pressure_evict(net, post, &mut pool, post_id);
+        }
         pool
+    }
+
+    /// Dormant reserve pool pressure (docs/x-clla-dormant-reserve.md §1):
+    /// when every slot is reserved or eligible-waiting and a channel that
+    /// fired on this neuron has no candidate, evict one per the priority
+    /// ladder and draw the missing fired channel.
+    fn reserve_pressure_evict(
+        &mut self,
+        net: &Network,
+        post: usize,
+        pool: &mut Vec<Candidate>,
+        post_id: NeuronId,
+    ) {
+        if pool.len() < self.params.c_slots {
+            return;
+        }
+        let all_held = pool.iter().all(|c| c.reserved);
+        if !all_held {
+            return; // un-reserved slots exist; new draws fit normally
+        }
+        // P2: a fired input channel with no matching candidate
+        let fired = &self.fired_channels[post];
+        if fired.is_empty() {
+            return;
+        }
+        let missing: Vec<u32> = fired.iter().copied()
+            .filter(|&ch| !pool.iter().any(|c| c.pre.0 == ch))
+            .collect();
+        if missing.is_empty() {
+            return;
+        }
+        // Eviction priority: 1 un-reserved (none — all held), 2 reserved
+        // at floor (lowest index), 3 eligible-waiting (w == theta_permanent,
+        // lowest index). Priority 2 strictly before 3 per the freeze.
+        let mut victim: Option<usize> = None;
+        for (idx, c) in pool.iter().enumerate() {
+            match victim {
+                None => victim = Some(idx),
+                Some(v) => {
+                    let vc = &pool[v];
+                    let v_prio = if vc.w >= self.params.theta_permanent { 2 } else { 1 };
+                    let c_prio = if c.w >= self.params.theta_permanent { 2 } else { 1 };
+                    if c_prio < v_prio || (c_prio == v_prio && c.w < vc.w) {
+                        victim = Some(idx);
+                    }
+                }
+            }
+        }
+        if let Some(v) = victim {
+            let ch = missing[0];
+            pool[v] = Candidate { pre: NeuronId(ch), w: self.params.w_c_init, reserved: false };
+        }
     }
 
     /// M5: evict the lowest-weight live excitatory incoming synapse of
@@ -392,7 +513,7 @@ impl V2Plasticity {
 
     /// CLLA: sum of consolidated (protected) live excitatory weights
     /// onto `post`. Pure local read of the post neuron's incoming set.
-    fn consolidated_mass(&self, net: &Network, post_id: NeuronId) -> f32 {
+    pub(crate) fn consolidated_mass(&self, net: &Network, post_id: NeuronId) -> f32 {
         let incoming = &net.incoming[post_id.idx()];
         let mut p = 0.0f32;
         for &sid in incoming {

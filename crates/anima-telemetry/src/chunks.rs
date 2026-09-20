@@ -233,6 +233,11 @@ impl Buffers {
                 self.reason[last] = Some(kind.clone().into_bytes());
                 self.detail[last] = Some(detail.clone().into_bytes());
             }
+            Payload::CandidatePool { pools } => {
+                // Lossless blob storage (same pattern as RunStarted's
+                // params_json): the JSON blob round-trips the payload.
+                self.params_json[last] = Some(serde_json::to_vec(pools).unwrap());
+            }
         }
     }
 }
@@ -627,6 +632,13 @@ impl Row {
                 kind: s(&self.reason).unwrap_or_default(),
                 detail: s(&self.detail).unwrap_or_default(),
             },
+            EventKind::CandidatePool => {
+                let pools = self.params_json.as_deref().map(|b| {
+                    serde_json::from_slice::<Vec<crate::events::PoolEntry>>(b)
+                        .unwrap_or_default()
+                }).unwrap_or_default();
+                Payload::CandidatePool { pools }
+            }
         };
         let exp = self.exp_id.as_deref()
             .map(|b| String::from_utf8_lossy(b).into_owned())

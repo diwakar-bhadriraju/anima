@@ -108,6 +108,12 @@ pub enum Payload {
         kind: String,
         detail: String,
     },
+    /// Dormant-reserve instrumentation (docs/x-clla-dormant-reserve.md §5):
+    /// per-neuron candidate pool state at snapshot cadence; emitted ONLY
+    /// when the dormant_reserve flag is on (identity: absent flag-off).
+    CandidatePool {
+        pools: Vec<PoolEntry>,
+    },
 }
 
 /// Causal metadata carried by every structural event (§15).
@@ -157,6 +163,17 @@ pub enum EventKind {
     NoveltySignal,
     ResourceUsage,
     Failure,
+    /// Dormant-reserve instrumentation (docs/x-clla-dormant-reserve.md §5):
+    /// per-neuron candidate pool state at snapshot cadence; emitted ONLY
+    /// when the dormant_reserve flag is on (identity: absent flag-off).
+    CandidatePool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoolEntry {
+    pub neuron: u32,
+    /// (pre channel, w, reserved, eligible_waiting) per candidate slot.
+    pub slots: Vec<(u32, f32, bool, bool)>,
 }
 
 impl EventKind {
@@ -180,6 +197,7 @@ impl EventKind {
             EventKind::NoveltySignal => "novelty-signal",
             EventKind::ResourceUsage => "resource-usage",
             EventKind::Failure => "failure",
+            EventKind::CandidatePool => "candidate-pool",
         }
     }
 }
@@ -230,6 +248,7 @@ impl EventKind {
             EventKind::NoveltySignal => 15,
             EventKind::ResourceUsage => 16,
             EventKind::Failure => 17,
+            EventKind::CandidatePool => 18,
         }
     }
 }
@@ -254,6 +273,7 @@ impl EventKind {
             Payload::PredictionError { .. } => EventKind::PredictionError,
             Payload::NoveltySignal { .. } => EventKind::NoveltySignal,
             Payload::ResourceUsage { .. } => EventKind::ResourceUsage,
+            Payload::CandidatePool { .. } => EventKind::CandidatePool,
             Payload::Failure { .. } => EventKind::Failure,
         }
     }

@@ -118,6 +118,10 @@ pub struct V2Section {
     /// candidate accumulation by protected-input-current fraction.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub alloc_residual: bool,
+    /// Dormant-candidate reserve (docs/x-clla-dormant-reserve.md): retain
+    /// ever-coactive candidate pre-associations within c_slots.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub dormant_reserve: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

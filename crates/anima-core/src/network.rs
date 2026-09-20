@@ -338,6 +338,12 @@ pub struct V2Params {
     /// candidate accumulation by protected-input-current fraction R.
     #[serde(default, skip_serializing_if = "is_false")]
     pub alloc_residual: bool,
+    /// Dormant-candidate reserve (docs/x-clla-dormant-reserve.md): retain
+    /// ever-coactive candidate pre-associations (reserved bit, floor =
+    /// theta_die) within the existing c_slots pool. false = byte-identical
+    /// M3 candidate dynamics (identity).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub dormant_reserve: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,

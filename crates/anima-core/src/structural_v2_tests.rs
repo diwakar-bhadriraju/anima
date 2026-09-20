@@ -3,7 +3,7 @@
 //! them depend on A/B/C labels or stage structure.
 
 use crate::network::{Network, NetworkConfig, NeuronClass, NeuronId, SynapseId, Tick, V2Params};
-use crate::structural_v2::{V2Event, V2Plasticity};
+use crate::structural_v2::{Candidate, V2Event, V2Plasticity};
 
 /// The exact frozen parameter set (protocol §2–§8).
 pub fn v2_params() -> V2Params {
@@ -25,6 +25,7 @@ pub fn v2_params() -> V2Params {
         p_max_frac: 0.75,
         w_consolidate_min: 0.05,
         alloc_residual: false,
+        dormant_reserve: false,
         c_slots: 6,
         w_c_init: 0.01,
         delta_perm: 0.01,
@@ -1174,7 +1175,7 @@ fn clla_alloc_rule_scales_candidate_accumulation() {
         .map(NeuronId)
         .expect("post has a live unconsolidated input-channel afferent");
     // Replace the first candidate slot with a controlled candidate from c.
-    v2.candidates[post.idx()][0] = crate::structural_v2::Candidate { pre: c, w: 0.01 };
+    v2.candidates[post.idx()][0] = crate::structural_v2::Candidate { pre: c, w: 0.01, reserved: false };
     let w0 = v2.candidates[post.idx()][0].w;
     // Window 1: drive channel c only => R=0 => g=1 => + delta_perm (0.01).
     v2.accumulate_input_current(&net, &[c]);
@@ -1189,4 +1190,122 @@ fn clla_alloc_rule_scales_candidate_accumulation() {
     let _ = v2.window(&mut net, Tick(200));
     let w3 = v2.candidates[post.idx()][0].w;
     assert!((w3 - w2).abs() < 1e-6, "g=0: candidate must not accumulate: {w2} -> {w3}");
+}
+
+/// Dormant reserve: a candidate that once co-fired becomes reserved; while
+/// inactive it decays to the floor theta_die and is NOT redrawn (no death
+/// on inactivity), so its pre-association survives across a long block.
+#[test]
+fn clla_reserve_survives_inactivity() {
+    let params = V2Params {
+        dormant_reserve: true,
+        theta_die: 0.005,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 31,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic && s.post == post
+        }))
+        .map(NeuronId).expect("channel with afferent to post");
+    v2.candidates[post.idx()][0] = Candidate { pre: c, w: 0.01, reserved: false };
+    // One co-active window: w rises above w_c_init => reserved.
+    v2.accumulate_input_current(&net, &[c]);
+    v2.tick(&[c, post]);
+    let _ = v2.window(&mut net, Tick(100));
+    assert!(v2.candidates[post.idx()][0].reserved, "co-fired candidate must become reserved");
+    // 500 inactive windows (50 s): reserved decays to the floor, never dies,
+    // never redrawn (pre preserved).
+    for w in 2..=500u64 {
+        let _ = v2.window(&mut net, Tick(w * 100));
+    }
+    let cand = &v2.candidates[post.idx()][0];
+    assert!(cand.reserved, "reserved survives 50 s of inactivity");
+    assert_eq!(cand.pre, c, "pre-association preserved");
+    assert!((cand.w - 0.005).abs() < 1e-5, "decayed to floor theta_die: {}", cand.w);
+}
+
+/// Dormant reserve: without the flag, the same 50 s of inactivity kills the
+/// candidate (pre redrawn / candidate replaced) — identity of semantics.
+#[test]
+fn clla_reserve_off_candidate_dies() {
+    let params = v2_params(); // dormant_reserve = false
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 31,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic && s.post == post
+        }))
+        .map(NeuronId).expect("channel with afferent to post");
+    v2.candidates[post.idx()][0] = Candidate { pre: c, w: 0.01, reserved: false };
+    for w in 1..=500u64 {
+        let _ = v2.window(&mut net, Tick(w * 100));
+    }
+    // The original candidate decays below theta_die (0.005) within ~69
+    // windows and is redrawn; after 500 windows its pre need NOT be c.
+    let cand = &v2.candidates[post.idx()][0];
+    assert!(
+        cand.pre != c || cand.w < 0.005,
+        "flag-off: candidate must decay/redraw, not survive: pre={} w={}",
+        cand.pre.0, cand.w
+    );
+}
+
+/// Dormant reserve: permanence-eligible with NO protected headroom pins the
+/// candidate (eligible-waiting) instead of consolidating; P cap never
+/// exceeded.
+#[test]
+fn clla_reserve_eligible_waiting_under_cap() {
+    let params = V2Params {
+        dormant_reserve: true,
+        assembly_protect: true,
+        p_max_frac: 0.3, // cap = 0.24; pre-fill P to cap
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 33,
+    );
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    // Pre-fill protected mass to the cap: consolidated synapses totaling 0.24.
+    let s1 = net.add_synapse(NeuronId(0), post, 0.12, true, Tick(0));
+    let s2 = net.add_synapse(NeuronId(1), post, 0.12, true, Tick(0));
+    net.synapses[s1.idx()].consolidated = true;
+    net.synapses[s2.idx()].consolidated = true;
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic && s.post == post
+        }))
+        .map(NeuronId).expect("channel afferent");
+    // Candidate at theta_permanent (eligible) from channel c.
+    v2.candidates[post.idx()][0] = Candidate { pre: c, w: 0.05, reserved: true };
+    let mut made = 0usize;
+    for w in 1..=5u64 {
+        v2.accumulate_input_current(&net, &[c]);
+        v2.tick(&[c, post]);
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { reason, .. } = e {
+                if reason == "candidate-permanence" { made += 1; }
+            }
+        }
+    }
+    assert_eq!(made, 0, "no permanence without headroom (eligible-waiting pins)");
+    let cand = &v2.candidates[post.idx()][0];
+    assert_eq!(cand.w, 0.05, "eligible-waiting pinned at theta_permanent");
+    // protected mass still at cap
+    let p = v2.consolidated_mass(&net, post);
+    assert!(p <= 0.3 * 0.8 + 1e-6, "cap never exceeded: {p}");
 }
