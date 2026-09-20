@@ -1800,6 +1800,35 @@ fn e6_configs_freeze_source_with_e6_only() {
             "snapshot bytes identical to V2.3 baseline");
     }
 
+    /// Corrected dimensional definition (docs/x-mechanism-review.md):
+    /// x_i = min(I_aff/v_th, 1) with I_aff = amplitude*w summed over
+    /// spiking input afferents (amplitude = 52.0, v_th = 1.0). A single
+    /// input spike on a w >= 1/52 synapse saturates x to 1.0.
+    #[test]
+    fn x_drive_amplitude_scale() {
+        use anima_core::network::{InputChannelId, InputFrame, NetworkConfig, Tick};
+        let mut net = anima_core::network::Network::new(
+            NetworkConfig {
+                slow_state_beta: 0.0046875,
+                slow_state_tau_ms: 5000.0,
+                slow_state_beta_drive: true,
+                amplitude: 52.0,
+                ..NetworkConfig::default()
+            },
+            24, 1, 0, 7,
+        );
+        // Internal neuron id = 24 (1 internal). Deliver one input spike
+        // repeatedly over several ticks: each afferent spike carries
+        // amplitude*w >= 1 at w >= 1/52 -> x clamps at 1.0 -> g -> 1-eps.
+        for t in 0..80u64 {
+            net.step(&InputFrame { tick: Tick(t), spikes: vec![InputChannelId(0)] });
+        }
+        let g = net.neurons[24].g_drive;
+        assert!(g > 0.9, "saturated drive trace g={g} (>0.9 expected at amplitude=52, v_th=1)");
+        // Bare-w (old definition) would yield x ~ 0.02-0.06 = 100x smaller.
+        assert!(g > 0.5, "dimension check: with amplitude factor trace is O(1), got {g}");
+    }
+
     /// Mechanism-level identity: with the flag off, g_drive stays 0 and u
     /// evolves identically to the ungated rule (unit-level).
     #[test]

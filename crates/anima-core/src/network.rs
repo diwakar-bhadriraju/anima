@@ -709,14 +709,16 @@ impl Network {
         // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
         // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
         let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
-        // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3).
-        // g_drive EMA: x_i = min(I_aff/t_e, 1); I_aff = sum of w over
+        // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3;
+        // SPEC CORRECTION 2026-09-20, docs/x-mechanism-review.md):
+        // x_i = min(I_aff/v_th, 1); I_aff = sum of amplitude*w over
         // excitatory INPUT-channel -> i synapses delivering a spike this
-        // tick. Gated write uses g_i(t_spike) = value BEFORE this tick's
-        // advance (spec semantics g(t+1) = lam*g + (1-lam)*x).
+        // tick (the membrane receives amplitude*w per spike, the deposit
+        // expression at the foot of this fn). Gated write uses
+        // g_i(t_spike) = value BEFORE this tick's advance.
         let drive_on = self.cfg.slow_state_beta_drive;
         let lam_g = exp_approx(-dt / 20.0); // tau_g = STDP tau = 20 ms
-        let t_e = self.cfg.v2.as_ref().map(|v| v.t_e).unwrap_or(1.0);
+        let v_th = p.v_th; // existing LIF threshold (frozen 1.0)
         let mut drive_x: Vec<f32> = Vec::new();
         if drive_on {
             drive_x.resize(n, 0.0);
@@ -730,12 +732,12 @@ impl Network {
                     }
                     let post = syn.post.idx();
                     if post < n && self.neurons[post].class != NeuronClass::Input {
-                        drive_x[post] += syn.w;
+                        drive_x[post] += syn.amplitude * syn.w;
                     }
                 }
             }
             for x in drive_x.iter_mut() {
-                *x = (*x / t_e).min(1.0);
+                *x = (*x / v_th).min(1.0);
             }
         }
         for i in 0..n {

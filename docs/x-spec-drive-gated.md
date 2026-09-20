@@ -42,18 +42,31 @@ V2.2/V2.3 untouched; no parameter tuning.
 ### 3.1 Afferent drive input
 
 ```
-I_aff_i(t) = Σ w_{j→i} over excitatory synapses where
+I_aff_i(t) = Σ amplitude·w_{j→i} over excitatory synapses where
              presynaptic j is an INPUT CHANNEL and j fired at t
 ```
 
 - Input-channel → this-neuron excitatory synapses only.
 - Recurrent (internal→internal) and inhibitory excluded.
 - Input-vs-internal = architectural boundary (D8), not a label.
+- **SPEC CORRECTION (2026-09-20, user-approved, pre-execution):
+  the membrane receives `amplitude * w` per spike
+  (network.rs deposit: `current = s.amplitude * s.w`); the
+  original spec (and the failed 16-run diagnostic, commit
+  2923a90) summed bare `w`, a 52x scale error documented in
+  docs/x-mechanism-review.md. Corrected definition uses the
+  frozen substrate constants amplitude = 52.0 and v_th = 1.0
+  (LIF threshold).
+
 
 ### 3.2 Drive trace (per neuron, fast, deterministic)
 
 ```
-x_i(t) = min( I_aff_i(t) / t_e, 1.0 )        # t_e = 0.8 (M2 budget)
+x_i(t) = min( I_aff_i(t) / v_th, 1.0 )      # v_th = 1.0 (LIF threshold,
+                                            #   existing frozen constant;
+                                            #   SPEC CORRECTION: t_e was a
+                                            #   dimensionless M2 budget, not
+                                            #   a membrane-current scale)
 λ_g    = exp( -dt / τ_g ), dt = 1 ms, τ_g = 20 ms (= STDP τ)
 g_i(t+1) = λ_g · g_i(t) + (1 - λ_g) · x_i(t)   # g_i ∈ [0,1], g_i(0)=0
 ```
@@ -89,7 +102,8 @@ flag on:              `on spike:  u_i += β · g_i(t_spike)`
 
 | param | value | source |
 |---|---|---|
-| t_e | 0.8 | existing M2 budget |
+| t_e | — | removed from the drive definition (spec correction) |
+| v_th | 1.0 | existing LIF threshold (frozen) |
 | τ_g | 20 ms | existing STDP tau (tau_plus) |
 | β | 0.0046875 (protocol-corrected V2.3 gate baseline; the 0.00625 statement was erroneous) | existing slow_state_beta |
 | τ_s | unchanged | existing slow_state_tau_ms |
