@@ -451,3 +451,59 @@ mixed through the recurrent pool); per-window structure is a
 small modulation on a huge common baseline.
 
 No E-number, no mechanism, no fix. STOP.
+
+
+---
+
+## 12. Local presentation-boundary signal analysis (READ-ONLY; no runs,
+no implementation) — instrument examples/boundary.rs (committed)
+
+Committed A/C spike stream (v21repac-b0.003125-t10000 + byte-
+identical twin xp2). Local per-neuron state traces reconstructed
+deterministically from the recorded spikes (exact substrate
+equations: i_syn += amp*w per pre-spike tau 5ms; i_adapt += 0.05/
+own spike tau 200ms; rate EMA 1/s; u += beta/own spike tau 10s;
+spk per-tick) with weights from nearest-preceding snapshot.
+
+(1) Population mean rate (sum over 52 neurons, Hz-ish) per
+bucket: onset 1416/1453 (A/C), rise 1531/1502, early 1694/1607,
+steady 2026/1823, late 2467/2127, offt 2657/2271, post1
+2315/2031, post2 1735/1588. The population DOES show a reliable
+stimulus envelope: rate rises through the presentation
+(1416 -> 2657), peaks at the offset boundary, then decays over
+~1.5s (2657 -> 1735). Population spike-count alone can segment
+"stimulus vs background" (ratio late+offt / post2 ~ 1.5-1.7).
+
+(2) Per-neuron boundary d' (onset [0,20) vs steady [100,250)):
+rate median d' -0.94 (2/52 > 1.5); i_adapt -1.04 (2/52);
+i_syn -0.31 (0/52); u -0.15 (0/52); spk -0.22 (0/52). The LOCAL
+per-neuron signals are weak discriminators of "presentation
+start" vs "mid-presentation": median |d'| < 1 everywhere; only
+a handful of neurons exceed 1.5. The onset boundary is NOT
+reliably readable from any single neuron's local state; it IS
+readable from the population envelope (above), but that is not
+a local quantity.
+
+(3) Dilution curve cos(A,C): windowed count (within
+[t,t+500)ms) 0.876 -> 0.627 across k=1..40 (structure retained
+per-presentation, in line with the per-window bottleneck map);
+cumulative count 0.988 -> 1.0000 (diluted by k~5-10);
+u 0.984 -> 0.9993 (same). A/C structure in windowed counts
+persists (0.63 at k=40) but the run-accumulated representations
+(cumulative, u) are flat by k~10.
+
+INTERPRETATION (observation; no fix): the missing primitive is
+plausibly t. segmentation/reset at the level of the WRITE
+(START/end-of-presentation boundary gating + write-epoch
+reset), not an absen.t local boundary signal per se: the
+population envelope clearly marks the boundary (segmentable),
+but no single neuron's local state does (median |d'|<=1 for all
+five local signals; i_syn, the fastest, is near-zero d'). The
+population-level envelope is available to the substrate only as
+aggregated input statistics, not to a neuron's own state
+(boundary never appears in any local trace with d'>1.5 in the
+median neuron). Whether a local rule could extract the
+boundary from e.g. onset transients across many afferents is a
+mechanism question - NOT implemented/decided here.
+
+Same numbers on the committed twin = deterministic replication.
