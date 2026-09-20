@@ -19,6 +19,8 @@ pub fn v2_params() -> V2Params {
         w_rec_lo: 0.005,
         w_rec_hi: 0.02,
         t_e: 0.8,
+        m2_buckets: 1,
+        m2_epoch_windows: 40,
         c_slots: 6,
         w_c_init: 0.01,
         delta_perm: 0.01,

@@ -735,6 +735,8 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         w_rec_lo: v.w_rec_lo,
         w_rec_hi: v.w_rec_hi,
         t_e: v.t_e,
+        m2_buckets: v.m2_buckets,
+        m2_epoch_windows: v.m2_epoch_windows,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,

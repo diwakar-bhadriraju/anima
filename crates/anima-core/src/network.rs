@@ -87,6 +87,14 @@ fn one_f32() -> f32 {
     1.0
 }
 
+fn one_u32() -> u32 {
+    1
+}
+
+fn v23_epoch_windows() -> u32 {
+    40
+}
+
 fn v22_theta_mean() -> f32 { 2.0 }
 fn v22_plateau_mean() -> f32 { 0.9 }
 fn v22_phi_rel() -> f32 { 0.5 }
@@ -148,6 +156,10 @@ pub struct Synapse {
     pub amplitude: f32,
     /// Creation tick.
     pub created: Tick,
+    /// V2.3 (docs/v2_3-design.md §1): write-epoch bucket tag (0/1). Set at
+    /// LTP time from the post-neuron's epoch-parity counter; 0 = pre-V2.3.
+    #[serde(default)]
+    pub m2_bucket: u8,
     /// Ticks this synapse has been continuously below the silence threshold.
     /// u64::MAX tombstones pruned synapses (ids are permanent indices).
     pub silent_ticks: u64,
@@ -272,6 +284,14 @@ pub struct V2Params {
     pub w_rec_hi: f32,
     // M2 — normalization
     pub t_e: f32,
+    /// V2.3: trace-partitioned M2 (docs/v2_3-design.md). 1 = shared budget
+    /// (identity, byte-identical to baseline). >1 = capacity-matched
+    /// per-write-epoch buckets: per-bucket target T = t_e / n_populated.
+    #[serde(default = "one_u32")]
+    pub m2_buckets: u32,
+    /// V2.3: epoch length in structural windows (parity flip period).
+    #[serde(default = "v23_epoch_windows")]
+    pub m2_epoch_windows: u32,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -585,6 +605,7 @@ impl Network {
             amplitude: self.cfg.amplitude,
             created: tick,
             silent_ticks: 0,
+            m2_bucket: 0,
             plastic,
             inhibitory,
         });

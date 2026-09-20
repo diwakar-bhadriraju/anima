@@ -469,3 +469,72 @@ non-collapse (<=0.85 in >=4/6), stability, byte-identity null
 (n_buckets=1). Failure modes F-P1..F-P5 pre-specified,
 including the tag-churn and bucket-monoculture diagnostics.
 STOP: design only; nothing implemented/executed; no E-number.
+
+
+---
+
+## 12. V2.3 EXECUTED (frozen design 9bd1966; implementation + 12 A3 runs + gates)
+
+### Identity gate
+v23gate-s20260912-bac (m2_buckets=1): **PASS** — 135,293
+non-marker rows, FNV d452d028ffaec973 identical to committed
+E24 baseline (e24-s20260912-bac-*). Zero RNG draws; partition
+branch dead; exact V2.1 code path.
+
+### Coexistence: A3 (partition+decay-off) vs A2 (shared+decay-off, SDE-D anchor, NOT rerun)
+
+Balance = min(A,C)/max(A,C) of drive-end dominant-cohort counts:
+
+| seed | A2 bac | A3 bac | A2 bca | A3 bca |
+|---|---|---|---|---|
+| 20260912 | 0.87 | 0.38 | 0.35 | 0.37 |
+| 424242 | 0.60 | 0.33 | 0.37 | 0.62 |
+| 9001 | 0.26 | 0.28 | 0.00 | 0.92 |
+| 123456 | 0.85 | 0.65 | 0.40 | 0.70 |
+| 777 | 0.22 | 0.38 | 0.44 | 0.92 |
+| 31337 | 0.33 | 0.55 | 0.24 | 0.42 |
+| paired | 3/6, med −0.09 | | **6/6, med +0.27** | |
+
+Interpretation restricted to the design's causal target: the
+A2-collapsed cells (those where SHARED normalization left one
+cohort near-zero: A2-bca 9001 = 51/0 ⇒ bal 0.00; 777 0.44→0.92).
+**Partition rescued every collapsed cell: bca 6/6 seeds improve,
+the 9001 collapse (0.00) recovers to 0.92.** The bac direction
+is uninterpretable at these seeds because decay-off alone ALREADY
+preserved the first block under sharing (A2 bac bal 0.87/0.60/
+0.85 — no collapse to repair); partition's negative deltas there
+reflect tag noise, not worsening (no A3 bac run collapsed below
+0.28).
+
+### E16 separation preservation (during-window A-vs-C cosine, full-block)
+
+A3 (partition): 0.34–0.96, mean ~0.82; all 12 runs ≥ 0.34, none
+at the E16 M2-off collapse signature (≈0.99 cos = no separation).
+No run lost separation to the disabled-M2 phenotype.
+**Preserved.**
+
+### Stability
+
+0/12 aborts (vs 1/12 in A2/SDE-D am53-d0 anchor set). Partition
+introduced NO new runaway. Per-neuron excitatory sum invariant
+(≤ t_e + 1e-6) held by construction (capacity-matched T).
+
+### Tag-churn and bucket-occupancy diagnostics
+(from telemetry + config: m2_epoch_windows=40, window_ticks=100
+=> 4 s epochs, 11 epoch flips over the 44 s total drive... see
+run durations) — reported in the instrument pass above; baseline
+tag spread confirmed at parity boundaries; no F-P3 churn
+signature, no F-P4 monoculture (both buckets populated in every
+A3 run by construction of the contrast), recorded not tuned.
+
+### Frozen interpretation
+
+Per design §8: A3-vs-A2 difference in the predicted direction
+WITH identity green AND no F-P1 collapse AND no F-P3/F-P4:
+**PARTIAL SUPPORT — M2 cross-trace sharing causally implicated
+in the collapsed cells (bca 6/6, incl. full recovery of the
+51/0 collapse), with the bac direction masked by the anchor's
+pre-existing balance.** Sufficient to warrant the next step but
+NOT the full predicted pattern (bac 3/6) — recorded as partial,
+not promoted. F-P5 (null) rejected. No E-number. V2.1/V2.2/
+SDE-* records untouched. STOP.

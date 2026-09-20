@@ -339,6 +339,16 @@ pub fn stdp_tick(
             let before = s.w;
             s.w = (s.w + params.a_plus * pre_t * gate * beta).min(params.w_max);
             if s.w != before {
+                // V2.3 (docs/v2_3-design.md §1): write-epoch bucket tag.
+                // Tag = parity of the structural window clock (E1-frozen)
+                // at LTP time, gated by m2_buckets > 1 (identity: skipped).
+                if let Some(v2) = net.cfg.v2.as_ref() {
+                    if v2.m2_buckets > 1 && v2.window_ticks > 0 {
+                        let win = net.tick.0 / v2.window_ticks;
+                        let parity = (win / v2.m2_epoch_windows.max(1) as u64) % 2;
+                        s.m2_bucket = parity as u8;
+                    }
+                }
                 changes.push(WeightChange { synapse: sid, before, after: s.w });
             }
         }

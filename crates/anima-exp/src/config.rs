@@ -50,6 +50,9 @@ fn default_variant_block() -> u64 {
     1
 }
 
+fn cfg_one_u32() -> u32 { 1 }
+fn cfg_v23_epoch_windows() -> u32 { 40 }
+
 fn default_e6_alpha() -> f32 {
     1.0 / 25.0
 }
@@ -90,6 +93,13 @@ pub struct V2Section {
     pub w_rec_hi: f32,
     // M2
     pub t_e: f32,
+    /// V2.3: trace-partitioned M2 (docs/v2_3-design.md). 1 (default) =
+    /// shared budget, identity. >1 = capacity-matched write-epoch buckets.
+    #[serde(default = "cfg_one_u32")]
+    pub m2_buckets: u32,
+    /// V2.3: epoch length in structural windows (default 40 = 4 s).
+    #[serde(default = "cfg_v23_epoch_windows")]
+    pub m2_epoch_windows: u32,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

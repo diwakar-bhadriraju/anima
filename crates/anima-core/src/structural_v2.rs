@@ -282,29 +282,77 @@ impl V2Plasticity {
 
     /// M2: rescale each neuron's live incoming excitatory weights to total
     /// t_e, then clamp to [w_min, w_max]. Invariant: post-pass sum <= t_e.
+    ///
+    /// V2.3 (docs/v2_3-design.md §2): when m2_buckets > 1, the budget is
+    /// CAPACITY-MATCHED and partitioned by write-epoch bucket tag: per-bucket
+    /// target T = t_e / n_populated_buckets, so the total post-pass sum never
+    /// exceeds t_e (testing cross-trace sharing at constant capacity).
+    /// m2_buckets = 1 (default) is the exact baseline path (identity).
     fn normalize(&mut self, net: &mut Network) {
+        let n_buckets = self.params.m2_buckets.max(1);
+        if n_buckets == 1 {
+            for post in 0..net.neurons.len() {
+                if net.neurons[post].class == NeuronClass::Input {
+                    continue;
+                }
+                let incoming: Vec<SynapseId> = net.incoming[post].clone();
+                let mut sum: f32 = 0.0;
+                for &sid in &incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.silent_ticks != u64::MAX && !s.inhibitory {
+                        sum += s.w;
+                    }
+                }
+                if sum <= 0.0 || (sum - self.params.t_e).abs() < 1e-9 {
+                    continue;
+                }
+                let factor = self.params.t_e / sum;
+                for sid in incoming {
+                    let s = &mut net.synapses[sid.idx()];
+                    if s.silent_ticks == u64::MAX || s.inhibitory {
+                        continue;
+                    }
+                    s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                }
+            }
+            return;
+        }
+        // Partitioned, capacity-matched (V2.3 §2).
         for post in 0..net.neurons.len() {
             if net.neurons[post].class == NeuronClass::Input {
                 continue;
             }
             let incoming: Vec<SynapseId> = net.incoming[post].clone();
-            let mut sum: f32 = 0.0;
+            let mut sums = vec![0.0f32; n_buckets as usize];
             for &sid in &incoming {
                 let s = &net.synapses[sid.idx()];
                 if s.silent_ticks != u64::MAX && !s.inhibitory {
-                    sum += s.w;
+                    let b = (s.m2_bucket as usize).min(sums.len() - 1);
+                    sums[b] += s.w;
                 }
             }
-            if sum <= 0.0 || (sum - self.params.t_e).abs() < 1e-9 {
+            let populated: Vec<usize> = (0..sums.len()).filter(|&b| sums[b] > 0.0).collect();
+            if populated.is_empty() {
                 continue;
             }
-            let factor = self.params.t_e / sum;
-            for sid in incoming {
-                let s = &mut net.synapses[sid.idx()];
-                if s.silent_ticks == u64::MAX || s.inhibitory {
+            let per_bucket = self.params.t_e / populated.len() as f32;
+            for &b in &populated {
+                if (sums[b] - per_bucket).abs() < 1e-9 {
                     continue;
                 }
-                s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                if sums[b] <= per_bucket {
+                    continue; // never boost; invariant: sum <= t_e
+                }
+                let factor = per_bucket / sums[b];
+                for sid in &incoming {
+                    let s = &mut net.synapses[sid.idx()];
+                    if s.silent_ticks == u64::MAX || s.inhibitory {
+                        continue;
+                    }
+                    if (s.m2_bucket as usize).min(sums.len() - 1) == b {
+                        s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                    }
+                }
             }
         }
     }
