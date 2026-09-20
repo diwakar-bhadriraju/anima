@@ -224,6 +224,7 @@ impl EventKind {
             15 => EventKind::NoveltySignal,
             16 => EventKind::ResourceUsage,
             17 => EventKind::Failure,
+            18 => EventKind::CandidatePool,
             _ => return None,
         })
     }
