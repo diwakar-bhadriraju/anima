@@ -95,6 +95,20 @@ fn v23_epoch_windows() -> u32 {
     40
 }
 
+fn clla_p_max_frac() -> f32 {
+    0.75
+}
+
+fn clla_w_consolidate_min() -> f32 {
+    0.05
+}
+
+/// serde skip helper: omit bool fields when false (CLLA flag-off runs must
+/// serialize byte-identically to the committed baseline).
+pub fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 fn v22_theta_mean() -> f32 { 2.0 }
 fn v22_plateau_mean() -> f32 { 0.9 }
 fn v22_phi_rel() -> f32 { 0.5 }
@@ -174,6 +188,12 @@ pub struct Synapse {
     /// negative (depress post); STDP never touches these (M6 owns them).
     #[serde(default)]
     pub inhibitory: bool,
+    /// CLLA (docs/anima-clla-protocol.md §3): true = consolidated memory
+    /// synapse — exempt from M2 rescaling, M4/silence pruning, and passive
+    /// decay; bounded per neuron by p_max_frac × t_e. Set at M3 permanence
+    /// iff assembly_protect && weight ≥ w_consolidate_min && cap headroom.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub consolidated: bool,
 }
 
 /// Pure spike source — the last deterministic stage of the organism's "body"
@@ -303,6 +323,17 @@ pub struct V2Params {
     /// V2.3: epoch length in structural windows (parity flip period).
     #[serde(default = "v23_epoch_windows")]
     pub m2_epoch_windows: u32,
+    // CLLA (docs/anima-clla-protocol.md) — consolidation-locked allocation.
+    /// Master flag: false = byte-identical pre-CLLA behavior (identity).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub assembly_protect: bool,
+    /// Protected-mass cap as fraction of t_e (protocol frozen: 0.75).
+    #[serde(default = "clla_p_max_frac")]
+    pub p_max_frac: f32,
+    /// Minimum candidate weight at permanence to consolidate (protocol
+    /// frozen: 0.05 = theta_permanent, reused constant).
+    #[serde(default = "clla_w_consolidate_min")]
+    pub w_consolidate_min: f32,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -622,6 +653,7 @@ impl Network {
             created: tick,
             silent_ticks: 0,
             m2_bucket: 0,
+            consolidated: false,
             plastic,
             inhibitory,
         });

@@ -48,6 +48,14 @@ pub struct SynapseState {
     pub post: u32,
     pub w: Option<f32>,
     pub plastic: bool,
+    /// CLLA: protected-memory marker. Omitted when false so flag-off runs
+    /// serialize byte-identically to the committed baseline.
+    #[serde(default, skip_serializing_if = "snapshot_bool_false")]
+    pub consolidated: bool,
+}
+
+fn snapshot_bool_false(b: &bool) -> bool {
+    !*b
 }
 
 pub struct Recorder {
@@ -244,9 +252,10 @@ mod tests {
                 tick: 10,
                 neurons: vec![NeuronState {
                     id: 0, class: "input".into(), v: Some(0.0), rate_hz: Some(1.0),
+                    u_slow: None, z_latch: None, g_drive: None,
                     dormant: false, retired: false, born: 0,
                 }],
-                synapses: vec![SynapseState { id: 0, pre: 0, post: 1, w: Some(0.2), plastic: true }],
+                synapses: vec![SynapseState { id: 0, pre: 0, post: 1, w: Some(0.2), plastic: true, consolidated: false }],
             }).unwrap();
             rec.write_snapshot(&NetworkStateSnapshot {
                 tick: 20,

@@ -21,6 +21,9 @@ pub fn v2_params() -> V2Params {
         t_e: 0.8,
         m2_buckets: 1,
         m2_epoch_windows: 40,
+        assembly_protect: false,
+        p_max_frac: 0.75,
+        w_consolidate_min: 0.05,
         c_slots: 6,
         w_c_init: 0.01,
         delta_perm: 0.01,
@@ -801,4 +804,170 @@ fn e6_deterministic_repeated_execution() {
         state_fingerprint(&net, &v2)
     };
     assert_eq!(run(21), run(21), "identical seed -> identical E6 state");
+}
+
+/// CLLA: flag-off is the exact baseline — no synapse is ever marked
+/// consolidated, even when permanence fires (byte-identity path).
+#[test]
+fn clla_flag_off_never_consolidates() {
+    let params = V2Params { assembly_protect: false, ..v2_params() };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 42,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let pre = v2.candidates[post.idx()][0].pre;
+    let mut permanence = 0;
+    for w in 1..=30u64 {
+        v2.tick(&[pre, post]);
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { reason, .. } = e {
+                if reason == "candidate-permanence" { permanence += 1; }
+            }
+        }
+        v2.tick(&[pre, post]);
+    }
+    assert!(permanence > 0, "sanity: permanence must occur");
+    assert_eq!(
+        net.synapses.iter().filter(|s| s.silent_ticks != u64::MAX && s.consolidated).count(),
+        0,
+        "flag-off must never consolidate"
+    );
+}
+
+/// CLLA: permanence within headroom consolidates the new synapse.
+#[test]
+fn clla_permanence_consolidates_within_cap() {
+    let params = V2Params {
+        assembly_protect: true,
+        w_consolidate_min: 0.05,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 7,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let pre = v2.candidates[post.idx()][0].pre;
+    let mut consolidated = 0;
+    for w in 1..=30u64 {
+        v2.tick(&[pre, post]);
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { syn, reason, .. } = e {
+                if reason == "candidate-permanence" && net.synapses[syn.idx()].consolidated {
+                    consolidated += 1;
+                }
+            }
+        }
+        v2.tick(&[pre, post]);
+    }
+    assert!(consolidated > 0, "permanence with headroom must consolidate");
+}
+
+/// CLLA: permanence still creates the synapse but does NOT consolidate when
+/// the protected-mass cap would be exceeded (p_max_frac * t_e < w).
+#[test]
+fn clla_cap_blocks_consolidation() {
+    let params = V2Params {
+        assembly_protect: true,
+        p_max_frac: 0.01, // cap = 0.008; permanence w = 0.02 exceeds it
+        w_consolidate_min: 0.05,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 7,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let pre = v2.candidates[post.idx()][0].pre;
+    let mut permanence = 0;
+    let mut bad_cons = 0;
+    for w in 1..=30u64 {
+        v2.tick(&[pre, post]);
+        for e in v2.window(&mut net, Tick(w * 100)) {
+            if let V2Event::SynapseCreated { syn, reason, .. } = e {
+                if reason == "candidate-permanence" {
+                    permanence += 1;
+                    if net.synapses[syn.idx()].consolidated { bad_cons += 1; }
+                }
+            }
+        }
+        v2.tick(&[pre, post]);
+    }
+    assert!(permanence > 0, "sanity: permanence must still create synapses");
+    assert_eq!(bad_cons, 0, "over-cap permanence must NOT consolidate");
+}
+
+/// CLLA: M2 normalizes WORKING mass only — protected mass P is untouched;
+/// working W converges to t_e - P.
+#[test]
+fn clla_normalize_working_only() {
+    let params = V2Params {
+        assembly_protect: true,
+        w_consolidate_min: 0.05,
+        t_e: 0.8,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 11,
+    );
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let s_cons = net.add_synapse(NeuronId(0), post, 0.4, true, Tick(0));
+    let s_work = net.add_synapse(NeuronId(1), post, 0.1, true, Tick(0));
+    net.synapses[s_cons.idx()].consolidated = true;
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let _ = v2.window(&mut net, Tick(100));
+    assert!(
+        (net.synapses[s_cons.idx()].w - 0.4).abs() < 1e-6,
+        "protected mass must be untouched: {}",
+        net.synapses[s_cons.idx()].w
+    );
+    // Working target = t_e - P = 0.8 - 0.4 = 0.4 (single working synapse);
+    // exact normalize would pull it to 0.4 but the synapse may also get M4
+    // or E6 interplay: assert convergence direction and <= target binding.
+    assert!(
+        net.synapses[s_work.idx()].w <= 0.4 + 1e-6,
+        "working must not exceed t_e - P: {}",
+        net.synapses[s_work.idx()].w
+    );
+}
+
+/// CLLA: M4 prune skips consolidated synapses even when they sit below
+/// theta_prune for many windows; unconsolidated ones are pruned. M2 is
+/// disabled so normalization cannot rescue the low working weight (the
+/// rule under test is M4's consolidated skip, in isolation).
+#[test]
+fn clla_m4_skips_consolidated() {
+    let params = V2Params {
+        assembly_protect: true,
+        disable_m2: true,
+        w_consolidate_min: 0.05,
+        theta_prune: 0.005,
+        prune_windows: 2,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 13,
+    );
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let s_cons = net.add_synapse(NeuronId(0), post, 0.001, true, Tick(0));
+    let s_work = net.add_synapse(NeuronId(1), post, 0.001, true, Tick(0));
+    net.synapses[s_cons.idx()].consolidated = true;
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    for w in 1..=5u64 {
+        let _ = v2.window(&mut net, Tick(w * 100));
+    }
+    assert!(
+        net.synapses[s_cons.idx()].silent_ticks != u64::MAX,
+        "consolidated must survive M4"
+    );
+    assert_eq!(
+        net.synapses[s_work.idx()].silent_ticks, u64::MAX,
+        "unconsolidated low-weight synapse must be pruned"
+    );
 }

@@ -400,6 +400,9 @@ pub fn silent_synapse_pass(
         if s.inhibitory {
             continue; // V2 M6: anti-Hebbian weights are not silence-pruned
         }
+        if s.consolidated {
+            continue; // CLLA: protected from silence-pruning (protocol §3.7)
+        }
         if s.w < silence_w {
             s.silent_ticks += 1;
         } else {
@@ -542,6 +545,37 @@ mod tests {
         }
         assert!(!flagged.is_empty());
         assert_eq!(flagged[0].1, "silent-synapse");
+    }
+
+    /// CLLA: the silence-prune pass skips consolidated synapses — they are
+    /// never counted toward silent_ticks and never flagged for pruning,
+    /// even when held below silence_w indefinitely.
+    #[test]
+    fn silent_synapse_pass_skips_consolidated() {
+        let mut net = small_net();
+        for i in 0..net.synapses.len() {
+            net.synapses[i].w = 0.001;
+            net.synapses[i].created = Tick(0);
+        }
+        // Consolidate one synapse; it must never be flagged.
+        let cons_id = net.synapses[0].id;
+        net.synapses[0].consolidated = true;
+        let mut flags: Vec<u32> = Vec::new();
+        for _ in 0..(60_001) {
+            let flagged = silent_synapse_pass(&mut net, 0.02, 60_000, 30_000);
+            for (sid, _) in flagged {
+                flags.push(sid.0);
+            }
+            net.tick = Tick(net.tick.0 + 1);
+            if !flags.is_empty() {
+                break;
+            }
+        }
+        assert!(!flags.is_empty(), "unconsolidated synapses must be flagged");
+        assert!(
+            !flags.contains(&cons_id.0),
+            "consolidated synapse must never be silence-pruned"
+        );
     }
 
     /// Multiplicative LTP is scaled by (1 − w): at w near ceiling Δw → 0.

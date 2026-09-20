@@ -52,6 +52,9 @@ fn default_variant_block() -> u64 {
 
 fn cfg_one_u32() -> u32 { 1 }
 fn cfg_v23_epoch_windows() -> u32 { 40 }
+fn cfg_bool_false(b: &bool) -> bool { !*b }
+fn cfg_clla_p_max_frac() -> f32 { 0.75 }
+fn cfg_clla_w_consolidate_min() -> f32 { 0.05 }
 
 fn default_e6_alpha() -> f32 {
     1.0 / 25.0
@@ -100,6 +103,17 @@ pub struct V2Section {
     /// V2.3: epoch length in structural windows (default 40 = 4 s).
     #[serde(default = "cfg_v23_epoch_windows")]
     pub m2_epoch_windows: u32,
+    // CLLA (docs/anima-clla-protocol.md): consolidation-locked allocation.
+    /// Master flag: false = byte-identical pre-CLLA behavior (identity).
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub assembly_protect: bool,
+    /// Protected-mass cap as fraction of t_e (protocol frozen: 0.75).
+    #[serde(default = "cfg_clla_p_max_frac")]
+    pub p_max_frac: f32,
+    /// Minimum candidate weight at permanence to consolidate (protocol
+    /// frozen: 0.05 = theta_permanent).
+    #[serde(default = "cfg_clla_w_consolidate_min")]
+    pub w_consolidate_min: f32,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

@@ -118,6 +118,11 @@ impl V2Plasticity {
         }
     }
 
+    /// CLLA gate read by the harness (passive-decay exemption).
+    pub fn assembly_enabled(&self) -> bool {
+        self.params.assembly_protect
+    }
+
     /// One structural window. Frozen order; returns events for telemetry.
     pub fn window(&mut self, net: &mut Network, tick: Tick) -> Vec<V2Event> {
         let mut events = Vec::new();
@@ -175,6 +180,10 @@ impl V2Plasticity {
                 self.low_windows[sid] = 0;
                 continue;
             }
+            if s.consolidated {
+                self.low_windows[sid] = 0;
+                continue; // CLLA: protected from M4
+            }
             if s.w < self.params.theta_prune {
                 self.low_windows[sid] += 1;
                 if self.low_windows[sid] >= self.params.prune_windows {
@@ -217,6 +226,18 @@ impl V2Plasticity {
                 self.evict_for(net, post_id, events);
                 let w = self.params.w_c_permanent;
                 let syn = net.add_synapse(pre, post_id, w, true, tick);
+                // CLLA: consolidate at permanence iff (a) mechanism on,
+                // (b) candidate weight cleared w_consolidate_min (protocol:
+                // 0.05 = theta_permanent, so this holds exactly when the
+                // permanence branch is reached), (c) cap headroom: P + w
+                // <= p_max_frac * t_e (P = current consolidated mass).
+                if self.params.assembly_protect
+                    && pool[i].w >= self.params.w_consolidate_min
+                    && self.consolidated_mass(net, post_id) + w
+                        <= self.params.p_max_frac * self.params.t_e
+                {
+                    net.synapses[syn.idx()].consolidated = true;
+                }
                 self.live_e[post] += 1;
                 events.push(V2Event::SynapseCreated {
                     syn,
@@ -280,6 +301,20 @@ impl V2Plasticity {
         }
     }
 
+    /// CLLA: sum of consolidated (protected) live excitatory weights
+    /// onto `post`. Pure local read of the post neuron's incoming set.
+    fn consolidated_mass(&self, net: &Network, post_id: NeuronId) -> f32 {
+        let incoming = &net.incoming[post_id.idx()];
+        let mut p = 0.0f32;
+        for &sid in incoming {
+            let s = &net.synapses[sid.idx()];
+            if s.silent_ticks != u64::MAX && !s.inhibitory && s.consolidated {
+                p += s.w;
+            }
+        }
+        p
+    }
+
     /// M2: rescale each neuron's live incoming excitatory weights to total
     /// t_e, then clamp to [w_min, w_max]. Invariant: post-pass sum <= t_e.
     ///
@@ -290,6 +325,42 @@ impl V2Plasticity {
     /// m2_buckets = 1 (default) is the exact baseline path (identity).
     fn normalize(&mut self, net: &mut Network) {
         let n_buckets = self.params.m2_buckets.max(1);
+        // CLLA (docs/anima-clla-protocol.md §3.7): consolidated synapses are
+        // excluded from normalization. Working budget = t_e - P; factor =
+        // (t_e - P)/W applied to working (unconsolidated) only, clamped to
+        // [w_min, w_max]. When flag off this branch is never entered
+        // (identity). Protocol freezes m2_buckets=1, so CLLA takes
+        // precedence whenever assembly_protect is set.
+        if self.params.assembly_protect {
+            for post in 0..net.neurons.len() {
+                if net.neurons[post].class == NeuronClass::Input {
+                    continue;
+                }
+                let incoming: Vec<SynapseId> = net.incoming[post].clone();
+                let post_id = NeuronId(post as u32);
+                let p = self.consolidated_mass(net, post_id);
+                let mut w_sum: f32 = 0.0;
+                for &sid in &incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
+                        w_sum += s.w;
+                    }
+                }
+                let target = self.params.t_e - p;
+                if w_sum <= 0.0 || target <= 0.0 || (w_sum - target).abs() < 1e-9 {
+                    continue;
+                }
+                let factor = target / w_sum;
+                for sid in incoming {
+                    let s = &mut net.synapses[sid.idx()];
+                    if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated {
+                        continue;
+                    }
+                    s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                }
+            }
+            return;
+        }
         if n_buckets == 1 {
             for post in 0..net.neurons.len() {
                 if net.neurons[post].class == NeuronClass::Input {

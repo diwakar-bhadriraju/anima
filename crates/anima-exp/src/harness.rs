@@ -438,8 +438,14 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                 *acc = 0.0;
             }
         }
-        // Passive decay per tick.
+        // Passive decay per tick. CLLA: consolidated synapses are exempt
+        // (protocol §3.5; SDE-C2 measured passive decay as the dominant
+        // eraser). Flag off => clla=false => byte-identical baseline.
+        let clla_protect = v2.as_ref().map_or(false, |v| v.assembly_enabled());
         for s in net.live_synapses_mut() {
+            if clla_protect && s.consolidated {
+                continue;
+            }
             s.w = (s.w - params.decay).max(params.w_min);
         }
 
@@ -739,6 +745,9 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         t_e: v.t_e,
         m2_buckets: v.m2_buckets,
         m2_epoch_windows: v.m2_epoch_windows,
+        assembly_protect: v.assembly_protect,
+        p_max_frac: v.p_max_frac,
+        w_consolidate_min: v.w_consolidate_min,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,
@@ -821,6 +830,7 @@ fn network_snapshot(net: &Network) -> anima_telemetry::recorder::NetworkStateSna
                 post: s.post.0,
                 w: anima_telemetry::events::f32_json(s.w),
                 plastic: s.plastic,
+                consolidated: s.consolidated,
             })
             .collect(),
     }
