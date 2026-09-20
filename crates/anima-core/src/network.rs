@@ -334,6 +334,10 @@ pub struct V2Params {
     /// frozen: 0.05 = theta_permanent, reused constant).
     #[serde(default = "clla_w_consolidate_min")]
     pub w_consolidate_min: f32,
+    /// CLLA allocation rule (docs/x-clla-allocation-rule.md §2): gates M3
+    /// candidate accumulation by protected-input-current fraction R.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub alloc_residual: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,

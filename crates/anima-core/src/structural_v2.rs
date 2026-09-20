@@ -61,6 +61,15 @@ pub struct V2Plasticity {
     pub report: V2Report,
     /// E6 rate balancing (docs/anima-e6-protocol.md §3); None = inert.
     pub rate_balance: Option<RateBalance>,
+    /// CLLA allocation rule (docs/x-clla-allocation-rule.md): per-window
+    /// delivered input-current sums split by consolidated flag.
+    /// res_ip[i] = Σ amplitude·w over fired input-channel afferents with
+    /// consolidated=true onto neuron i; res_iw[i] = same, unconsolidated.
+    /// Zeroed at each window START; R = res_ip/(res_ip+res_iw) read at M3.
+    res_ip: Vec<f32>,
+    res_iw: Vec<f32>,
+    /// Allocation gate g per neuron for the current window.
+    res_gate: Vec<f32>,
 }
 
 impl V2Plasticity {
@@ -92,6 +101,9 @@ impl V2Plasticity {
             live_i,
             report: V2Report::default(),
             rate_balance: e6.map(RateBalance::new),
+            res_ip: vec![0.0; n],
+            res_iw: vec![0.0; n],
+            res_gate: vec![1.0; n],
         }
     }
 
@@ -123,6 +135,70 @@ impl V2Plasticity {
         self.params.assembly_protect
     }
 
+    /// CLLA allocation rule enabled? (flag + base CLLA both required).
+    pub fn alloc_residual_enabled(&self) -> bool {
+        self.params.assembly_protect && self.params.alloc_residual
+    }
+
+    /// Current window's allocation gate per neuron (tests/instrumentation).
+    pub(crate) fn residual_gate(&self, post: usize) -> f32 {
+        self.res_gate[post]
+    }
+
+    /// Per-tick accumulation of delivered input current onto each post
+    /// neuron, split by the synapse's consolidated flag. Mirrors the
+    /// network deposit loop exactly (amplitude·w per fired input-channel
+    /// afferent; excitatory only; post internal). No-op when the rule is
+    /// off — accumulators stay zero and res_gate stays 1.0 (identity).
+    pub fn accumulate_input_current(&mut self, net: &Network, spikes: &[NeuronId]) {
+        if !self.alloc_residual_enabled() {
+            return;
+        }
+        for &pre in spikes {
+            if pre.0 >= net.channels.len() as u32 {
+                continue; // input-channel afferents only (D8)
+            }
+            let outgoing: Vec<SynapseId> = net.outgoing[pre.idx()].clone();
+            for sid in outgoing {
+                let s = &net.synapses[sid.idx()];
+                if s.silent_ticks == u64::MAX {
+                    continue; // tombstoned (pruned) — mirror network deposit
+                }
+                if s.inhibitory || !s.plastic {
+                    continue;
+                }
+                if s.post.idx() >= net.neurons.len() {
+                    continue;
+                }
+                let cur = s.amplitude * s.w;
+                let i = s.post.idx();
+                if s.consolidated {
+                    self.res_ip[i] += cur;
+                } else {
+                    self.res_iw[i] += cur;
+                }
+            }
+        }
+    }
+
+    /// Compute the allocation gate for every neuron from the JUST-FINISHED
+    /// window's current sums, then zero the accumulators. Called at window
+    /// start (pre-M4). Flag off: gate stays 1.0 (identity).
+    fn compute_residual_gate(&mut self, net: &Network) {
+        let n = self.res_gate.len();
+        for i in 0..n {
+            let ip = self.res_ip[i];
+            let iw = self.res_iw[i];
+            let total = ip + iw;
+            let r = if total > 0.0 { ip / total } else { 1.0 }; // silence: fully explained
+            let p = self.consolidated_mass(net, NeuronId(i as u32));
+            let headroom = self.params.p_max_frac * self.params.t_e - p;
+            self.res_gate[i] = if headroom > 0.0 { (1.0 - r).max(0.0) } else { 0.0 };
+        }
+        for v in self.res_ip.iter_mut() { *v = 0.0; }
+        for v in self.res_iw.iter_mut() { *v = 0.0; }
+    }
+
     /// One structural window. Frozen order; returns events for telemetry.
     pub fn window(&mut self, net: &mut Network, tick: Tick) -> Vec<V2Event> {
         let mut events = Vec::new();
@@ -131,6 +207,11 @@ impl V2Plasticity {
         if let Some(rb) = self.rate_balance.as_mut() {
             rb.window_start();
         }
+
+        // --- CLLA allocation rule: compute g from the JUST-FINISHED window's
+        // input-current sums, then reset accumulators (identity when off:
+        // gate stays 1.0). Read by M3 below. ---
+        self.compute_residual_gate(net);
 
         // --- M4: competitive pruning (excitatory only; frees slots) ---
         if !self.params.disable_m3_m4 {
@@ -216,7 +297,15 @@ impl V2Plasticity {
             if coactive {
                 // E6 (frozen §3.3.2): co-active accumulation × β_pre. When
                 // E6 is disabled β ≡ 1, exact v2 increment.
-                pool[i].w += self.params.delta_perm * self.beta(net, post_id, pre);
+                // CLLA allocation rule (docs/x-clla-allocation-rule.md §2):
+                // × g(post) — 1.0 when rule off (identity); 0 when headroom
+                // exhausted or the window's input was fully explained.
+                let g = if self.alloc_residual_enabled() {
+                    self.res_gate[post]
+                } else {
+                    1.0
+                };
+                pool[i].w += self.params.delta_perm * self.beta(net, post_id, pre) * g;
             } else {
                 pool[i].w *= self.params.decay_c;
             }

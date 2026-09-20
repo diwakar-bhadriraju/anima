@@ -24,6 +24,7 @@ pub fn v2_params() -> V2Params {
         assembly_protect: false,
         p_max_frac: 0.75,
         w_consolidate_min: 0.05,
+        alloc_residual: false,
         c_slots: 6,
         w_c_init: 0.01,
         delta_perm: 0.01,
@@ -1072,4 +1073,120 @@ fn clla_ltp_clip_disabled_when_flag_off() {
     }
     let after = net.synapses[s_cons.idx()].w;
     assert!(after > before + 0.004, "flag-off: uncapped LTP {before} -> {after}");
+}
+
+/// CLLA allocation rule: g = (1-R)·sgn(H); R = protected-input fraction.
+/// Test the gate computation directly via accumulate + window on a
+/// controlled net: no consolidation => R=0 => g=1; all current through
+/// consolidated synapses => R=1 => g=0; headroom zero => g=0 regardless.
+#[test]
+fn clla_alloc_rule_gate_semantics() {
+    use crate::network::{InputChannelId, InputFrame};
+    let params = V2Params {
+        assembly_protect: true,
+        alloc_residual: true,
+        p_max_frac: 0.75,
+        t_e: 0.8,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 23,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let s_cons = net.add_synapse(NeuronId(0), post, 0.4, true, Tick(0));
+    let s_work = net.add_synapse(NeuronId(1), post, 0.4, true, Tick(0));
+    net.synapses[s_cons.idx()].consolidated = true;
+    // Remove M1-seeded afferents to post so only the crafted synapses
+    // deliver current (clean R calibration; rule reads true fractions).
+    for sid in 0..net.synapses.len() {
+        let (alive, pst, not_crafted) = {
+            let s = &net.synapses[sid];
+            (s.silent_ticks != u64::MAX, s.post == post, s.id != s_cons && s.id != s_work)
+        };
+        if alive && pst && not_crafted {
+            net.synapses[sid].silent_ticks = u64::MAX;
+        }
+    }
+
+    // Case 1: only the WORKING channel fires => Ip=0, Iw>0 => R=0 => g=1.
+    v2.accumulate_input_current(&net, &[NeuronId(1)]);
+    let _ = v2.window(&mut net, Tick(100));
+    assert_eq!(v2.residual_gate(post.idx()), 1.0, "unexplained input => g=1");
+
+    // Case 2: only the CONSOLIDATED channel fires => R=1 => g=0.
+    v2.accumulate_input_current(&net, &[NeuronId(0)]);
+    let _ = v2.window(&mut net, Tick(200));
+    assert_eq!(v2.residual_gate(post.idx()), 0.0, "fully explained => g=0");
+
+    // Case 3: both fire in the same window => R=0.5 => g=0.5.
+    v2.accumulate_input_current(&net, &[NeuronId(0), NeuronId(1)]);
+    let _ = v2.window(&mut net, Tick(300));
+    assert!((v2.residual_gate(post.idx()) - 0.5).abs() < 1e-6, "half explained => g=0.5");
+
+    // Case 4: silence (no current) => R defined 1 => g=0 (no allocation).
+    let _ = v2.window(&mut net, Tick(400));
+    assert_eq!(v2.residual_gate(post.idx()), 0.0, "silence => g=0");
+
+    // Case 5: headroom zero => g=0 regardless of R.
+    // Fill the protected cap: add consolidated synapses up to cap.
+    // P currently 0.4; cap = 0.6 => add 0.2 more.
+    let s2 = net.add_synapse(NeuronId(2), post, 0.2, true, Tick(0));
+    net.synapses[s2.idx()].consolidated = true;
+    v2.accumulate_input_current(&net, &[NeuronId(1)]); // fully unexplained
+    let _ = v2.window(&mut net, Tick(500));
+    assert_eq!(v2.residual_gate(post.idx()), 0.0, "no headroom => g=0");
+}
+
+/// CLLA allocation rule: candidate accumulation uses g; with g=1 the
+/// increment equals the frozen delta_perm·beta (identity path), with g=0
+/// the candidate does not accumulate.
+#[test]
+fn clla_alloc_rule_scales_candidate_accumulation() {
+    use crate::network::{InputChannelId, InputFrame};
+    // reuse gate semantics net setup: exploit accumulation ordering
+    let params = V2Params {
+        assembly_protect: true,
+        alloc_residual: true,
+        p_max_frac: 0.75,
+        t_e: 0.8,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 29,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+
+    // Find an input channel c that ALREADY has a live unconsolidated
+    // afferent to post (M1 guarantees several). Accumulating current for c
+    // is then > 0 => R=0 => g=1 (works even with mixed wiring), and we
+    // control the candidate pre exactly. NOTE: outgoing[pre] is the
+    // pre-indexed list (incoming is post-indexed).
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic
+                && !s.consolidated && s.post == post
+        }))
+        .map(NeuronId)
+        .expect("post has a live unconsolidated input-channel afferent");
+    // Replace the first candidate slot with a controlled candidate from c.
+    v2.candidates[post.idx()][0] = crate::structural_v2::Candidate { pre: c, w: 0.01 };
+    let w0 = v2.candidates[post.idx()][0].w;
+    // Window 1: drive channel c only => R=0 => g=1 => + delta_perm (0.01).
+    v2.accumulate_input_current(&net, &[c]);
+    v2.tick(&[c, post]);
+    let _ = v2.window(&mut net, Tick(100));
+    let w1 = v2.candidates[post.idx()][0].w;
+    assert!((w1 - w0 - 0.01).abs() < 1e-5, "g=1 accumulation: {w0} -> {w1}");
+
+    // Window 2: co-active but SILENT current window => R=1 (silence) => g=0.
+    let w2 = v2.candidates[post.idx()][0].w;
+    v2.tick(&[c, post]);
+    let _ = v2.window(&mut net, Tick(200));
+    let w3 = v2.candidates[post.idx()][0].w;
+    assert!((w3 - w2).abs() < 1e-6, "g=0: candidate must not accumulate: {w2} -> {w3}");
 }

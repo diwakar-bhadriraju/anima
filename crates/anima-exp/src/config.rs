@@ -114,6 +114,10 @@ pub struct V2Section {
     /// frozen: 0.05 = theta_permanent).
     #[serde(default = "cfg_clla_w_consolidate_min")]
     pub w_consolidate_min: f32,
+    /// CLLA allocation rule (docs/x-clla-allocation-rule.md): gates M3
+    /// candidate accumulation by protected-input-current fraction.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub alloc_residual: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

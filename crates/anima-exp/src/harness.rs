@@ -381,6 +381,8 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         // frozen cadence (M4 → M3 → M2 → M6 → M5), events → telemetry.
         if let Some(v2) = v2.as_mut() {
             v2.tick(&step.spikes);
+            // CLLA allocation rule: tracked per tick (no-op when off).
+            v2.accumulate_input_current(&net, &step.spikes);
             if net.tick.0 % v2_window_ticks == 0 && net.tick.0 > 0 {
                 let tick = net.tick;
                 for ev in v2.window(&mut net, tick) {
@@ -748,6 +750,7 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         assembly_protect: v.assembly_protect,
         p_max_frac: v.p_max_frac,
         w_consolidate_min: v.w_consolidate_min,
+        alloc_residual: v.alloc_residual,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,
