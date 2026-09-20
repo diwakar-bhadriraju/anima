@@ -139,9 +139,14 @@ anything new at all.
 
 ### 3.4 Novel D composition — EXACT DEFINITION
 
-RESPONSE BASES (frozen, committed): v̄_A, v̄_C = mean during-window
-response vectors over reps 21..40 of the committed e24-s<seed>-a
-and e24-s<seed>-c runs (same instrument, same window).
+RESPONSE BASES (frozen): v̄_A, v̄_C = mean during-window response
+vectors over reps 21..40 of the SAME-SEED il ARM (CLLA=true,
+same organism state as the d arm). This is the load-bearing
+basis: protection can shift response dynamics, and comparing a
+CLLA=true D response to CLLA=false committed vectors would fail
+the cosine for reasons unrelated to composition. The committed
+single-pattern (CLLA=false) vectors are reported as SECONDARY
+diagnostics only, never as the F6 basis.
 
 D RESPONSE: v̄_D = mean during-window response vector over reps
 21..40 of the d arm.
@@ -164,7 +169,7 @@ unsupported by the A/C components is NOT automatically proof of
 hidden labels — it is reported as evidence requiring further
 investigation (E-gated), per the K-review mandate.
 
-### 3.5 Itermediate blocked-order overwrite — EXACT (retained)
+### 3.5 Blocked-order overwrite — EXACT (retained)
 
 F1 already covers bac/bca coexistence. ADDITIONAL registered
 overwrite diagnostic (reported, not a falsifier): M_A at bac
@@ -178,14 +183,14 @@ the 20260912 committed collapse value is reported as context).
 Definition: P_A[i] = Σ w over consolidated synapses with pre ∈
 {0..7} onto neuron i; peak P_A over snapshots vs drive-end value.
 
-F7 CRITERION (fail ⇒ bundle not supported):
-  drive-end total protected A-mass ≥ 0.5 × peak protected A-mass
+F7 CRITERION: **F7 fails iff** drive-end total protected A-mass
+  < 0.5 × peak protected A-mass
   (total = sum over all neurons)
-i.e. within-pattern LTD must not erode more than half the
-protected structure. On F7 failure, the pre-registered remedy is
-an A-series amendment proposing the consolidated-LTD exemption
-(architecture doc failure mode 8); the F7 result is reported
-WITH the leak, not excused.
+i.e. only a greater-than-half within-pattern erosion of the
+protected structure trips the falsifier. On F7 failure, the
+pre-registered remedy is an A-series amendment proposing the
+consolidated-LTD exemption (architecture doc failure mode 8); the
+F7 result is reported WITH the leak, not excused.
 
 ## 4. Identity gate
 
@@ -216,9 +221,15 @@ R4. No hidden memory: Σ consolidated-synapse weights per neuron
     == count(unconsolidated) + count(consolidated).
 R5. Config invariants asserted at run start (w_c_permanent ≥
     silence_w; w_consolidate_min ≥ theta_prune).
-R6. RNG draw parity via identity gate (F4-run draws counted).
+R6. RNG draw parity via identity gate (identity-run draws
+    counted).
 
 ## 6. Falsifier summary (frozen)
+
+NOTE ON CONVENTION: every row below states a PASS condition; a
+falsifier FAILS iff its stated inequality/relation is violated
+(e.g. F7 fails iff drive-end protected A-mass < 0.5 × peak;
+F6 passes only while cos(v̄_D, v̄_A + v̄_C) ≥ 0.90).
 
 | id | criterion | triggers |
 |---|---|---|
