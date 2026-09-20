@@ -2,6 +2,16 @@
 
 Status: FROZEN SPEC, 2026-09-20. Implemented; identity gate
 PASSED; diagnostic NOT executed (ambiguity STOP, see §8).
+
+PROTOCOL CORRECTION (2026-09-20, recorded before execution, user-
+approved resolution of §8): the earlier statement 'β unchanged
+(0.00625)' was erroneous. The corrected baseline is the actual
+V2.3 gate baseline — beta = 0.0046875, m2_buckets = 1, decay =
+1e-6, a_minus = 0.0053 — NOT the A3 partition arm (m2_buckets=2,
+decay=0). A3 remains a historical retention anchor only. Seeds:
+{20260912, 424242, 9001, 123456}. Curricula: BOTH blocked orders
+{bac, bca}. This is a protocol correction, not a post-hoc
+experimental adjustment; no parameter was retuned.
 Exploratory (no E-number, no promotion). V2/V2.1/V2.2/V2.3 and
 all E-numbered records untouched.
 
@@ -81,7 +91,7 @@ flag on:              `on spike:  u_i += β · g_i(t_spike)`
 |---|---|---|
 | t_e | 0.8 | existing M2 budget |
 | τ_g | 20 ms | existing STDP tau (tau_plus) |
-| β | unchanged (see §8 ambiguity) | existing slow_state_beta |
+| β | 0.0046875 (protocol-corrected V2.3 gate baseline; the 0.00625 statement was erroneous) | existing slow_state_beta |
 | τ_s | unchanged | existing slow_state_tau_ms |
 | dt | 1 ms | substrate tick |
 | g(0) | 0.0 | frozen init |
@@ -170,7 +180,7 @@ More endogenous activity with cosine ≈ 1.0 = NULL. Discrimin-
 ability via trivial global amplitude difference does not count
 (cosine scale-invariance + norm ratio handle this).
 
-## 8. AMBIGUITY STOP (this spec conflicts with its own baseline)
+## 8. AMBIGUITY STOP — RESOLVED (2026-09-20, user ruling; spec corrected above)
 
 The fence requires: "If any parameter below is ambiguous
 despite this spec, STOP and report the ambiguity before
@@ -196,16 +206,15 @@ V2.3 A3/A2 runs": those runs are pairs {bac, bca} (blocked
 both orders). "One pair" = bac? bca? both (8 arms/seed pair)?
 Not specified.
 
-**Not executed pending resolution.** Recommended defaults if
-approved: β = 0.0046875 (true V2.3 baseline value; the
-0.00625 wedge is a V2.1 B4 cell, not a V2.3 artifact), decay =
-0.0, a_minus = 0.0053, m2_buckets = 1 (the V2.3 gate baseline —
-the A3 partition is a separate mechanism, orthogonal to this
-X-probe), seeds = {20260912, 424242, 9001, 123456}, curriculum
-= both blocked orders {bac, bca}. Rationale: maximal
-comparability with the A2/A3 anchors at minimal mechanism
-overlap. Any different resolution requires explicit user
-confirmation.
+**RESOLVED (user ruling, verbatim intent):** baseline = truthful
+V2.3 gate config (β = 0.0046875, m2_buckets = 1, decay = 1e-6);
+A3 (m2_buckets=2, decay=0) NOT combined with this test (A3 =
+orthogonal retention intervention; historical anchor only);
+seeds exactly {20260912, 424242, 9001, 123456}; curricula both
+blocked orders {bac, bca}; arms: slow_state_beta_drive false vs
+true; 4 × 2 × 2 = 16 runs. Rationale (user): isolates the
+write-path intervention without confounding with the tested
+retention mechanisms.
 
 ## 9. Scope guard
 
