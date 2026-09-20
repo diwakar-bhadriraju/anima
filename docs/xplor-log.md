@@ -310,3 +310,72 @@ C-S1..C-S5 (decoding>chance, 2s latch-set stability >=80%,
 and the 4-arm x 6-seed x 5-curriculum Stage-2 discrimination
 plan whose BETWEEN-arm paired differences are the component
 attribution. STOP after freeze, per mandate.
+
+
+---
+
+## 10. V2.1 u-information reproducibility experiment (read-only + 3 runs)
+
+Question restored: does the ORIGINAL ungated u carry
+sensory/curriculum information after stimulus offset? Never
+measured directly before (all prior A/C readouts were spike-
+windows or gate experiments). No mechanism change: historical
+V2.1 configs, gated write OFF, V2.3 partition OFF.
+
+Runs:
+- runs/v21rep-b0.00625-t5000-20260920T154419Z — EXACT historical
+  config (configs/v21rep-b0.00625-t5000.toml, byte-identical to
+  committed v21probe-b0.00625-t5000.toml save exp_id).
+- runs/v21repac-b0.003125-t10000-20260920T154446Z — historical
+  second-wedge config (b0.003125, t10000), S1 roster A/C
+  interleaved (40+40 pres; organism/timing untouched).
+- runs/v21repac-b0.00625-t5000-20260920T154428Z — interleaved
+  A/C at the SELECTED cell: runaway-activity abort at S1
+  (committed historical fact at that cell, X2 O2.3); preserved,
+  not data.
+
+IDENTITY/REPRODUCTION: v21rep-A-only = 511,333 non-marker rows,
+FNV e4b018992c97d1a9 — BYTE-IDENTICAL to committed
+v21probe-b0.00625-t5000-20260919T063803Z. A/C-0.003125 run
+reproduces the committed xp2 numbers exactly: 29,768 silence
+spikes, 5 active neurons, 487.6 max Hz, pacemaker regime.
+
+INSTRUMENT (read-only): uvinfo (snapshot windows: during/post/
+late at 1 s snapshot cadence) + urecon (deterministic
+tick-exact u reconstruction from recorded spikes, sampling at
+true intra-stimulus offsets 0/+50/+200/+250/+500/+1500 ms;
+validated vs snapshots: 0.6% A/C cell, 5.7% A-only, bounded,
+direction-neutral).
+
+RESULTS (A/C cell, reconstructed u, per-offset cosine/dist):
+offset:  +0ms  cos 0.9995 dist 0.57 ||A|| 18.23 ||C|| 18.31
+         +50ms cos 0.9997 dist 0.45
+         +200ms cos 0.9999 dist 0.20
+         +250ms cos 0.9999 dist 0.25
+         +500ms cos 0.9993 dist 0.77
+         +1500ms cos 0.9993 dist 0.71  ratio A/C 0.996-1.015
+Snapshot-read windows (uvinfo): during 0.9995, post 0.9993,
+late 0.9994; top-10 u overlap Jaccard 0.900 at all windows.
+
+INTERPRETATION (observation, not mechanism change): u at the
+V2.1 wedge does NOT separate A from C at any temporal offset —
+including DURING the stimulus (mid/end). The A/C condition
+difference visible in afferent/spike structure does not enter u.
+This is substrate diagnosis, matching interpretation D: even
+during-stimulus u is not sensory-specific at these operating
+points; norm ratio ~1.0 excludes a global-amplitude artifact.
+
+CAVEATS kept separate:
+- The A/C interleaved cell is the b0.003125/t10000 wedge (the
+  selected cell aborts under interleaving — historical).
+- Snapshot cadence aliasing closed via reconstruction; blocked-
+  order u-cosines from committed E24 runs (0.82-0.95, top-10
+  overlap 0.5-0.7) remain the only evidence of ANY u-level A/C
+  separation, and those are at beta=0.0046875, not the
+  historical wedge, with 1 s cadence.
+- u carries the integrated spike history (all patterns mixed
+  through shared recurrent pool) with no per-pattern separation:
+  consistent with the earlier finding that during-window spike
+  cosines separate (0.30-0.89) but u does not inherit it.
+
+No E-number. No mechanism, no sweep, no gate. Records untouched.
