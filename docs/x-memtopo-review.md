@@ -91,25 +91,35 @@ failure inevitable for any of them, at any timescale.
 | cumulative counts cntR | 1.0000 (bottleneck) | no — destroyed |
 | single-vector u, accumulated | → 1.0000 (tsegsim k≥20) | no — destroyed |
 | single-vector u, decayed | ≈ 0.999 real / ≈0.85–0.9 gated | no (real) / marginal (gated) |
-| afferent weight fingerprints affw | 0.887 → 0.052, J10 0.0 | YES — strongest separator in the organism |
+| affw (within-run: per-neuron Σw from channels 0–7 vs 8–23) | 0.887 → 0.052, J10 0.0 | yes — channel-address development; NOT a cross-run trained-matrix measure |
 
 Everything post-synaptic dies by accumulation (Reason 1) or was
 born collinear (Reason 2). The afferent matrix is the single
-representation that (a) survived 40A+40C interleaved in the
-committed run, (b) has per-synapse directional diversity, (c)
+representation that (a) developed channel-addressed structure
+(A-mass vs non-A-mass decorrelating to 0.05) inside the
+40A+40C interleaved committed run, (b) has per-synapse
+directional diversity, (c)
 already has a slow timescale (M2 epoch structure, passive decay
 ≈ τ 1000 s) and a self-organized competition (STDP + M2 zero-sum
 budget → V2.3 epoch buckets).
 
-Caveat recorded: affw's decorrelation is partly M2-budget
-complementarity (va[i]+vc[i] bounded per neuron) — i.e., the
-"separation" includes competition-induced mutual exclusion, not
-only Hebbian potentiation. That caveat does NOT weaken the
-memory argument: competition IS a legitimate self-organizing
-storage mechanism (it is the substrate's own overwrite rule), and
-the question is whether the resulting structure persists and is
-readable — not which plasticity produced it. It persists (drive
-end), and it is locally maintained (STDP/M2 at the synapse).
+Caveat recorded (semantics correction): bottleneck.rs's affw is a
+WITHIN-RUN metric — single committed 40A+40C run; per neuron i,
+va[i] = Σ w over channels 0–7 (group A), vc[i] = Σ w over
+channels 8–23 (groups B+C; B never presented, so vc ≈ C-mass +
+vestigial B at ~init). It measures per-neuron CHANNEL-SELECTIVITY
+development (A-mass vs non-A-mass decorrelating 0.887 → 0.052,
+top-10 neuron sets disjoint at drive end), NOT A-trained vs
+C-trained weight-matrix separation between runs. It is still
+valid evidence for D (synapses became channel-addressed within
+one alternating run — the A-driven mass and C-driven mass end
+near-orthogonal across the population), and its decorrelation is
+partly M2-budget complementarity (va[i]+vc[i] bounded per
+neuron): competition-induced mutual exclusion is itself a
+legitimate self-organizing storage mechanism. But the DIRECT
+measure — cross-run, same-seed A-only vs C-only trained weight
+matrices (e24-a vs e24-c) — is UNMEASURED, which is exactly what
+the offline distinguishing experiment (G1) must supply.
 
 ## 3. Architectural bottleneck — what capability is missing?
 
@@ -230,13 +240,15 @@ boundaries; identity default when off.
   2. Labels: none.
   3. Local: yes — STDP eligibility is per-synapse, pre-partner
      known locally; no comparison needed.
-  4. Coexistence: demonstrated by affw at 40/40 alternation and
-     V2.3 partitioned epochs (both cohorts held in the
-     partition arm).
+  4. Coexistence: V2.3 partitioned epochs held both cohorts
+     (blocked-order bca rescue); within-run channel-address
+     structure survived 40/40 alternation (affw) — cross-run
+     trained-matrix coexistence unmeasured (G1).
   5. Resemblance: overlapping exposure strengthens shared
      synapses (recognition storage by construction).
-  6. Alternation: empirically yes — the only measured
-     representation that did not collapse (0.05 / J10 0.0).
+  6. Alternation: within-run channel-selectivity evidence
+     (affw 0.05 / J10 0.0 at drive end) is consistent — but the
+     direct cross-run trained-matrix test is unmeasured (G1).
   7. Overwrite/merge: M2 zero-sum budget = substrate-native
      overwrite; passive decay the eraser; merge on similarity.
   8. New resource: none — store, timescale, competition all
@@ -277,23 +289,30 @@ zero RNG, identity default (off = today's path byte-identical).
 BUT before any freeze, a READ-ONLY GATE on committed artifacts
 (the actual first distinguishing experiment, no organism change):
 
-  G1. Decode A vs C (leave-one-presentation-out) from
-      per-neuron afferent weight vectors at the last snapshot of
-      the committed 40A+40C run (affw suggests strong signal:
-      0.05 / J10 0.0). Chance = 50%.
-  G2. Same decode from per-channel-group weight sums (the C
-      representation) — is the collapse of u (0.999) really not
-      present at the channel-resolved level?
+  G1. CROSS-RUN trained-matrix separation (the unmeasured
+      direct test): compare the end-of-drive AFFERENT WEIGHT
+      MATRICES of the same-seed A-only vs C-only committed runs
+      (e24-s20260912-a vs e24-s20260912-c; xp1 vs xp2c as
+      cross-check at the other cell). Per-neuron 24-dim input
+      weight vectors: cosine, and LOPO/permutation decode of
+      run-identity (A-trained vs C-trained). Chance = 50%.
+  G2. Within-run channel-resolved compare (affw semantics,
+      re-derived from e24-a and e24-c separately): per-neuron
+      A-mass vs C-mass profile cosine — is the 0.05-level
+      decorrelation an A/C trained effect or a within-run
+      artifact? Both runs' own internal A-vs-C profiles should
+      diverge similarly.
   G3. Mid-run snapshots (5–10 along the drive): does the
-      fingerprint survive the alternation THROUGHOUT, or only at
-      the end? (Determines whether the store is stable or a
-      transient.)
+      A-trained/C-trained separation grow monotonically and
+      survive across alternating exposure, or is the finger-
+      print a drive-end transient? (Uses snapshot series of the
+      committed alternating run + both single-pattern runs.)
   G4. Contamination control: M2-budget complementarity could
-      inflate G1 (va+vc ≈ budget per neuron). Control: decode on
-      weights after dividing out per-neuron budget (project onto
-      the budget-orthogonal subspace); if the decode survives,
-      the memory is real structure, not just competition
-      artifact.
+      inflate G1/G2 (Σw per neuron ≈ budget). Control: decode
+      on weights after projecting out each neuron's total-budget
+      direction (the budget-orthogonal subspace); if the decode
+      survives, the memory is real structure, not just
+      competition artifact.
 
 If G1–G4 pass → freeze D (channel-resolved persistent read,
 identity-gated) as the mechanism experiment, per standing
