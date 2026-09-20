@@ -379,3 +379,75 @@ CAVEATS kept separate:
   cosines separate (0.30-0.89) but u does not inherit it.
 
 No E-number. No mechanism, no sweep, no gate. Records untouched.
+
+
+---
+
+## 11. Information-bottleneck map (read-only; v21repac-b0.003125-t10000 + committed xp2 twin)
+
+Representations over matched windows (instrument examples/
+bottleneck.rs, committed; no runs executed):
+
+| rep | phase | cos(A,C) | dist | ratio | J10 |
+|---|---|---|---|---|---|
+| affw s1start | — | 0.8865 | 1.75 | 0.551 | 0.00 |
+| affw driveend | — | 0.0524 | 3.40 | 1.150 | 0.00 |
+| inst | start t+0 | 0.9453 | 0.23 | 0.922 | 0.90 |
+| inst | mid t+250 | 0.6476 | 0.80 | 1.407 | 0.30 |
+| inst | end t+500 | 0.5798 | 0.89 | 1.501 | 0.40 |
+| inst | post t+550 | 0.9819 | 0.15 | 1.166 | 0.90 |
+| inst | late t+1500 | 0.9758 | 0.15 | 1.019 | 0.90 |
+| rateDrn | end t+500 | 0.6270 | — | 1.311 | 0.30 |
+| cntP50 | end | 0.6713 | — | 1.524 | 0.40 |
+| cntP250 | end | 0.6192 | — | 1.371 | 0.30 |
+| cntP500 | end | 0.6270 | — | 1.311 | 0.30 |
+| cntR | start..late | **1.0000** | 400± | 0.99 | 1.00 |
+| u | start..late | 0.9993–0.9999 | 0.2–0.8 | ~1.0 | 0.90–1.0 |
+
+affw replicated byte-identically on the committed xp2 twin
+(0.8865 -> 0.0524). All numbers from the SAME committed A/C
+cell; E24 beta=0.0046875 u-separation (0.82-0.95) NOT used as
+primary evidence.
+
+INFORMATION-LOSS MAP (observation; no fix):
+- Afferent weights: A/C structure present at S1 start (cos
+  0.887) but the M2/STDP reorganization over the run drives it
+  toward 0.05 (near-orthogonal per-neuron A-vs-C input weight
+  vectors) while keeping top-10 disjoint (J10=0) — the layer
+  still distinguishes, differently.
+- Instantaneous spikes: strong separation mid/end of stimulus
+  (cos 0.58-0.65, J10 0.3-0.4); SEPARATION COLLAPSES OFF-WINDOW
+  (post 0.98, late 0.98) — stimulus-locked only, E19/E20
+  signature.
+- Within-presentation counts (cntP50..500) and rate-during:
+  retain the mid/end structure (0.62-0.67) — integration over
+  a single presentation window does NOT destroy it.
+- Cumulative-from-run-start counts (cntR): cos = 1.0000 at ALL
+  windows, J10=1.00 — **cross-presentation temporal integration
+  destroys A/C structure exactly and completely**.
+- u: 0.9993-0.9999 everywhere, including DURING stimulus —
+  same destruction, at every offset.
+
+VERDICT on the mandated classification: option C is supported
+(cumulative counts retain structure 0.62-0.67 per-window but u
+loses it at 0.999) — actually stronger: the loss happens at the
+CROSS-presentation accumulation stage (cntR = 1.0000), BEFORE u
+dynamics; u's integration is over a mixed spike pool whose
+per-window A/C structure is already diluted by the run-level
+accumulator. The bottleneck is NOT the u decay/update dynamics;
+it is the transition from per-presentation (windowed) spike
+counts to run-accumulated counts (temporal integration over
+repeated alternating stimuli). Option B's mechanism (within-
+presentation integration) is rejected: cntP retains structure.
+Option D's afferent stage retains discriminating structure.
+
+Then u (which is exactly cntR's output after the same
+accumulation, per spike) inherits the flat 1.0.
+
+CAVEAT (recorded): cntR/u collapse reflects that each neuron's
+total count over the run is dominated by its shared baseline
+activity (pacemaker ~29k spikes over 20s silence, all patterns
+mixed through the recurrent pool); per-window structure is a
+small modulation on a huge common baseline.
+
+No E-number, no mechanism, no fix. STOP.
