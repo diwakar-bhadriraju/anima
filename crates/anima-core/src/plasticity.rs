@@ -313,6 +313,14 @@ pub fn stdp_tick(
     rate_balance: Option<&crate::rate_balance::RateBalance>,
 ) -> Vec<WeightChange> {
     let mut changes = Vec::new();
+    // CLLA (docs/x-clla-amendment-review.md): per-post-neuron protected
+    // mass accumulator for the LTP clip. Recomputed per post neuron the
+    // pass visits (a fired neuron appears once in `spikes` per tick).
+    let clla = net.cfg.v2.as_ref().map_or(false, |v| v.assembly_protect);
+    let mut clla_p: Option<f32> = None;
+    let mut clla_post: Option<NeuronId> = None;
+    let mut self_t_e: f32 = 0.8;
+    let mut self_p_max: f32 = 0.75;
     // LTP pass: for each post neuron that fired, potentiate its incoming.
     for &post in spikes {
         let incoming: Vec<SynapseId> = net.incoming[post.idx()].clone();
@@ -323,6 +331,25 @@ pub fn stdp_tick(
             let s = &net.synapses[sid.idx()];
             if !s.plastic || s.inhibitory {
                 continue; // V2 M6: inhibitory owned by anti-Hebbian rule
+            }
+            let is_consolidated = s.consolidated;
+            // CLLA bounded protection: when the post neuron's protected
+            // class is first touched in this pass, compute P (a local read
+            // of the neuron's own live consolidated incoming) BEFORE any
+            // mutable borrow. Accumulated across this post's synapses.
+            if clla && is_consolidated && clla_post != Some(post) {
+                clla_post = Some(post);
+                let v2 = net.cfg.v2.as_ref().unwrap();
+                self_t_e = v2.t_e;
+                self_p_max = v2.p_max_frac;
+                clla_p = Some(net.incoming[post.idx()].iter().fold(0.0f32, |acc, &sid2| {
+                    let s2 = &net.synapses[sid2.idx()];
+                    if s2.silent_ticks != u64::MAX && !s2.inhibitory && s2.consolidated {
+                        acc + s2.w
+                    } else {
+                        acc
+                    }
+                }));
             }
             // Skip synapses whose pre ALSO fired this tick (coincident — net
             // zero, assigned neither sign).
@@ -337,7 +364,26 @@ pub fn stdp_tick(
             let beta = rate_balance.map(|rb| rb.beta(net, post, s.pre)).unwrap_or(1.0);
             let s = &mut net.synapses[sid.idx()];
             let before = s.w;
-            s.w = (s.w + params.a_plus * pre_t * gate * beta).min(params.w_max);
+            // CLLA bounded protection (docs/x-clla-amendment-review.md §2A):
+            // consolidated excitatory LTP clipped at remaining headroom so
+            // P <= p_max_frac * t_e at every tick. Flag off => clla false =>
+            // consolidated never set => bit-exact baseline path (identity).
+            if clla && is_consolidated {
+                let cap = self_p_max * self_t_e;
+                let headroom = cap - clla_p.unwrap_or(0.0);
+                if headroom <= 0.0 {
+                    continue; // skip protected LTP when the class is full
+                }
+                let dw = params.a_plus * pre_t * gate * beta;
+                let dw_eff = dw.min(headroom);
+                let w_new = (s.w + dw_eff).min(params.w_max);
+                if let Some(p) = clla_p.as_mut() {
+                    *p += w_new - s.w; // track applied increment exactly
+                }
+                s.w = w_new;
+            } else {
+                s.w = (s.w + params.a_plus * pre_t * gate * beta).min(params.w_max);
+            }
             if s.w != before {
                 // V2.3 (docs/v2_3-design.md §1): write-epoch bucket tag.
                 // Tag = parity of the structural window clock (E1-frozen)

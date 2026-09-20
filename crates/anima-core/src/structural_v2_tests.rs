@@ -47,6 +47,12 @@ pub fn v2_params() -> V2Params {
     }
 }
 
+
+fn force_post(net: &mut Network, id: NeuronId) {
+    net.neurons[id.idx()].v = 100.0;
+    net.neurons[id.idx()].refractory_until = Tick(0);
+}
+
 fn v2_net(seed: u64) -> (Network, V2Plasticity) {
     let cfg = NetworkConfig { v2: Some(v2_params()), ..NetworkConfig::default() };
     let mut net = Network::new(cfg, 8, 12, 4, seed);
@@ -970,4 +976,100 @@ fn clla_m4_skips_consolidated() {
         net.synapses[s_work.idx()].silent_ticks, u64::MAX,
         "unconsolidated low-weight synapse must be pruned"
     );
+}
+
+
+/// CLLA bounded protection: LTP on a consolidated synapse is clipped at
+/// p_max_frac * t_e - P. Repeated pre→post LTP can grow the protected
+/// synapse toward the cap but never past it, while working synapses LTP
+/// normally.
+#[test]
+fn clla_ltp_clip_bounds_protected_mass() {
+    use crate::plasticity::{stdp_tick, Traces};
+    use crate::network::InputFrame;
+    let params = V2Params {
+        assembly_protect: true,
+        p_max_frac: 0.75,
+        t_e: 0.8,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 17,
+    );
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    // Consolidated synapse at 0.59 (close to cap 0.6) + unconsolidated at 0.1.
+    let s_cons = net.add_synapse(NeuronId(0), post, 0.59, true, Tick(0));
+    let s_work = net.add_synapse(NeuronId(1), post, 0.1, true, Tick(0));
+    net.synapses[s_cons.idx()].consolidated = true;
+    let mut traces = Traces::new(&net, 20.0);
+    let stdp = crate::plasticity::StdpParams::default();
+    let mut max_p = 0.0f32;
+    for t in 0..600u64 {
+        // Even ticks: fire pre channel 0 (trace bump). Odd: fire post.
+        let tick = Tick(t);
+        if t % 2 == 0 {
+            // Fire BOTH pre channels: ch0 (consolidated) + ch1 (working).
+            let frame = InputFrame { tick, spikes: vec![
+                crate::network::InputChannelId(0),
+                crate::network::InputChannelId(1),
+            ]};
+            let ev = net.step(&frame);
+            traces.step(&net, &ev.spikes);
+        } else {
+            force_post(&mut net, post);
+            let ev = net.step(&InputFrame { tick, spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            let mut spikes = ev.spikes.clone();
+            if !spikes.contains(&post) { spikes.push(post); }
+            stdp_tick(&stdp, &mut net, &traces, &spikes, 1.0, None);
+        }
+        let p: f32 = net.incoming[post.idx()].iter()
+            .filter(|&&sid| net.synapses[sid.idx()].consolidated && net.synapses[sid.idx()].silent_ticks != u64::MAX)
+            .map(|&sid| net.synapses[sid.idx()].w)
+            .sum();
+        max_p = max_p.max(p);
+        assert!(p <= 0.75 * 0.8 + 1e-5, "P={p} exceeds cap at tick {t}");
+    }
+    assert!(max_p > 0.595, "LTP should grow toward the cap (max {max_p})");
+    assert!(
+        net.synapses[s_work.idx()].w > 0.1,
+        "working synapse must LTP normally: {}",
+        net.synapses[s_work.idx()].w
+    );
+}
+
+/// CLLA flag-off: the LTP path applies normal LTP even on a (hypothetically)
+/// consolidated synapse — the clip is gated on assembly_protect.
+#[test]
+fn clla_ltp_clip_disabled_when_flag_off() {
+    use crate::plasticity::{stdp_tick, Traces};
+    use crate::network::InputFrame;
+    let params = v2_params(); // assembly_protect = false (default)
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 17,
+    );
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    let s_cons = net.add_synapse(NeuronId(0), post, 0.59, true, Tick(0));
+    net.synapses[s_cons.idx()].consolidated = true; // artificial; flag off
+    let mut traces = Traces::new(&net, 20.0);
+    let stdp = crate::plasticity::StdpParams::default();
+    let before = net.synapses[s_cons.idx()].w;
+    for t in 0..20u64 {
+        let tick = Tick(t);
+        if t % 2 == 0 {
+            let ev = net.step(&InputFrame { tick, spikes: vec![crate::network::InputChannelId(0)] });
+            traces.step(&net, &ev.spikes);
+        } else {
+            force_post(&mut net, post);
+            let ev = net.step(&InputFrame { tick, spikes: vec![] });
+            traces.step(&net, &ev.spikes);
+            let mut spikes = ev.spikes.clone();
+            if !spikes.contains(&post) { spikes.push(post); }
+            stdp_tick(&stdp, &mut net, &traces, &spikes, 1.0, None);
+        }
+    }
+    let after = net.synapses[s_cons.idx()].w;
+    assert!(after > before + 0.004, "flag-off: uncapped LTP {before} -> {after}");
 }
