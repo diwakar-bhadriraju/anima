@@ -163,6 +163,19 @@ Three changes to the existing V2 substrate, one flag.
 - Consolidated synapses: STDP still applies (pre-gated: their
   pre must fire, so cross-pattern interference is structurally
   zero — a C-presentation never fires an A-synapse's pre).
+  CAVEAT (advisory-fixed): within-pattern LTD is NOT pre-gated —
+  during A's own presentations, recurrent drive also fires the
+  post neuron at times uncorrelated with a given A-synapse's pre
+  spike, and with a_minus > a_plus net depression is possible in
+  high-rate regimes. In the unmodified substrate M2's up-scaling
+  partially compensated this; CLLA removes M2 from consolidated
+  synapses, so that compensation is GONE. Two resolutions were
+  weighed: (a) exempt consolidated synapses from pre-only/post-
+  only LTD while keeping LTP — a real architectural change NOT
+  adopted at freeze; (b) register as failure mode #8 with a
+  pre-registered remedy (an A-series amendment proposing the
+  LTD exemption) IF the failure mode trips. Adopted: (b). See
+  failure mode 8 and protocol falsifier F7.
 - Passive decay: consolidated synapses exempt (the SDE-C2
   eraser is the measured killer; exemption is the point of
   consolidation).
@@ -172,6 +185,15 @@ Three changes to the existing V2 substrate, one flag.
   candidate → permanent after sustained co-activity). NO new
   timescale: permanence already exists and is healthy (E16
   permanence counts in band).
+- Gate: minimum weight w_consolidate_min ≥ theta_permanent
+  (reuse the existing permanence threshold; no new number).
+- Config-consistency invariants (asserted at run start, NOT
+  emergent guarantees): w_c_permanent ≥ silence_w (0.02 = 0.02
+  is currently coincidental; the invariant is load-bearing
+  because 3.7's pruning exemption for consolidated relies on it;
+  if a future config violates it the protocol must be amended,
+  not silently re-interpreted); w_consolidate_min ≥ theta_prune
+  (0.05 ≥ 0.005, holds).
 - On permanence: if P + w ≤ cap → `consolidated = true`.
 - Consolidation is one-way under normal operation (no
   de-consolidation); capacity exhaustion is graceful: when
@@ -273,6 +295,15 @@ bounded by the cap and is what makes stored structure persist.
    design; the falsifier set must not require overwrite).
 7. Same-neuron multi-profile with OVERLAPPING channels (D-like):
    blends as above — architectural limit, not bug.
+8. Within-pattern LTD on consolidated synapses: recurrent-driven
+   post firing uncorrelated with the pre spike → net depression
+   (a_minus > a_plus, high-rate regimes), previously compensated
+   by M2 up-scaling, now uncompensated. Falsifier F7: protected
+   mass erodes within its own pattern's presentations (drive-end
+   protected mass < 0.5 × peak). Pre-registered remedy: A-series
+   amendment to exempt consolidated synapses from LTD (keep LTP);
+   until then the mechanism is tested WITH this leak, and F7
+   passes only if the leak is small.
 
 ## 6. Minimal falsifiable experiment (proposal only)
 Single flag arm, all other config frozen at the e24 cell
