@@ -177,3 +177,73 @@ the frozen diagnostic spec would need a correction amendment
 - No runs executed for this review; no code changed.
 
 STOP after mechanism review.
+
+---
+
+# APPENDIX: boundary-detector benchmark (READ-ONLY, commit fee5c96 x-segcap §6)
+
+Thresholds DECLARED before inspection (x-segcap §1 recorded scale:
+S1 silence floor 0.0002, i_syn zero-floor):
+  S1 onset   : S1 > +0.0020  within [t, t+500)     (10x S1 floor)
+  S1 offset  : S1 < -0.0020  within [t+500, t+2000) (symmetric)
+  i_syn off  : i_syn < 0.0010 within [t+450, t+2000) (10x zero-floor)
+No post-hoc optimization; single fixed rule.
+Instrument: examples/benchmark.rs (read-only; committed).
+DP: detector-capable = >=1 input afferent w>0 (52/52; note the 3
+non-plastic-only neurons counted by benchmark but not by wdiv's
+plastic-only 49/52 — documented).
+
+## A/C cell (v21repac-b0.003125-t10000, 80 pres)
+S1 onset   : TP 66.1% (neuron-pres pairs), lat median 12 ms, p90 40
+             ms; FP in 20 s silence = 0 (0/52 neurons).
+S1 offset  : TP 65.8%, lat median 0 ms, p90 17 ms; FP = 0.
+i_syn off  : TP 64.9%, lat median 77 ms, p90 92 ms; FP = 0;
+             mid-presentation dips 5,381 (103/neuron) = the
+             i_syn offset detector false-falls ~1.3x per
+             presentation DURING the stimulus at the 0.001 level.
+FULL i_syn (recurrent-inclusive upper bound; M6 inhibitory not
+recoverable from snapshots => overestimate): FP in silence 875
+(36/52 neurons) — i_syn as a TOTAL-current detector false-
+triggers during pacemaking when recurrent deposits are included
+(upper bound; true inhibitory contribution unknown).
+
+## beta=0.00625 pacemaker cell (v21rep-b0.00625-t5000, 40 pres, A-only)
+S1 onset   : TP 96.4%, lat median 7 ms, p90 43 ms; FP = 0.
+S1 offset  : TP 95.8%, lat median 0 ms, p90 16 ms; FP = 0.
+i_syn off  : TP 95.2%, lat median 78 ms, p90 90 ms; FP = 0 for
+             INPUT-ONLY i_syn; FULL upper bound FP = 40
+             (40/52 neurons) — one fall per neuron across the
+             20 s silence. Mid-presentation dips 3,168 (61/neuron).
+
+## RAW VERDICT (no claim of 'best')
+- S1 (input-current fast-vs-slow diff) is a candidate EPISODE-
+  BOUNDARY detector: detects onset (lat 7-12 ms) AND offset
+  (lat 0 ms) with ZERO false positives in silence in BOTH cells,
+  including the pacemaker run. TP per neuron-pres ~66% (weak
+  cell) / ~96% (wedge), improving with drive strength; per-
+  presentation coverage is higher than per-pair TP (any of 52
+  neurons may fire). FP=0 holds BY CONSTRUCTION (input current
+  exactly zero with no input spikes) — the 0.0002 measured floor
+  is below the 10x threshold.
+- i_syn (input-only) is an OFFSET-ONLY detector (onset not
+  detectable; offset lat 77-92 ms = the 5 ms-tau drain through
+  the 0.001 level), FP=0 input-only but mid-presentation
+  self-dips are frequent (103/neuron over 80 pres); as a FULL
+  total-current detector (recurrent-inclusive upper bound) it
+  false-triggers during silence in both cells (36-40/52
+  neurons). i_syn therefore FAILS the local-boundary
+  requirement whenever recurrent contribution is real (the
+  pacemaker run demonstrates this).
+- Neither per-pair TP is near 100% at the weak cell, but S1
+  does not false-trigger in the pacemaker; i_syn does (upper
+  bound) and false-dips mid-stimulus.
+
+## Minimum-experiment outcome
+S1 is the only candidate satisfying all local-boundary
+requirements measured: onset+offset, zero silence FP in the
+worst (pacemaker) case, strictly local, pattern-agnostic. i_syn
+is excluded by (a) offset-only function, (b) mid-presentation
+dips, (c) recurrent-induced silence FPs (upper bound). Whether
+S1's 66-96% TP at fixed threshold suffices for a mechanism is a
+threshold/architecture decision NOT made here (mandate: no
+architecture). Benchmark STOP.
