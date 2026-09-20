@@ -87,6 +87,30 @@ the very mechanisms (M2 rescale, decay) that previously held the
 all-excitatory organism's runaways in check (E3/E4 history: growth
 arms without these brakes regress).
 
+## 3b. Advisory resolutions (post-execution, read-only)
+
+1. w_consolidate_min gate semantics: the implementation checks the
+   CANDIDATE'S accumulated weight (pool[i].w >= w_consolidate_min)
+   at the M3 permanence transition — since the branch is reached
+   exactly when pool[i].w >= theta_permanent = 0.05 =
+   w_consolidate_min, consolidation fires at creation per the
+   frozen trigger ("M3 permanence transition", gate reuses
+   theta_permanent, no new number). The created synapse's bootstrap
+   w (0.02 = w_c_permanent) is NOT the gate operand. An alternative
+   reading — delay consolidation until a live permanent synapse
+   reaches 0.05 via LTP — is a DIFFERENT design (would need a
+   protocol amendment); recorded, not adopted, not tested.
+2. M5 budget-eviction vs consolidated synapses: evict_for targets
+   the lowest-weight live excitatory synapse (identity-free, per
+   frozen "M5 unchanged"). Empirically MOOT in this execution:
+   0 budget-evictions in all 6 surviving runs (occupancy never
+   reached b_e=40; consistent with E16 9-12/40 occupancy record).
+   Slot-level protection failure cannot occur without evictions.
+   If a future amendment raises consolidation density to occupancy
+   saturation, an eviction-victim preference (skip consolidated
+   when a working alternative exists) would be a separate
+   amendment; not implemented here.
+
 ## 4. Verdict (frozen §7, binary)
 
 **CLLA bundle NOT SUPPORTED.**
