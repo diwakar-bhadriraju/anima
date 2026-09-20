@@ -131,13 +131,28 @@ Config: e24 cell exactly as the bounded-protection CLLA runs
 9001}, same timings), one new config flag enabling the rule
 (default off; flag-off byte-identical, identity gate first).
 
-Arms (12 runs + 1 identity + reuse = 13 executions):
-- identity: clla-ident-il with rule OFF → byte-identical FNV
-  9647ea8a0ca4dbd2 (152,254 rows) + 105/105 frames.
-- bac × 3 seeds (rule ON) — PRIMARY allocation endpoint.
-- bca × 3 seeds (rule ON) — PRIMARY (order mirror).
-- il × 3 seeds (rule ON) — coexistence intact check.
-Runs preserved incl. failures. No other arms.
+RUN MATRIX (frozen; 13 executions total — count corrected 2026-09-21):
+
+  1  identity (clla-ident-il, rule OFF) — byte-identical FNV
+     9647ea8a0ca4dbd2 (152,254 rows) + 105/105 snapshot frames
+  3  bac × seeds {20260912, 424242, 9001} (rule ON) — PRIMARY
+     allocation endpoint
+  3  bca × seeds {20260912, 424242, 9001} (rule ON) — PRIMARY
+     (order mirror)
+  3  il × seeds {20260912, 424242, 9001} (rule ON) — coexistence
+     intact check
+  3  d × seeds {20260912, 424242, 9001} (rule ON) — INFORMATIVE
+     ONLY: reported separately; never evidence for or against the
+     allocator; no effect on any endpoint or the verdict; same
+     informative-only status as the previous CLLA protocol (§0 of
+     anima-clla-protocol.md). The d-arm first-presentation >50 Hz
+     crossing occurs before the cap engages and no flag-off D
+     reference exists — D-completion/stability must not be cited
+     for or against the allocation rule.
+  --
+ 13  total (1 + 3 + 3 + 3 + 3)
+
+All runs preserved incl. failures. No other arms, no other changes.
 
 ## 7. Exact success/failure criteria (frozen, no post-hoc edits)
 
