@@ -165,6 +165,10 @@ pub struct OrganismSection {
     pub slow_state_beta: f32,
     #[serde(default = "default_slow_tau_ms")]
     pub slow_state_tau_ms: f32,
+    /// X-series: drive-gated slow-state write. false (default) = exact
+    /// ungated write (byte-identical path).
+    #[serde(default)]
+    pub slow_state_beta_drive: bool,
     /// V2.2 (docs/v2_2-spec.md §1.3): bistable latch. All defaults =
     /// identity (latch off => V2.1 exactly).
     #[serde(default)]

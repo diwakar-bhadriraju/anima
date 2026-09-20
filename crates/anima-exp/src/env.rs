@@ -382,6 +382,7 @@ mod tests {
                 inhibition_gain: 0.0,
                 slow_state_beta: 0.0,
                 slow_state_tau_ms: 2500.0,
+                slow_state_beta_drive: false,
                 latch_enable: false,
                 theta_rel_mean: 2.0,
                 theta_rel_sd: 0.0,
@@ -1756,6 +1757,83 @@ fn e6_configs_freeze_source_with_e6_only() {
         assert!(failures.is_empty(), "phantom run references:\n{}", failures.join("\n"));
         assert!(checked > 50, "integrity scan actually ran (checked {checked} refs)");
     }
+    // ---- X-series drive-gated identity gate (docs/x-spec-drive-gated.md) ----
+    // Full-run byte-identity: with slow_state_beta_drive=false the telemetry
+    // event stream must be byte-identical to the committed V2.3 baseline
+    // (FNV-1a over non-marker rows == stored hash d452d028ffaec973).
+    #[test]
+    fn x_drive_identity_gate() {
+        let cfg_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../configs/v23gate-s20260912-bac.toml");
+        let text = std::fs::read_to_string(&cfg_path).expect("gate config");
+        assert!(text.contains("m2_buckets = 1"));
+        let cfg = crate::config::ExpConfig::parse(&cfg_path).expect("parse");
+        // explicitly set the flag false (serde default would be identical; be explicit)
+        let mut cfg = cfg;
+        cfg.organism.slow_state_beta_drive = false;
+        let outcome = crate::harness::run(cfg, &cfg_path, false).expect("run");
+        // FNV-1a over non-marker rows (kind != 5), same as v22ident.
+        let reader = anima_telemetry::TelemetryReader::open(&outcome.dir.join("telemetry")).unwrap();
+        let idx = reader.chunk_index();
+        let mut h: u64 = 0xcbf29ce484222325;
+        let mut rows = 0u64;
+        for c in 0..idx.len() {
+            for row in reader.chunk_rows(c).unwrap() {
+                if row.kind == 5 { continue; }
+                h ^= row.kind as u64; h = h.wrapping_mul(0x100000001b3);
+                h ^= row.t; h = h.wrapping_mul(0x100000001b3);
+                h ^= row.n.unwrap_or(0) as u64; h = h.wrapping_mul(0x100000001b3);
+                if let Some(w) = row.w { h ^= w.to_bits() as u64; h = h.wrapping_mul(0x100000001b3); }
+                rows += 1;
+            }
+        }
+        assert_eq!(rows, 135_293, "row count matches V2.3 baseline");
+        assert_eq!(h, 0xd452d028ffaec973u64, "FNV matches V2.3 baseline (byte identity)");
+        // Artifact-level byte identity: snapshots.bin.zst must hash to the
+        // committed V2.3 gate run's snapshot (g_drive omitted when flag off).
+        let snap = std::fs::read(outcome.dir.join("snapshots.bin.zst")).expect("snapshots");
+        use sha2::{Digest, Sha256};
+        let mut sh = Sha256::new();
+        sh.update(&snap);
+        let hex = format!("{:x}", sh.finalize());
+        assert_eq!(hex, "7e3ef343b959175e208b97141e01153d5dc9077573bfca06c2d616a4d56324b6",
+            "snapshot bytes identical to V2.3 baseline");
+    }
+
+    /// Mechanism-level identity: with the flag off, g_drive stays 0 and u
+    /// evolves identically to the ungated rule (unit-level).
+    #[test]
+    fn x_drive_trace_inert_when_off() {
+        use anima_core::network::{InputChannelId, InputFrame, NetworkConfig, Tick};
+        let mk = |drive: bool| {
+            let mut net = anima_core::network::Network::new(
+                NetworkConfig {
+                    slow_state_beta: 0.00625,
+                    slow_state_tau_ms: 5000.0,
+                    slow_state_beta_drive: drive,
+                    ..NetworkConfig::default()
+                },
+                24, 40, 12, 20260912,
+            );
+            // drive 2 s of A-like input through channels 0..4
+            for t in 0..2000u64 {
+                let chs = (0..4u32).map(InputChannelId).collect::<Vec<_>>();
+                net.step(&InputFrame { tick: Tick(t), spikes: chs });
+            }
+            let u: Vec<f32> = net.neurons.iter().filter(|n| n.id.0 >= 24).map(|n| n.u_slow).collect();
+            let g: Vec<f32> = net.neurons.iter().filter(|n| n.id.0 >= 24).map(|n| n.g_drive).collect();
+            (u, g)
+        };
+        let (u_off, g_off) = mk(false);
+        let (u_on, g_on) = mk(true);
+        assert!(g_off.iter().all(|&g| g == 0.0), "g_drive inert when flag off");
+        assert!(g_on.iter().any(|&g| g > 0.0), "g_drive accumulates when flag on");
+        // gated write must lower u (beta*g <= beta): u_on <= u_off elementwise
+        for (a, b) in u_on.iter().zip(u_off.iter()) {
+            assert!(*a <= *b + 1e-6, "gated u <= ungated u (got {a} > {b})");
+        }
+    }
+
 
     // ---- ANIMA E21/E23 pre-registered tests ----
 

@@ -131,6 +131,11 @@ pub struct Neuron {
     /// RESET when decayed u < phi_i. Plateau U_i adds to u in dv.
     #[serde(default)]
     pub z_latch: u8,
+    /// X-series drive trace (docs/x-spec-drive-gated.md §2): EMA of the
+    /// neuron's own afferent input-channel drive, in [0,1]. Advanced every
+    /// tick when slow_state_beta_drive; identically 0.0 otherwise.
+    #[serde(default)]
+    pub g_drive: f32,
     /// V2.2 G2: per-neuron heterogeneity draws (LogNormal, frozen
     /// spec §2; identity 1.0 when heterogeneity sd = 0 — NO RNG
     /// consumed in that case).
@@ -237,6 +242,12 @@ pub struct NetworkConfig {
     pub slow_state_beta: f32,
     #[serde(default = "default_slow_tau")]
     pub slow_state_tau_ms: f32,
+    /// X-series: drive-gated slow-state write (docs/x-spec-drive-gated.md).
+    /// true => per-spike write is u += beta * g_drive(spike), g_drive the
+    /// neuron's own afferent-drive EMA in [0,1]. false (default) => exact
+    /// ungated write (byte-identical path).
+    #[serde(default)]
+    pub slow_state_beta_drive: bool,
     // ---- V2.2 (docs/v2_2-spec.md §1.3): all defaults = identity. ----
     /// Master switch: false => code path is V2.1 exactly.
     #[serde(default)]
@@ -337,6 +348,8 @@ impl Default for NetworkConfig {
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
+            // X-series default OFF: ungated write (identity).
+            slow_state_beta_drive: false,
             latch_enable: false,
             theta_rel_mean: v22_theta_mean(),
             theta_rel_sd: 0.0,
@@ -397,6 +410,7 @@ impl Network {
                 i_adapt: 0.0,
                 u_slow: 0.0,
                 z_latch: 0,
+                g_drive: 0.0,
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
@@ -424,6 +438,7 @@ impl Network {
                 i_adapt: 0.0,
                 u_slow: 0.0,
                 z_latch: 0,
+                g_drive: 0.0,
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
@@ -446,6 +461,7 @@ impl Network {
                 i_adapt: 0.0,
                 u_slow: 0.0,
                 z_latch: 0,
+                g_drive: 0.0,
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
@@ -693,6 +709,35 @@ impl Network {
         // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
         // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
         let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
+        // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3).
+        // g_drive EMA: x_i = min(I_aff/t_e, 1); I_aff = sum of w over
+        // excitatory INPUT-channel -> i synapses delivering a spike this
+        // tick. Gated write uses g_i(t_spike) = value BEFORE this tick's
+        // advance (spec semantics g(t+1) = lam*g + (1-lam)*x).
+        let drive_on = self.cfg.slow_state_beta_drive;
+        let lam_g = exp_approx(-dt / 20.0); // tau_g = STDP tau = 20 ms
+        let t_e = self.cfg.v2.as_ref().map(|v| v.t_e).unwrap_or(1.0);
+        let mut drive_x: Vec<f32> = Vec::new();
+        if drive_on {
+            drive_x.resize(n, 0.0);
+            for &ch in &frame.spikes {
+                let pre = self.channels[ch.idx()].target;
+                let outs = self.outgoing[pre.idx()].clone();
+                for sid in outs {
+                    let syn = &self.synapses[sid.idx()];
+                    if syn.silent_ticks == u64::MAX || syn.inhibitory {
+                        continue;
+                    }
+                    let post = syn.post.idx();
+                    if post < n && self.neurons[post].class != NeuronClass::Input {
+                        drive_x[post] += syn.w;
+                    }
+                }
+            }
+            for x in drive_x.iter_mut() {
+                *x = (*x / t_e).min(1.0);
+            }
+        }
         for i in 0..n {
             if self.neurons[i].class == NeuronClass::Input || self.neurons[i].retired {
                 continue;
@@ -744,7 +789,16 @@ impl Network {
                 // U1: hyperpolarizing kick per spike.
                 neur.i_adapt += self.cfg.adaptation_gain;
                 // V2.1: depolarizing slow kick per spike (spec §1.2-1.3).
-                neur.u_slow += self.cfg.slow_state_beta;
+                // X-series: gated write REPLACES the ungated term:
+                // u += beta * g_drive(spike). Pacemaking spikes (g~0)
+                // consolidate nothing; sensory-driven spikes consolidate
+                // in proportion to drive. Takes g_i(t) BEFORE this tick's
+                // trace advance.
+                if drive_on {
+                    neur.u_slow += self.cfg.slow_state_beta * neur.g_drive;
+                } else {
+                    neur.u_slow += self.cfg.slow_state_beta;
+                }
                 // V2.2 Y1: local per-spike subtraction eta = beta*eta_rel,
                 // floored at 0 (spec §3; 0 = off when eta_rel = 0).
                 if self.cfg.latch_enable && self.cfg.eta_rel > 0.0 {
@@ -752,6 +806,18 @@ impl Network {
                     neur.u_slow = (neur.u_slow - eta).max(0.0);
                 }
                 spikes.push(neur.id());
+            }
+        }
+        // X-series: post-pass advance of the drive trace (g(t+1) =
+        // lam*g(t) + (1-lam)*x(t)); g strictly in [0,1]. Skipped when off
+        // (g_drive stays 0 => identity).
+        if drive_on {
+            for i in 0..n {
+                if self.neurons[i].class == NeuronClass::Input {
+                    continue;
+                }
+                let neur = &mut self.neurons[i];
+                neur.g_drive = lam_g * neur.g_drive + (1.0 - lam_g) * drive_x[i];
             }
         }
         // low-passed with tau = rate_tau_ms.

@@ -104,6 +104,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             inhibition_gain: cfg.organism.inhibition_gain,
             slow_state_beta: cfg.organism.slow_state_beta,
             slow_state_tau_ms: cfg.organism.slow_state_tau_ms,
+            slow_state_beta_drive: cfg.organism.slow_state_beta_drive,
             latch_enable: cfg.organism.latch_enable,
             theta_rel_mean: cfg.organism.theta_rel_mean,
             theta_rel_sd: cfg.organism.theta_rel_sd,
@@ -246,6 +247,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
         "inhibition_gain": cfg.organism.inhibition_gain,
         "slow_state_beta": cfg.organism.slow_state_beta,
         "slow_state_tau_ms": cfg.organism.slow_state_tau_ms,
+        "slow_state_beta_drive": cfg.organism.slow_state_beta_drive,
         "latch_enable": cfg.organism.latch_enable,
         "theta_rel_mean": cfg.organism.theta_rel_mean,
         "theta_rel_sd": cfg.organism.theta_rel_sd,
@@ -782,6 +784,12 @@ fn class_str(c: NeuronClass) -> &'static str {
     }
 }
 
+/// X-series: g_drive is serialized only when the gate is on (None ->
+/// field omitted in serde), keeping flag-off snapshots byte-identical.
+fn net_has_drive_gate(net: &Network) -> bool {
+    net.cfg.slow_state_beta_drive
+}
+
 fn network_snapshot(net: &Network) -> anima_telemetry::recorder::NetworkStateSnapshot {
     anima_telemetry::recorder::NetworkStateSnapshot {
         tick: net.tick.0,
@@ -795,6 +803,11 @@ fn network_snapshot(net: &Network) -> anima_telemetry::recorder::NetworkStateSna
                 rate_hz: anima_telemetry::events::f32_json(n.rate_hz),
                 u_slow: anima_telemetry::events::f32_json(n.u_slow),
                 z_latch: Some(n.z_latch),
+                g_drive: if net_has_drive_gate(net) {
+                    anima_telemetry::events::f32_json(n.g_drive)
+                } else {
+                    None
+                },
                 dormant: n.dormant_since.is_some(),
                 retired: n.retired,
                 born: n.born.0,

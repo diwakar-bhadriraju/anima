@@ -32,6 +32,10 @@ pub struct NeuronState {
     /// V2.2: bistable latch state (None = pre-V2.2 files).
     #[serde(default)]
     pub z_latch: Option<u8>,
+    /// X-series drive trace (None = pre-X files / gate off). Skipped in
+    /// serialization when None so flag-off runs stay byte-identical to V2.3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub g_drive: Option<f32>,
     pub dormant: bool,
     pub retired: bool,
     pub born: u64,

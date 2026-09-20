@@ -339,6 +339,7 @@ impl StructuralMonitor {
             i_adapt: 0.0,
             u_slow: 0.0,
             z_latch: 0,
+            g_drive: 0.0,
             theta_rel: 1.0,
             u_plateau_rel: 1.0,
             tau_het_rel: 1.0,
