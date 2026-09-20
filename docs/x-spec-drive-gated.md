@@ -324,3 +324,97 @@ user decision; NOT executed under frozen rules (no tuning).
 Preserved: all runs incl. the 1 abort and the 8 defective-batch
 runs (marked in this record as non-data). No E-number. No
 progression to Alternative A/B. STOP.
+
+
+---
+
+# X-DIAGNOSTIC EXECUTION RECORD — CORRECTED I_aff (2026-09-20)
+
+Spec correction (commit 0fd6a55): I_aff = sum(amplitude*w) over
+spiking input afferents; x = min(I_aff/v_th, 1.0), v_th = 1.0
+(LIF threshold); amplitude = 52.0. Everything else frozen. 16
+runs (4 seeds x {bac,bca} x {base,exp}), all curriculum-complete,
+ZERO aborts (the prior BCA-20260912 runaway cell no longer
+aborts). Failed diagnostic (commit 2923a90) preserved byte-
+exactly; NOT reused for any number.
+
+## 1. Corrected equations (as implemented, network.rs)
+I_aff_i(t) = sum_j amplitude*w_{j->i} over excitatory INPUT->i
+             synapses j firing at t
+x_i(t)     = min(I_aff_i(t)/v_th, 1.0), v_th = 1.0
+g_i(t+1)   = lam_g*g_i(t) + (1-lam_g)*x_i(t), lam_g = exp(-1/20)
+on spike:  u_i += beta * g_i(t_spike)
+Frozen: amplitude 52.0, beta 0.0046875, tau_g 20 ms, m2_buckets
+1, decay 1e-6. No new gains; no changes to verdict rules.
+
+## 2. Identity gate (flag OFF): PASS (committed suite;
+FNV d452d028ffaec973, 135293 rows, snapshot SHA 7e3ef343 — the
+identity test reruns with the corrected code; plus new committed
+test x_drive_amplitude_scale: at amplitude=52/v_th=1, a single
+input spike on w>=0.0192 saturates x to 1.0, g>0.9; the old
+bare-w definition would give ~0.02-0.06).
+
+## 3. g during stimulus (empirical replay, examples/gdur.rs;
+distribution over presentation ticks, mean over 52 neurons):
+g_on across exp runs: 0.0494-0.0590 (median-neuron med_on
+0.039-0.051, p90 0.118-0.128). Note: the preregistered
+expectation was ~0.2-0.3; the observed value is ~0.05. This is
+REPORTED, not tuned: x per tick is a clamped Bernoulli of input
+presence (a connected channel fires with probability
+p ~ 4 connections x 20 Hz / 1000 = 0.08; x clamps to 1.0 on
+each firing), so g is the EMA of a ~p stream — mean ~p. The
+0.2-0.3 estimate conflated per-tick probability with
+per-window flux; the observed distribution stands.
+
+## 4. g at offset / read: g_offset 0.024-0.080 (last presentation
+fraction), g_read = 0.000000 in ALL 8 exp runs (trace provably
+dead by read; off-window effects are in u only).
+
+## 5. u norms (off-window read): exp 0.11-0.30 vs base 2.18-14.60
+(about 10x the defective-batch 0.01-0.02, i.e. ~4-5% of
+baseline). Norm guard 0.1x base: FAILS in 7/8 cells.
+
+## 6-7. Cosines: reported ONLY for the one guard-passing cell
+(bca-9001): c_dur=0.9752, c_off_exp=0.9390. Other cells:
+cosines computed but NOT results (frozen rule).
+
+## 8-9. top-u overlap / rate-Fano: NO_PERSISTENT_STATE cells are
+not scored. bca-9001 top10 differs from base (3/17 Jaccard).
+Endogenous exp rate = 0.0, Fano = 0.00 in ALL 8 exp runs —
+the gate killed off-window pacemaking entirely (the write's
+purpose), but with the 0.05 gate the u build is too weak to
+sustain a usable persistent representation.
+
+## 10. Per-cell verdicts (frozen rules):
+| cell | u_exp | guard 0.1x | verdict |
+|---|---|---|---|
+| bac 20260912 | 0.13 | 0.397 | NO_PERSISTENT_STATE |
+| bac 424242 | 0.12 | 0.347 | NO_PERSISTENT_STATE |
+| bac 9001 | 0.11 | 0.514 | NO_PERSISTENT_STATE |
+| bac 123456 | 0.13 | 0.916 | NO_PERSISTENT_STATE |
+| bca 20260912 | 0.30 | 1.460 | NO_PERSISTENT_STATE |
+| bca 424242 | 0.30 | 0.305 | NO_PERSISTENT_STATE |
+| bca 9001 | 0.23 | 0.218 | NULL (c_off 0.939 > 0.90; the STRONG criterion c_off<=c_dur also triggers at 0.939<=0.975 — resolved toward the falsifier: cosine ~0.94 is not progress) |
+| bca 123456 | 0.19 | 1.415 | NO_PERSISTENT_STATE |
+
+## 11. GO criterion (>=2/4 seeds PARTIAL+ AND zero RUNAWAY):
+FAILED — 0/4 seeds PARTIAL-or-better (7 NPS, 1 NULL); aborts 0.
+
+## 12. EXACT VERDICT
+
+**NOT SUPPORTED (corrected normalization).** The gated persistent
+state is nonzero (u 0.11-0.30; ~10x the defective run) but fails
+the frozen norm guard in 7/8 cells and the surviving cell is
+NULL. The amplitude*v_th scale correction was necessary and
+correct (g now ~0.05, off-window g exactly 0 at read), but the
+20 Hz curriculum's per-tick input presence (~p~0.05-0.08)
+caps g, and at that gate the u-write cannot build a state above
+the 0.1x floor. Off-window consolidation is proven zero
+(g_read = 0.000000 in all runs; endogenous rate 0.0). The
+sensory-information question (after g decay) remains UNANSWERED
+under the frozen criteria — the carrier dies before it can
+carry. Reported distribution stands; no tuning performed.
+
+Preserved: all 16 corrected runs + 8 defective-batch + failed
+diagnostic runs + previous records. No E-number, no sweep, no
+Alternative A/B. STOP.
