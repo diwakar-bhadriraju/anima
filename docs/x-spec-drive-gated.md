@@ -227,3 +227,86 @@ retention mechanisms.
 
 STOP at diagnostic execution boundary pending user resolution
 of §8.
+
+---
+
+# X-DIAGNOSTIC EXECUTION RECORD (2026-09-20)
+
+16 runs (4 seeds x 2 curricula x 2 arms), V2.3 gate baseline
+(beta=0.0046875, m2_buckets=1, decay=1e-6), configs
+configs/xdg-{base,exp}-{bac,bca}-s{seed}.toml, instrument
+examples/xdg_an.rs. Two run batches exist on disk: the FIRST
+batch (15:19Z) had the flag appended AFTER [e6] (TOMl table
+mismatch -> flag ignored -> arms identical) and is preserved as
+a config-generation defect, NOT data. The corrected second batch
+(15:22-24Z) below is the diagnostic.
+
+## 1. Run IDs / status (corrected batch)
+
+base: xdg-base-{bac,bca}-s{20260912,424242,9001,123456}-20260920T15225x-335Z — all
+curriculum-complete.
+exp: xdg-exp-bac-* all complete;
+     xdg-exp-bca-s20260912-20260920T152405Z — **failure:runaway-activity**;
+     remaining exp-bca complete.
+
+## 2. Identity gate: PASS (committed suite tests x_drive_identity_gate
+FNV d452d028ffaec973 / 135293 rows / snapshot SHA 7e3ef343...)
+
+## 3-4. Cosines — NOT REPORTED as results (norm guard rule; see note)
+During and off-window cosines computed but per pre-registered rule
+NO_PERSISTENT_STATE forbids reporting any cosine as a finding. For
+the record, computed values: baseline c_dur 0.85-0.94, c_off
+0.22-0.99; experimental c_dur 0.77-0.97, c_off 0.50-0.99 with
+u_norm ~0.01-0.02. Descriptive only.
+
+## 5-8. Key measurements
+
+| cell | base ||u||_off | exp ||u||_off | exp rate/Fano | exp g@read |
+|---|---|---|---|---|---|
+| bac 20260912 | 3.97 | 0.01 | 0.0 sp/s, Fano 0.00 | 0.00000 |
+| bac 424242 | 3.47 | 0.02 | 0.0, 0.00 | 0.00000 |
+| bac 9001 | 5.14 | 0.01 | 0.0, 0.00 | 0.00000 |
+| bac 123456 | 9.16 | 0.01 | 0.0, 0.00 | 0.00000 |
+| bca 20260912 | 14.60 | 0.01 | (abort) | 0.00000 |
+| bca 424242 | 3.05 | 0.02 | 0.0, 0.00 | 0.00000 |
+| bca 9001 | 2.18 | 0.02 | 0.0, 0.00 | 0.00000 |
+| bca 123456 | 14.15 | 0.02 | 0.0, 0.00 | 0.00000 |
+
+- g at offset and read: 0.00000 in all exp runs at snapshot
+  resolution (1 s) — the 20 ms trace is dead at any snapshot
+  time (provably beyond 10*tau_g); off-window effects cannot be
+  attributed to g.
+- top-u overlap: n/a per norm-guard rule (no persistent state).
+- Endogenous firing collapsed in all exp runs (rate 0.0,
+  Fano 0.00): NO pacemaking survived; the gate erased the
+  persistent regime entirely.
+
+## 9-10. Verdicts per cell and GO
+
+ALL 8 exp cells: NO_PERSISTENT_STATE (||u_exp||_off < 0.1 x
+||u_base||_off in every cell); 1 RUNAWAY (bca 20260912).
+GO rule: >=2/4 seeds PARTIAL+ AND zero RUNAWAY — **FAILED
+(0/4 seeds; 1 RUNAWAY)**.
+
+## 11. EXACT VERDICT
+
+**NO_PERSISTENT_STATE — the drive-gated write, at the frozen
+parameters (t_e normalization x = min(I_aff/t_e, 1) with
+weights ~0.02-0.06 and 20 Hz/500 ms drive => x ~ 10^-3), gates
+u to ~0.4% of the ungated level: the persistent state does not
+exist at this operating point; therefore the question of whether
+it carries sensory information is UNANSWERABLE under this
+parameterization and the diagnostic stops per its own rules.**
+
+Mechanism note (observation, not tuned): with beta normalized by
+t_e=0.8 and real afferent sums ~0.001-0.01, x_i(t) is typically
+~10^-3 during drive, g ~ 10^-3, so u accumulates ~0.1% per
+spike. The gating is functionally an OFF switch at this
+curriculum's drive strength. Whether a different normalization
+(no t_e division; or drive-per-spike weighting) would restore a
+persistent-but-selective u is a MECHANISM QUESTION — requires
+user decision; NOT executed under frozen rules (no tuning).
+
+Preserved: all runs incl. the 1 abort and the 8 defective-batch
+runs (marked in this record as non-data). No E-number. No
+progression to Alternative A/B. STOP.
