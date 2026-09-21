@@ -1,0 +1,96 @@
+The interference regime trichotomy (\S\ref{sec:interference}) maps the
+limits of a FIXED population. Before committing to protection and
+allocation as the response, Phase I executed its only structural-growth
+era: mechanisms that literally add neurons and synapses to the
+population, intended as a homeostatic route to capacity. The era's
+verdict --- regression in every configuration --- is what makes the
+``protect the existing store'' (CLLA) and ``allocate what exists''
+choices defensible; a reader of the record needs it for the same
+reason.
+
+\subsection{Machinery}
+
+The substrate contains a complete structural machinery
+(\texttt{structural.rs}, \texttt{structural\_v2.rs}): birth triggers
+(\texttt{none}, \texttt{HomeostaticSaturation} at 25 Hz mean over
+2 s, \texttt{PersistentError}), admission windows
+(\texttt{births\_per\_window}), and wiring shapes (sink
+20-in afferents; \texttt{wiring\_avoid\_coactive}; fan-out-matched
+\emph{reciprocal} 20-in/20-out; configurable fan-in). Growth is a
+registered U-series hypothesis (U3): structural recruitment should
+provide capacity when synaptic routing saturates. Every experiment in
+every other era ran \texttt{birth\_trigger = "none"}; the growth era
+(protocol \cite{e4proto}) is the only executed use of the machinery.
+
+\subsection{Executed series and verdicts (all preserved)}
+
+All runs cited by their execution commits (commit messages are the
+execution records; configs \texttt{configs/e4*.toml}, \texttt{u3b.toml};
+runs \texttt{runs/e4-*}, \texttt{runs/*probe-*}).
+
+\begin{itemize}
+\item \textbf{E4 (52b6d54):} homeostatic-saturation trigger + co-active-
+avoidance wiring, pre-registered. 43 births over S1; birth cadence
+accelerated (trigger re-firing every \(\approx\)2 s after t = 405 s);
+each birth adds 20 plastic afferents recruiting quiet neurons; burst
+means climb 35 \(\to\) 42 \(\to\) 63 Hz; the 50 Hz/5 s runaway
+detector trips at t = 540 s, exactly the same sim-time failure shape
+as the uncontrolled baseline. E3 baseline completes 875 s clean.
+Verdict: \textbf{REGRESSION by the pre-registered guard}. Machinery
+bugs fixed en route (trigger latching so it fires per episode, not per
+tick --- A5; trace/coalescer fixes).
+\item \textbf{E4b (bde3efb):} rate-gated birth schedule (refractory
+after a birth). Stabilizes but cadence shortfall (2 births vs.\ the
+frozen \(\ge 3\)/240 s bar): \textbf{INCONCLUSIVE-inert}, no full run.
+\item \textbf{E4c (9ff3cb7):} 3 s birth cooldown (A10). The decisive
+run: 35 births --- within the frozen 15--40 band --- trips runaway at
+t = 540{,}021 ms, the SAME sim-time as uncontrolled E4 (540{,}013 ms)
+and E4-era baselines, while the inert 2-birth E4b arm survives 875 s.
+Verdict: \textbf{REGRESSION}; failure is shape-locked at
+\(\approx\)35+ births by t\(\approx\)540 s, independent of cadence.
+\item \textbf{E4d (0f438d3):} fan-out-matched growth (newborns receive
+20 efferents onto the same partners, \texttt{wiring\_bidirectional}).
+4 births then runaway at t = 32 s (mean 179 Hz; 17\(\times\) faster
+than the sink shape). Reciprocal newborn\(\leftrightarrow\)partner
+excitation is a positive-feedback amplifier in the all-excitatory
+organism. Verdict: \textbf{REGRESSION at the calibration gate}.
+\item \textbf{E4e (a7fba24):} low-fan-in capacity growth (4 afferents,
+no feedback). Calibration gate: stability PASS (zero failures; first
+regression-free growth shape), cadence FAIL (2 births/240 s vs.\ the
+frozen \(\ge 3\) bar): \textbf{INCONCLUSIVE-inert}.
+\item \textbf{E4f (a7fba24 family):} mid-fan-in sweep (8/12/16).
+All arms stable but birth cadence identical regardless of fan-in
+(2/240 s); only fan-in 20 sustains episodes and then regresses. The
+trigger's sustained episodes are initial-condition-driven, not
+birth-driven. \textbf{U3 closed} as untestable under the registered
+homeostatic framework.
+\item \textbf{U3b (cface8b):} persistent-error trigger. The shipped
+machinery was dead code: \texttt{should\_birth} could never arm (unit
+test only passed by pre-setting the state), and the harness fed it a
+running mean that made the \(\mu+2\sigma\) bound structurally
+unreachable. Both fixed (A11/A12, unit tests), re-gated: still
+0 births --- the error EWMA adaptation horizon equals the trigger's
+sustained window, so continuous exceedance is impossible at that
+horizon. \textbf{U3 closed under both registered frameworks.}
+\end{itemize}
+
+\subsection{What the era establishes}
+
+\begin{quote}
+\textbf{Demonstrated:} structural growth in the all-excitatory,
+uncapped substrate is unstable at every tested wiring shape (sink:
+shape-locked regression at \(\approx\)35--43 births by
+t\(\approx\)540 s; reciprocal: positive-feedback runaway at 32 s);
+cadence gating produces inertness, not viability; the persistent-error
+trigger's shipped mechanics were non-functional and the repaired
+version could not arm under its own parameterization.\\[1pt]
+\textbf{Supported:} any future growth mechanism must be rate-gated
+WITHOUT coupling the birth rate to the population mean (the coupling
+that made the trigger self-accelerating), and must bound newborn
+feedback in an all-excitatory population.\\[1pt]
+\textbf{Not established:} any growth configuration that adds capacity
+while preserving the operating regime.
+\end{quote}
+
+The CLLA era follows as the alternative: rather than grow new
+structure, protect and allocate the structure that exists.

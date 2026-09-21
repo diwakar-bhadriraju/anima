@@ -1,0 +1,84 @@
+This appendix answers the question a reader following the paper needs:
+\emph{what does the code implement, and how do I reproduce any step of
+Phase I?} It is an inventory, not a narrative; the narrative sections
+carry the interpretations.
+
+\subsection{Mechanism inventory (every implemented flag family)}
+
+Flags are the config surface; ``identity'' means the flag-off path is
+byte-identical to the committed baseline (verified per implementation
+by the event-stream hash \texttt{9647ea8a0ca4dbd2} and snapshot
+frames).
+
+\begin{center}
+\footnotesize
+\begin{tabular}{p{3.3cm}p{3.0cm}p{5.2cm}p{3.2cm}}
+\toprule
+Mechanism family & Config surface & Executed evidence / status & Record \\
+\midrule
+LIF substrate + STDP & \texttt{[organism]}, \texttt{[plasticity]} & all runs; E1-era determinism (hash-equal duplicates) & \cite{v2proto,e1proto} \\
+U1 adaptation / E3b inhibition & \texttt{adaptation\_gain}, \texttt{inhibition\_gain} & E3, E3b execution; separation unchanged & \cite{e3bproto} \\
+M2 normalization & \texttt{t\_e}, \texttt{m2\_buckets} & required for separation (E16); partition (V2.3) rescues blocked-only & \cite{synmem,overview} \\
+M3/M4/M5/M6 & \texttt{[v2]} M3--M6 & E16/E17 ablations; decay main eraser (SDE-C2) & \cite{synmem,overview} \\
+E6 rate balance & \texttt{[e6]} & executed, history-derived, no labels & \cite{v2proto} \\
+V2.1 slow state & \texttt{slow\_state\_beta/tau} & probe grid; info audit; Stage-C retracted & \cite{infoaudit} \\
+X-series drive gate & \texttt{slow\_state\_beta\_drive} & X1/X3 maps; I\_aff dimensional correction & \cite{xspecdrive,xplorlog,xplor2} \\
+V2.2 latch & \texttt{latch\_enable}, \texttt{eta\_rel}, \texttt{theta\_rel\_*} & 120-run stage 2; carrier failed & \cite{overview} \\
+V2.3 partition & \texttt{m2\_buckets=2}, \texttt{m2\_epoch\_windows} & bca 6/6 rescue; identity PASS & \cite{overview} \\
+Birth triggers & \texttt{birth\_trigger} = none / homeostatic / persistent-error; \texttt{wiring\_*} & E4--E4f, U3b: all regressions or inert; U3 closed & \cite{e4proto} \\
+CLLA consolidation & \texttt{assembly\_protect} & unbounded: runaway; bounded: viable & \cite{cllarecord,bbounded} \\
+Allocation rule & \texttt{alloc\_residual} & gate per spec; substrate destroyed upstream (FAIL 6/6) & \cite{rule} \\
+Dormant reserve & \texttt{dormant\_reserve} & vacuous trigger for novel patterns (FAIL 6/6) & \cite{reserve} \\
+First-exposure allocator & fe draw bias + pressure eviction & visibility cap; inert redraw (FAIL 6/6) & \cite{fe} \\
+Source correction & module \texttt{fired} record & supply 41\(\to\)61 (FAIL 6/6); residual (e) & \cite{fec} \\
+Recruitment gain & \texttt{recruit\_gain}, \texttt{recruit\_gain\_k}=8 & rg8 (op-point fail), rg8c (cap; primary fail) & \cite{rg8,rg8c} \\
+Encoders (specified) & \texttt{[e9]/[e10]} configs, \texttt{e9-rev/e9-seq} runs & retina/cochlea encoder arms; not part of the memory line & \cite{overview} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Replication walkthrough}
+
+All steps are deterministic and read-only against the preserved
+artifacts where possible.
+
+\begin{enumerate}
+\item \textbf{Build}: \texttt{cargo build --release -p anima-exp
+--bin anima-run --examples}. The substrate is in
+\texttt{crates/anima-core}; the harness in
+\texttt{crates/anima-exp/src/harness.rs}; telemetry in
+\texttt{crates/anima-telemetry}.
+\item \textbf{Run}: \texttt{target/release/anima-run run --config
+configs/<frozen-config>.toml} writes
+\texttt{runs/<exp\_id>-<UTC>Z/} with \texttt{telemetry/} (parquet
+event chunks), \texttt{snapshots.bin.zst} (1 s state), and
+\texttt{metrics.json} + \texttt{report.md}. Same seed
+\(\Rightarrow\) byte-identical telemetry (determinism guarantee).
+\item \textbf{Identity gate}: run the flag-off configuration (e.g.\
+\texttt{configs/clla-fe-s20260912-bac.toml} with no added flag) and
+compare byte-for-byte against a preserved baseline (all telemetry
+chunks, snapshots, metrics). Any mechanism implementation must pass
+this before its flag-on runs are interpreted.
+\item \textbf{Measurement}: committed read-only examples
+\texttt{rg8eval} (per-presentation spikes, currents, burst),
+\texttt{clla\_traj} (protected/working mass trajectories),
+\texttt{papermass} (drive-end channel masses), plus the era
+instruments \texttt{read\_rates}, \texttt{cross\_cosine},
+\texttt{e24\_endpoint}, \texttt{clla\_meas}, \texttt{snapdiff},
+\texttt{v22ident}.
+\item \textbf{Audits}: the analyses reproduced in this paper
+(e.g.\ Figs.\ 2, 4--7) rerun the instruments through
+\texttt{paper/scripts/gen\_data.sh} \(\to\) \texttt{figs.py}; the
+regime figure asserts its numbers against the committed audit table.
+\item \textbf{Determinism check}: re-running the same config twice
+must produce identical artifacts; the E1 record documents hash-equal
+duplicate runs.
+\end{enumerate}
+
+\subsection{What is not in the code veto}
+
+The codebase also contains machinery designed but never activated in
+any run (notably the learning gates of E5, the multiplicative STDP
+bound of E2, and the E9/E10 encoder pipelines beyond their calibration
+runs). They are implemented and unit-tested but carry no execution
+verdict; this paper does not assign them one.

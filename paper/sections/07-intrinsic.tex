@@ -54,6 +54,37 @@ divergence over 800 ms; output responses stimulus-locked with zero
 endogenous output activity; temporal capacity below 50 ms
 \cite{overview}.
 
+\subsection{The drive-gated slow state and the writable-memory review}
+
+The X-series explored the one amendment to \(u\) that its own audit
+motivated: gate the per-spike write by the neuron's afferent drive
+(\texttt{slow\_state\_beta\_drive}; drive trace
+\(x_i = \min(I_{\mathrm{aff}}/v_{\mathrm{th}}, 1)\), fitted with
+the frozen membrane scale after the dimensional correction of
+\S\ref{sec:repro}; spec and logs
+\cite{xspecdrive,xplorlog}). The records measure:
+\begin{itemize}
+\item X1: a transition band at \(\beta \approx 0.0047\) --- an
+intermediate regime with a decaying tail whose effective time constant
+(\(\approx\) 8.2 s) differs from \(\tau_u\);
+\item X3: a 45-run boundary map in which top-\(u\) at drive end is a
+near-perfect predictor of the post-drive regime (\(\rho \approx
+0.97\)); drive composition shifts regime, but seed dominates;
+\item the architectural review \cite{xplor2}: sensory organization
+exists at the afferent layer (42--48 of 52 neurons dominant for a given
+pure-drive curriculum; interleaving keeps separable cohorts);
+during-stimulus responses separate (cosine 0.30--0.89) while
+off-window responses do not (0.999+); the persistent state is a
+``seed-lottery'' twice over.
+\end{itemize}
+The review's primary diagnosis --- \emph{insufficient writable /
+competitive memory}; the missing capability is coexisting
+independently writeable traces under budget competition --- is the
+exact bridge to the synaptic-store chapters: it reframes the negative
+as a memory-capability question and names budget competition (M2) as
+the suspected mechanism, which the SDE probes and the CLLA era then
+isolated \cite{xplor2,overview}.
+
 \begin{quote}
 \textbf{Demonstrated:} scalar intrinsic persistence (\(u\)) is
 self-sustaining but information-poor (saturated mean, pacemaker core,
