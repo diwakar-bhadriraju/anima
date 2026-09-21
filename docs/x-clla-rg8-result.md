@@ -39,6 +39,13 @@ il = interleaved.
 
 Baselines: committed clla-fe-*20260921T1533{38,43,48,53,58,03,08,13,18}Z.
 
+GUARD NOTE: metrics S1 stage_population_rate = 58.7 Hz exceeds the 50 Hz
+guard threshold, yet no trip occurred (failures []): the stage mean is
+presentation-burst-weighted (duty ≈ 0.2), while the guard requires mean
+> 50 Hz sustained over 5 s. Measured arithmetic: even with pres-1's
+391 Hz burst, the 5 s-window mean = 41 Hz — under threshold. No guard
+inconsistency.
+
 ## 3. Predeclared endpoints
 
 | # | endpoint (bar) | result | verdict |
@@ -61,11 +68,21 @@ First block (A):
 - pres 2–5: 243 / 124 / 94 / 78 Hz (base ≈ 84). R decays 0 → 0.38 by
   pres 6 (identical trajectory shape to baseline — the gate is the
   allocation-rule R, observed).
-- C-afferent churn during A-block: 195 prunes (base 165–187) — C's working
-  substrate destroyed FASTER under the boosted block 1.
+- C-afferent churn during A-block: 195 / 202 / 215 prunes (base 164–187).
+  ERASER DECOMPOSED: STDP excluded — C channels never fire in block 1, so
+  C-cohort STDP events in the A-block = 0 (measured in the weight-growth
+  audit); the eraser is M2 rescale pressure (per-neuron t_e targets under
+  3×-drive activity) driving the surviving working C weights below
+  theta_prune (0.005) → M4 prune. The prune EXCESS over baseline
+  (+15 / +31 / +51) matches the baseline survivor populations — the
+  boost's block-1 side effect removes the exact afferents the mechanism
+  was built to amplify. End-of-block-1 working C current at first-C:
+  0.000 vs 81.38 network-total (= 1.565/neuron baseline), verified both
+  from snapshot-weighted telemetry and from the pruning record.
 
 First novel exposure (C pres 21): IW_C = **0.000 /neuron total** (base
-1.565) — every surviving working C afferent gone. Under the frozen
+1.565; snapshot-verified) — every surviving working C afferent gone.
+Under the frozen
 equation's input-proportional bound (i_boost ≤ k_g·I_W), boost = 0. The
 mechanism DID NOT ENGAGE at its target moment. Posts 0 (base 101 spikes).
 Repeat in 2/3 bac arms and 2/3 bca arms (iwA = 0.000).
