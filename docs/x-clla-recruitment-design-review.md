@@ -72,10 +72,16 @@ same cadence the allocation rule already uses).
 - 0 ≤ i_boost ≤ k_g·I_W ≤ k_g·(per-tick afferent current) —
   bounded by the neuron's OWN input availability, never by
   population state.
-- Bounded: for the measured first-C (I_W ≤ 1.565) and the
-  counterfactual bracket k_g ∈ [6,10]: i_boost ≤ 15.7 — the
-  SAME order as A's steady protected+working drive (≈26.7) —
-  no regime outside what the organism already survived.
+- Bounded: i_boost is INPUT-PROPORTIONAL — 0 ≤ i_boost ≤ k_g·I_W.
+  At first-C (I_W = 1.565, k_g = 8): ≤ 12.5 — comfortably below
+  A's steady drive (26.7). But at BLOCK-1 FIRST EXPOSURE
+  (I_W = 9–12 for the block's own pattern, R = 0): ≤ 72–96 —
+  ~3× A's normal drive. The strong-drive case is NOT bounded by
+  the input-proportional cap at A's level; residual safety rests
+  on posts saturation (cannot exceed 1.0/n), R decay within
+  ~3–6 presentations (measured 1.0 → 0.38), adaptation,
+  refractory, and the 50 Hz/5 s guard — and on the predeclared
+  first-block stability endpoint (§10.1 item 4, §10.3).
 - The boost is transient: I_W = 0 between/after presentations
   (no input spikes → no current → boost 0).
 
@@ -128,16 +134,22 @@ detector unchanged.
 The one intended positive loop is the RECURRENT bootstrap
 (weak drive → first posts → recurrence → stronger response).
 Its open-loop gain is bounded: (a) boost is capped at k_g·I_W
-(own-input-bounded, k_g ≤ 10 ⇒ ≤ 15.7 current ≈ A's normal
-drive); (b) recurrence is NOT boosted (I_rec ∉ I_W — the boost
-is input-channel-only by construction), so the loop gain
-carries no multiplier beyond the bare recurrent factor the A
-block already demonstrates without instability; (c) posts/n
-saturates at 1.0 (refractory/adaptation), so the bootstrap's
-amplifier is gain-limited at the same operating point A already
-lives at. No runaway fixed point is reachable that does not
-already exist in the A-block operating regime (which survived
-875 s with the same guards).
+(own-input-bounded — but INPUT-PROPORTIONAL: ≤ 12.5 at first-C
+(I_W = 1.565), yet ≤ 72–96 at block-1 first exposures
+(I_W = 9–12) — the block-1 case overshoots A's normal drive
+(≈38) ~3× and is the registered endangerment window, covered
+by the predeclared first-block stability endpoint §10.1.4 /
+§10.3, not by the bound itself); (b) recurrence is NOT boosted
+(I_rec ∉ I_W — the boost is input-channel-only by
+construction), so the loop gain carries no multiplier beyond
+the bare recurrent factor the A block already demonstrates
+without instability; (c) posts/n saturates at 1.0 (refractory/
+adaptation), so the bootstrap's amplifier is gain-limited at
+the same operating point A already lives at. No runaway fixed
+point is reachable that does not already exist in the
+A-block operating regime (which survived 875 s with the same
+guards) — with the block-1 window now predeclared as a
+measured, registered outcome rather than an implicit one.
 
 ## 7. CLLA / M2 / M6 interaction
 
@@ -276,12 +288,23 @@ synaptic structure?" — CLLA baseline vs CLLA + gain.
    (baseline 0.12).
 3. PERMANENCE RATE: C-block permanence events ≥ 150 per run
    (baseline 61; A-block 264).
-4. STABILITY: zero failures in every gain arm (runaway
-   detector, resource limits, birth limits); A-block behavior
-   preserved — A posts/n at pres 20 ≥ 0.9 × that arm's
-   baseline pres-20 value; no protected-cap violation (max P
-   per neuron ≤ p_max_frac × t_e = 0.6 + 1e-6, from
-   snapshots).
+4. STABILITY — including the BLOCK-1 FIRST-EXPOSURE WINDOW
+   (pres 1–5 of the first block in every gain arm — the
+   endangerment window: A/B pres 1 has I_W ≈ 12, R = 0 →
+   i_boost ≈ 8 × 12 ≈ 96, drive ≈ 108 vs normal 38):
+   4a. NO runaway-guard trip in ANY window, all blocks, all
+       arms — a block-1 trip is a registered FAIL, not an
+       unexpected abort;
+   4b. mean internal burst rate during block-1 pres 1–5
+       (per presentation, gain arm) within the established
+       [100, 200] Hz calibration band — the E3 band the
+       organism already operates in; outside it = block-1
+       learning distorted = registered FAIL;
+   4c. first-block behavior preserved at the block boundary:
+       A (BAC) / B (BCA) posts/n at block-1 pres 20 ≥ 0.9 ×
+       that arm's paired baseline value;
+   4d. no protected-cap violation: max P per neuron ≤
+       p_max_frac × t_e = 0.6 + 1e-6, from snapshots.
 5. IL PRESERVATION: the 3 IL-with-gain runs must keep C posts
    mean ≥ 0.8 × the committed IL baseline mean and C permanence
    within ±20% of baseline (98) — the alternating coexistence
@@ -322,6 +345,25 @@ two-sided informative: pass → mechanism confirmed at its lowest
 credible magnitude; fail → the mechanism is insufficient at the
 most defensible low value and the failure mechanism is the
 deliverable. Both outcomes are clean; neither invites tuning.
+
+BLOCK-1 ENDANGERMENT (registered, not silent): the gain fires
+at full gate on the FIRST block's own first exposures
+(I_W ≈ 9–12, R = 0 → i_boost ≈ 72–96, drive ≈ 108–115 vs
+normal 38 — ~3× the strongest regime the organism has run).
+This is why stability endpoint 4a–4b covers pres 1–5 of
+block 1 explicitly; a block-1 guard trip counts as a
+registered FAIL of the mechanism test, reported with the
+measured burst-rate numbers 4b. If 4a/4b fail, the recorded
+design alternative — NOT adopted now, equation frozen — is a
+threshold-completion cap on the boost,
+i_boost ≤ max(0, (v_th − v(t))·τ_m/dt), the exact current that
+reaches threshold this tick (parameter-free: existing v, v_th,
+τ_m): it binds at strong drive (A pres 1: crossings occur
+within ~1–2 ticks, cap ≈ 0) while leaving the weak-C
+operating point untouched (first-C availability 12.5 < cap ~20
+when v low); the C-case test outcome would be largely
+unchanged, but that is a SEPARATE design decision the user
+must make, not a silent amendment here.
 
 ## 11. Architectural status
 
