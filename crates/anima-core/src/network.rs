@@ -451,6 +451,11 @@ pub struct Network {
     /// (value-before-advance semantics). Length = neurons.len(). Unused and
     /// untouched when recruit_gain is off (identity).
     pub rg_gate: Vec<f32>,
+    /// Registration B (docs/x-clla-rg8c-cap.md): per-tick per-neuron total
+    /// working input current (accumulated in the deposit loop, consumed by
+    /// the post-loop clamped boost pass, reset same tick). Zero always when
+    /// recruit_gain is off (identity).
+    pub rg_tick: Vec<f32>,
 }
 
 impl Network {
@@ -563,6 +568,7 @@ impl Network {
         rng,
         seed,
         rg_gate: vec![0.0; n_total],
+        rg_tick: vec![0.0; n_total],
     };
 
         // Wiring (frozen order, docs/anima-v2-protocol.md §2):
@@ -960,12 +966,31 @@ impl Network {
                         n.i_syn += current;
                     } else {
                         n.rg_w += k;
-                        // boost = k_g · gate · I_W(this tick's working share)
-                        n.i_syn += current + k_g * self.rg_gate[pidx] * k;
+                        self.rg_tick[pidx] += k; // per-tick per-neuron sum
+                        n.i_syn += current;
                     }
                 } else {
                     self.neurons[pidx].i_syn += current;
                 }
+            }
+        }
+
+        // Registration B (docs/x-clla-rg8c-cap.md): per-NEURON clamped
+        // boost pass — i_boost_i = min(k_g·gate_i·I_W,i(this tick),
+        // max(0,(v_th − v_i)·τ_m/dt)). Parameter-free; binds at strong
+        // drive, leaves the weak first-exposure point untouched; rides
+        // i_syn into the next step (1-tick lag). Flag off => skipped.
+        if rg_on {
+            for i in 0..self.rg_tick.len() {
+                let k = self.rg_tick[i];
+                if k > 0.0 {
+                    let cap = ((p.v_th - self.neurons[i].v) * p.tau_m).max(0.0);
+                    let boost = (k_g * self.rg_gate[i] * k).min(cap);
+                    if boost > 0.0 {
+                        self.neurons[i].i_syn += boost;
+                    }
+                }
+                self.rg_tick[i] = 0.0;
             }
         }
 
@@ -1611,5 +1636,80 @@ mod tests {
         let _ = amp;
         assert!((i - refsum).abs() < 1e-6, "flag off == plain dynamics");
     }
-}
 
+    /// CAP (registration B): boost is clamped to max(0, (v_th - v)*tau_m).
+    /// At v = 0 the cap = 20 > working availability 12.5 => unchanged.
+    #[test]
+    fn rg_cap_does_not_bind_at_weak_drive() {
+        let (mut net, ch, post) = rg_net(true, 0.01, false);
+        let amp = net.cfg.amplitude;
+        let k_g = recruit_gain_k();
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch] });
+        let i1 = net.neurons[post.idx()].i_syn;
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch] });
+        let i2 = net.neurons[post.idx()].i_syn;
+        let decay = exp_approx(-1.0 / 5.0);
+        let expect = i1 * decay + amp * 0.01 * (1.0 + k_g);
+        assert!((i2 - expect).abs() < 1e-3, "cap must not bind at weak drive: {i2} vs {expect}");
+    }
+
+    /// CAP: at high v the boost is clamped to exactly (v_th - v)*tau_m.
+    #[test]
+    fn rg_cap_binds_at_high_membrane() {
+        let (mut net, ch, post) = rg_net(true, 0.05, false); // larger weight
+        let amp = net.cfg.amplitude;
+        let k_g = recruit_gain_k();
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch] });
+        let i1 = net.neurons[post.idx()].i_syn;
+        // lift v close to threshold so the cap binds hard next tick
+        let n = &mut net.neurons[post.idx()];
+        n.v = 0.95;
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch] });
+        let i2 = net.neurons[post.idx()].i_syn;
+        let cap = (1.0 - 0.95) * 20.0; // (v_th - 0.95)*tau_m = 1.0
+        let raw_boost = k_g * 1.0 * amp * 0.05;
+        let expect_boost = raw_boost.min(cap);
+        let decay = exp_approx(-1.0 / 5.0);
+        let expect = i1 * decay + amp * 0.05 + expect_boost;
+        assert!(
+            (i2 - expect).abs() < 1e-3,
+            "cap clamp: {i2} vs {expect} (raw {raw_boost} cap {cap})"
+        );
+    }
+
+    /// CAP per-NEURON (registration B discriminator): two working afferents
+    /// on the same post whose summed raw boost exceeds the cap must receive
+    /// ONE clamped boost = cap. (Per-synapse clamping would deliver 2x cap.)
+    #[test]
+    fn rg_cap_clamps_per_neuron_not_per_synapse() {
+        let cfg = NetworkConfig {
+            amplitude: 52.0, // organism scale (default 0.5 keeps raw < cap)
+            v2: Some(V2Params { recruit_gain: true, ..v2_params_min() }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 1, 1, 0, 1);
+        let ch = InputChannelId(0);
+        let post = NeuronId(1);
+        net.add_synapse(net.channels[0].target, post, 0.05, false, Tick(0));
+        net.add_synapse(net.channels[0].target, post, 0.05, false, Tick(0));
+        let amp = net.cfg.amplitude;
+        let k_g = recruit_gain_k();
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch] });
+        let i1 = net.neurons[post.idx()].i_syn;
+        assert!((i1 - 2.0 * amp * 0.05).abs() < 1e-4, "tick1: two plain deposits {i1}");
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch] });
+        let i2 = net.neurons[post.idx()].i_syn;
+        let decay = exp_approx(-1.0 / 5.0);
+        let sum_k = 2.0 * amp * 0.05;               // 5.2 / tick
+        let v1 = net.neurons[post.idx()].v;         // after tick1 integration
+        let cap = ((1.0 - v1) * 20.0).max(0.0);
+        let raw = k_g * 1.0 * sum_k;                // 41.6
+        let boost = raw.min(cap);
+        let expect = i1 * decay + sum_k + boost;
+        assert!(
+            (i2 - expect).abs() < 1e-2,
+            "per-neuron clamp: {i2} vs {expect} (raw {raw} cap {cap})"
+        );
+        assert!(boost < raw - 1.0, "cap must bind with two afferents");
+    }
+}
