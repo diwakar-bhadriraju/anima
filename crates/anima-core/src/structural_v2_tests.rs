@@ -8,6 +8,7 @@ use crate::structural_v2::{Candidate, V2Event, V2Plasticity};
 /// The exact frozen parameter set (protocol §2–§8).
 pub fn v2_params() -> V2Params {
     V2Params {
+        recruit_gain: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,

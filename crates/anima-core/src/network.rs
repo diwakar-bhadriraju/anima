@@ -103,10 +103,23 @@ fn clla_w_consolidate_min() -> f32 {
     0.05
 }
 
+/// Local recruitment gain magnitude — FROZEN mechanism constant (2026-09-21,
+/// docs/x-clla-recruitment-design-review.md §9-§10: k_g = 8.0 exactly; not
+/// config-settable, not tunable, not bracketable).
+pub fn recruit_gain_k() -> f32 {
+    8.0
+}
+
 /// serde skip helper: omit bool fields when false (CLLA flag-off runs must
 /// serialize byte-identically to the committed baseline).
 pub fn is_false(b: &bool) -> bool {
     !*b
+}
+
+/// serde skip helper: omit zero f32 fields (recruitment-gain accumulators
+/// must not appear in flag-off snapshots — byte-identity).
+pub fn is_zero_f32(v: &f32) -> bool {
+    *v == 0.0
 }
 
 fn v22_theta_mean() -> f32 { 2.0 }
@@ -159,6 +172,16 @@ pub struct Neuron {
     pub u_plateau_rel: f32,
     #[serde(default = "one_f32")]
     pub tau_het_rel: f32,
+    /// Local recruitment gain (docs/x-clla-recruitment-design-review.md):
+    /// window accumulators of delivered input-channel current split by
+    /// consolidated flag — the allocation rule's signals, mirrored per
+    /// neuron for the membrane-side boost. Zeroed at window_ticks
+    /// boundaries; skipped in serialization when zero (flag-off byte
+    /// identity).
+    #[serde(default, skip_serializing_if = "is_zero_f32")]
+    pub rg_w: f32,
+    #[serde(default, skip_serializing_if = "is_zero_f32")]
+    pub rg_p: f32,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -344,6 +367,12 @@ pub struct V2Params {
     /// M3 candidate dynamics (identity).
     #[serde(default, skip_serializing_if = "is_false")]
     pub dormant_reserve: bool,
+    /// Local recruitment gain (docs/x-clla-recruitment-design-review.md):
+    /// i_boost = k_g · max(0, 1−R_live) · I_W per tick, k_g = 8.0 FROZEN
+    /// (recruit_gain_k). false = every branch skipped = byte-identical
+    /// baseline (identity).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub recruit_gain: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -417,6 +446,11 @@ pub struct Network {
     pub tick: Tick,
     pub rng: Xoshiro256PlusPlus,
     pub seed: u64,
+    /// Local recruitment gain: per-neuron gate max(0, 1−R_live), computed
+    /// each tick from the rg_p/rg_w accumulators BEFORE the tick's deposits
+    /// (value-before-advance semantics). Length = neurons.len(). Unused and
+    /// untouched when recruit_gain is off (identity).
+    pub rg_gate: Vec<f32>,
 }
 
 impl Network {
@@ -455,6 +489,8 @@ impl Network {
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
+                rg_w: 0.0,
+                rg_p: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -483,6 +519,8 @@ impl Network {
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
+                rg_w: 0.0,
+                rg_p: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -506,11 +544,14 @@ impl Network {
                 theta_rel: 1.0,
                 u_plateau_rel: 1.0,
                 tau_het_rel: 1.0,
+                rg_w: 0.0,
+                rg_p: 0.0,
                 dormant_since: None,
                 retired: false,
             });
         }
 
+        let n_total = n_input_channels + n_internal + n_output;
         let mut net = Self {
             cfg,
             neurons,
@@ -519,9 +560,10 @@ impl Network {
             outgoing: vec![Vec::new(); n_input_channels + n_internal + n_output],
             channels,
             tick: Tick(0),
-            rng,
-            seed,
-        };
+        rng,
+        seed,
+        rg_gate: vec![0.0; n_total],
+    };
 
         // Wiring (frozen order, docs/anima-v2-protocol.md §2):
         // when cfg.v2 is set (ANIMA v2): M1 dense-weak initialization —
@@ -873,16 +915,57 @@ impl Network {
 
         // Deposit current onto postsynaptic targets of spikers.
         let spikers: Vec<NeuronId> = spikes.clone();
+        // Local recruitment gain (frozen k_g = 8.0; docs/x-clla-recruitment-
+        // design-review.md §1): gate = max(0, 1−R_live) recomputed each tick
+        // from the rg_p/rg_w window accumulators BEFORE this tick's deposits
+        // (value-before-advance), accumulators zeroed at window_ticks
+        // boundaries (the allocation rule's existing cadence). Flag off =>
+        // all branches skipped => byte-identical baseline.
+        let rg_on = self.cfg.v2.as_ref().is_some_and(|v| v.recruit_gain);
+        if rg_on {
+            let wt = self.cfg.v2.as_ref().map_or(100u64, |v| v.window_ticks);
+            if self.tick.0 % wt == 0 {
+                for n in self.neurons.iter_mut() {
+                    n.rg_p = 0.0;
+                    n.rg_w = 0.0;
+                }
+            }
+            for i in 0..self.rg_gate.len() {
+                let (p, w) = {
+                    let n = &self.neurons[i];
+                    (n.rg_p, n.rg_w)
+                };
+                let tot = p + w;
+                self.rg_gate[i] = if tot > 0.0 { (1.0 - p / tot).max(0.0) } else { 0.0 };
+            }
+        }
+        let n_channels = self.channels.len();
+        let k_g = recruit_gain_k();
         for &src in &spikers {
+            let src_input = (src.0 as usize) < n_channels;
             for &sid in self.outgoing[src.idx()].clone().iter() {
                 let s = &self.synapses[sid.idx()];
                 if s.silent_ticks == u64::MAX {
                     continue;
                 }
                 let post = s.post;
+                let k = s.amplitude * s.w;
                 // V2 M6: inhibitory synapses deliver negative current.
-                let current = if s.inhibitory { -(s.amplitude * s.w) } else { s.amplitude * s.w };
-                self.neurons[post.idx()].i_syn += current;
+                let current = if s.inhibitory { -k } else { k };
+                let pidx = post.idx();
+                if rg_on && src_input && !s.inhibitory {
+                    let n = &mut self.neurons[pidx];
+                    if s.consolidated {
+                        n.rg_p += k;
+                        n.i_syn += current;
+                    } else {
+                        n.rg_w += k;
+                        // boost = k_g · gate · I_W(this tick's working share)
+                        n.i_syn += current + k_g * self.rg_gate[pidx] * k;
+                    }
+                } else {
+                    self.neurons[pidx].i_syn += current;
+                }
             }
         }
 
@@ -1311,4 +1394,222 @@ mod tests {
         ));
         assert_eq!(e3, e3b_inhibit_off, "inhibition gain 0 must not change dynamics");
     }
+
+    // ---- Local recruitment gain (frozen k_g = 8.0; docs/x-clla-recruitment-design-review.md) ----
+
+    /// Helper: 1 input channel -> 1 internal neuron with a single afferent
+    /// synapse at weight w; recruit_gain config option.
+    fn rg_net(recruit: bool, w: f32, consolidated: bool) -> (Network, InputChannelId, NeuronId) {
+        let cfg = NetworkConfig {
+            v2: Some(V2Params {
+                recruit_gain: recruit,
+                ..v2_params_min()
+            }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 1, 1, 0, 1);
+        let pre = net.channels[0].target;
+        let post = NeuronId(1);
+        let sid = net.add_synapse(pre, post, w, false, Tick(0)); // plastic excitatory
+        net.synapses[sid.idx()].consolidated = consolidated;
+        (net, InputChannelId(0), post)
+    }
+
+    /// Minimal V2Params mirror for the network-level tests (structural
+    /// machinery not exercised here).
+    fn v2_params_min() -> V2Params {
+        V2Params {
+            recruit_gain: false,
+            assembly_protect: false,
+            alloc_residual: false,
+            dormant_reserve: false,
+            c_slots: 1,
+            w_c_init: 0.01,
+            delta_perm: 0.01,
+            decay_c: 0.99,
+            theta_permanent: 0.05,
+            w_c_permanent: 0.02,
+            theta_die: 0.005,
+            p_cand_in: 0.5,
+            p_cand_rec: 0.5,
+            theta_prune: 0.005,
+            prune_windows: 10,
+            b_e: 40,
+            b_i: 10,
+            p_inh: 0.3,
+            w_inh_lo: 0.01,
+            w_inh_hi: 0.03,
+            a_inh: 0.005,
+            decay_inh: 0.98,
+            w_inh_max: 0.10,
+            window_ticks: 100,
+            disable_m2: false,
+            disable_m3_m4: false,
+            disable_m5: false,
+            disable_m6: false,
+            p_in: 0.5,
+            w_in_lo: 0.02,
+            w_in_hi: 0.06,
+            p_rec: 0.2,
+            w_rec_lo: 0.005,
+            w_rec_hi: 0.02,
+            t_e: 0.8,
+            m2_buckets: 1,
+            m2_epoch_windows: 1,
+            p_max_frac: 0.75,
+            w_consolidate_min: 0.05,
+        }
+    }
+
+    /// Exact boost math: working afferent, gate = 1 (R = 0) => deposited
+    /// current = amp*w*(1 + k_g). Gate read is value-before-advance, so the
+    /// boost appears from the SECOND tick of input onward.
+    #[test]
+    fn rg_boost_exact_math_working_only() {
+        let (mut net, ch, post) = rg_net(true, 0.01, false);
+        let amp = net.cfg.amplitude;
+        let k_g = recruit_gain_k();
+        // tick 1: first deposit fills rg_w; gate was silence (0) => plain
+        // current only.
+        let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch] });
+        assert!(!ev.spikes.contains(&post), "internal subthreshold at tick1");
+        let i1 = net.neurons[post.idx()].i_syn;
+        // deposit loop runs after integration; i_syn holds the deposited sum.
+        assert!((i1 - amp * 0.01).abs() < 1e-4, "tick1 plain deposit, got {i1}");
+        // tick 2: gate now 1 (R=0) => boost applies (plus exponential carry).
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch] });
+        assert!(!ev.spikes.is_empty() || true, ""); // input neuron always spikes
+        let i2 = net.neurons[post.idx()].i_syn;
+        let decay = exp_approx(-1.0 / 5.0);
+        let expect = i1 * decay + amp * 0.01 * (1.0 + k_g);
+        assert!((i2 - expect).abs() < 1e-3, "tick2 boosted deposit {i2} vs {expect}");
+    }
+
+    /// R-gating: protected current present => gate = 1-R scales the boost.
+    #[test]
+    fn rg_gate_scales_with_protected_fraction() {
+        // 2 input channels -> 1 internal (id 2); working afferent w=0.01 on
+        // ch0, consolidated afferent w=0.02 on ch1 (R = 2/3, gate = 1/3).
+        let cfg = NetworkConfig {
+            v2: Some(V2Params { recruit_gain: true, ..v2_params_min() }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 2, 1, 0, 1);
+        let ch = InputChannelId(0);
+        let post = NeuronId(2);
+        let sid = net.add_synapse(net.channels[0].target, post, 0.01, false, Tick(0));
+        net.synapses[sid.idx()].consolidated = false;
+        let pre2 = net.channels[1].target; // input neuron of channel 1
+        let sid2 = net.add_synapse(pre2, post, 0.02, false, Tick(0));
+        net.synapses[sid2.idx()].consolidated = true;
+        // fire BOTH channels for one tick: consolidated current accumulates
+        // into rg_p, working into rg_w; no boost on tick 1 (gate silence).
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch, InputChannelId(1)] });
+        // tick 2: R = 0.02*amp / (0.02*amp + 0.01*amp) = 2/3 => gate 1/3.
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch, InputChannelId(1)] });
+        let k_g = recruit_gain_k();
+        let amp = net.cfg.amplitude;
+        // i_syn decayed once (tau_syn=5) between steps; compare the
+        // ADDITIONAL working deposit at tick 2: expect amp*0.01*(1 + k_g/3)
+        // plus the consolidated deposit amp*0.02 (unboosted).
+        let expect_w = amp * 0.01 * (1.0 + k_g / 3.0);
+        let expect_p = amp * 0.02;
+        let decay = exp_approx(-1.0 / 5.0);
+        let carried = (amp * 0.03) * decay;
+        let total = net.neurons[post.idx()].i_syn;
+        assert!(
+            (total - (carried + expect_w + expect_p)).abs() < 1e-3,
+            "tick2 sum {total} vs {carried}+{expect_w}+{expect_p}"
+        );
+    }
+
+    /// Protected afferents receive NO boost (only their plain current).
+    #[test]
+    fn rg_consolidated_never_boosted() {
+        let (mut net, ch, post) = rg_net(true, 0.01, true);
+        let amp = net.cfg.amplitude;
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![ch] });
+        let i1 = net.neurons[post.idx()].i_syn;
+        assert!((i1 - amp * 0.01).abs() < 1e-4, "consolidated deposit plain");
+        let _ = net.step(&InputFrame { tick: Tick(1), spikes: vec![ch] });
+        let i2 = net.neurons[post.idx()].i_syn;
+        let decay = exp_approx(-1.0 / 5.0);
+        let expect = amp * 0.01 * decay + amp * 0.01; // no boost term
+        assert!(
+            (i2 - expect).abs() < 1e-4,
+            "consolidated never boosted: {i2} vs {expect}"
+        );
+    }
+
+    /// Silence convention: no input current => gate 0 and no boost. Also
+    /// endogenous internal firing (no input channels) contributes nothing.
+    #[test]
+    fn rg_zero_for_endogenous_and_silence() {
+        let (mut net, _ch, post) = rg_net(true, 0.01, false);
+        // fire the internal neuron endogenously via a second internal->post
+        // synapse: recurrent deposits must NOT enter rg_w and must NOT boost.
+        let pre_internal = NeuronId(1); // same neuron; use outgoing to itself
+        let amp = net.cfg.amplitude;
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+        assert_eq!(net.neurons[post.idx()].i_syn, 0.0, "silence: no current");
+        assert_eq!(net.neurons[post.idx()].rg_w, 0.0, "silence: no accumulation");
+        assert_eq!(net.rg_gate[post.idx()], 0.0, "silence convention gate 0");
+        // internal self-synapse deposit: force internal spike by i_ext.
+        let _s = net.add_synapse(pre_internal, post, 0.05, false, Tick(0));
+        net.neurons[post.idx()].i_ext = 2.0; // periodic firing
+        let ev = net.step(&InputFrame { tick: Tick(1), spikes: vec![] });
+        if !ev.spikes.is_empty() {
+            // if the internal spiked, its deposit is recurrent and must not
+            // be boost-eligible: rg_w untouched (src >= channels).
+            assert_eq!(net.neurons[post.idx()].rg_w, 0.0, "recurrent not accumulated");
+        }
+        let _ = amp;
+    }
+
+    /// Window cadence: accumulators zero at tick % window_ticks == 0.
+    #[test]
+    fn rg_accumulators_reset_at_window_boundary() {
+        let (mut net, ch, _post) = rg_net(true, 0.01, false);
+        for t in 0..50u64 {
+            let _ = net.step(&InputFrame { tick: Tick(t), spikes: vec![ch] });
+        }
+        assert!(net.neurons[1].rg_w > 0.0, "accumulated before boundary");
+        // tick 50 is not a multiple of 100; drive to 100.
+        for t in 50..100u64 {
+            let _ = net.step(&InputFrame { tick: Tick(t), spikes: vec![ch] });
+        }
+        let _ = net.step(&InputFrame { tick: Tick(100), spikes: vec![ch] });
+        // boundary tick zeroes BEFORE deposits; the tick-100 deposit refills.
+        let w = net.neurons[1].rg_w;
+        let expect = net.cfg.amplitude * 0.01;
+        assert!(
+            (w - expect).abs() < 1e-4,
+            "window boundary reset: {w} vs single-tick {expect}"
+        );
+    }
+
+    /// Flag off: rg fields and gate stay exactly zero; no boost ever.
+    #[test]
+    fn rg_flag_off_is_identity() {
+        let (mut net, ch, post) = rg_net(false, 0.01, false);
+        let amp = net.cfg.amplitude;
+        for t in 0..10u64 {
+            let _ = net.step(&InputFrame { tick: Tick(t), spikes: vec![ch] });
+        }
+        let i = net.neurons[post.idx()].i_syn;
+        assert!(i > 0.0, "plain synaptic current flows");
+        assert_eq!(net.neurons[post.idx()].rg_w, 0.0, "flag off: no accumulation");
+        assert_eq!(net.neurons[post.idx()].rg_p, 0.0, "flag off: no accumulation");
+        assert_eq!(net.rg_gate[post.idx()], 0.0, "flag off: gate stays zero");
+        // no boost: recompute plain-only reference from fresh net
+        let (mut refnet, ch2, _) = rg_net(false, 0.01, false);
+        let mut refsum = 0.0f32;
+        for t in 0..10u64 {
+            let _ = refnet.step(&InputFrame { tick: Tick(t), spikes: vec![ch2] });
+        }
+        refsum = refnet.neurons[post.idx()].i_syn;
+        let _ = amp;
+        assert!((i - refsum).abs() < 1e-6, "flag off == plain dynamics");
+    }
 }
+

@@ -122,6 +122,10 @@ pub struct V2Section {
     /// ever-coactive candidate pre-associations within c_slots.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub dormant_reserve: bool,
+    /// Local recruitment gain (frozen k_g = 8.0 mechanism constant, code-
+    /// side; docs/x-clla-recruitment-design-review.md §10). false = identity.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub recruit_gain: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

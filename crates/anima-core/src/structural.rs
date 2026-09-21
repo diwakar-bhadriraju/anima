@@ -343,11 +343,14 @@ impl StructuralMonitor {
             theta_rel: 1.0,
             u_plateau_rel: 1.0,
             tau_het_rel: 1.0,
+            rg_w: 0.0,
+            rg_p: 0.0,
             dormant_since: None,
             retired: false,
         });
         net.incoming.push(Vec::new());
         net.outgoing.push(Vec::new());
+        net.rg_gate.push(0.0);
         // V2.2 G2 (spec §1.2 step 6): born neurons draw heterogeneity from
         // the same seeded distributions, appended to the network RNG stream.
         if net.cfg.latch_enable

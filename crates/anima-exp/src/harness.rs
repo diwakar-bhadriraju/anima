@@ -769,6 +769,7 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         w_consolidate_min: v.w_consolidate_min,
         alloc_residual: v.alloc_residual,
         dormant_reserve: v.dormant_reserve,
+        recruit_gain: v.recruit_gain,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,
