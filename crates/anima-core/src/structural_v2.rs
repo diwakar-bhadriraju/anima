@@ -338,11 +338,19 @@ impl V2Plasticity {
     ) -> Vec<Candidate> {
         let post_id = NeuronId(post as u32);
         let reserve = self.dormant_reserve_enabled();
-        // First-exposure allocation: candidate draws bias to this neuron's
-        // currently-firing input channels when the allocation rule is on.
+        // First-exposure allocation (source-corrected, docs/x-clla-fe-impl-
+        // audit.md §6): candidate draws bias to input channels that FIRED
+        // this window per the module firing record (the same record M3
+        // co-activity uses — content-addressable without any live
+        // synapse). NOTE: the prior source (fired_channels[post], derived
+        // from live outgoing synapses) was vacuous — a channel visible
+        // there necessarily had a live afferent, which connected()
+        // subsequently excluded. The `fired` vector observes every firing
+        // input channel regardless of synapse survival.
         let fe_fired: Option<std::collections::BTreeSet<u32>> =
             if self.alloc_residual_enabled() {
-                Some(self.fired_channels[post].clone())
+                let n_input = net.channels.len().min(self.fired.len());
+                Some((0..n_input).filter(|&ch| self.fired[ch]).map(|ch| ch as u32).collect())
             } else {
                 None
             };
@@ -456,8 +464,16 @@ impl V2Plasticity {
         if pool.len() < self.params.c_slots {
             return;
         }
-        // P2: a fired input channel with no matching candidate
-        let fired = &self.fired_channels[post];
+        // P2 (source-corrected): a fired input channel with no matching
+        // candidate — read from the module firing record (`fired`) so
+        // channels without live afferents are bindable; duplicates via
+        // live/pooled handled by the caller's connected() and by
+        // draw_candidate's exclusion.
+        let fired: std::collections::BTreeSet<u32> =
+            (0..net.channels.len().min(self.fired.len()))
+                .filter(|&ch| self.fired[ch])
+                .map(|ch| ch as u32)
+                .collect();
         if fired.is_empty() {
             return;
         }

@@ -1353,3 +1353,43 @@ fn clla_fe_binds_fired_channel_on_pressure() {
     let has_c = v2.candidates[post.idx()].iter().any(|cand| cand.pre == c);
     assert!(has_c, "fe: pressure eviction must bind the fired channel c={} in the pool", c.0);
 }
+
+/// Source-correction test (docs/x-clla-fe-impl-audit.md §6): the redraw
+/// bias now sources from the module firing record (`fired`), so a channel
+/// that FIRED this window is bindable EVEN IF the neuron has no live
+/// afferent from it (connected() excludes only live/pooled duplicates).
+#[test]
+fn clla_fe_corrected_binds_fired_channel_without_afferent() {
+    let params = V2Params {
+        alloc_residual: true,
+        assembly_protect: true,
+        p_max_frac: 0.75,
+        c_slots: 6,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 41,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    // Pick an input channel c with NO live afferent to post (so the OLD
+    // fired_channels source could not see it). Verify none exists.
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| !net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic && s.post == post
+        }))
+        .expect("at least one channel without afferent to post (8 channels, p_in 0.5)");
+    // Fill all 6 slots with OTHER channels.
+    for k in 0..6 {
+        let other = NeuronId(((c + 1 + k as u32) % 8) as u32);
+        v2.candidates[post.idx()][k] = Candidate { pre: other, w: 0.03, reserved: false };
+    }
+    // Fire c this window WITHOUT an afferent: the module `fired` record
+    // still observes it (harness passes the full spike list).
+    v2.tick(&[NeuronId(c), post]);
+    let _ = v2.window(&mut net, Tick(100));
+    let has_c = v2.candidates[post.idx()].iter().any(|cand| cand.pre == NeuronId(c));
+    assert!(has_c, "corrected fe: bind fired channel c={} even without an afferent", c);
+}
