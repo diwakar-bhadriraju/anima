@@ -1309,3 +1309,47 @@ fn clla_reserve_eligible_waiting_under_cap() {
     let p = v2.consolidated_mass(&net, post);
     assert!(p <= 0.3 * 0.8 + 1e-6, "cap never exceeded: {p}");
 }
+
+
+/// First-exposure allocation: the operative path is CANDIDATE-POOL PRESSURE
+/// (pool full of other-channel candidates + a fired channel with no pool
+/// candidate -> eviction binds the fired channel). NOTE (implementation
+/// fact): the redraw-bias path is structurally inert for channels with a
+/// live afferent — fired_channels is populated only from live outgoing
+/// synapses, and draw_candidate's connected() skip then excludes those same
+/// channels, so redraw falls through to random; pressure-eviction is the
+/// mechanism that actually binds novel fired channels.
+#[test]
+fn clla_fe_binds_fired_channel_on_pressure() {
+    let params = V2Params {
+        alloc_residual: true,
+        assembly_protect: true,
+        p_max_frac: 0.75,
+        c_slots: 6,
+        ..v2_params()
+    };
+    let mut net = Network::new(
+        NetworkConfig { v2: Some(params.clone()), ..NetworkConfig::default() },
+        8, 12, 4, 37,
+    );
+    let mut v2 = V2Plasticity::new(&mut net, params, None);
+    let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+    // Pick a channel c with a live afferent to post (visible).
+    let c = (0..net.channels.len() as u32)
+        .find(|&ch| net.outgoing[ch as usize].iter().any(|&sid| {
+            let s = &net.synapses[sid.idx()];
+            s.silent_ticks != u64::MAX && !s.inhibitory && s.plastic && s.post == post
+        }))
+        .map(NeuronId).expect("channel with afferent to post");
+    // Fill ALL 6 slots with OTHER channels (not c): all unreserved, healthy w.
+    for k in 0..6 {
+        let other = NeuronId(((c.0 + 1 + k as u32) % 8) as u32);
+        v2.candidates[post.idx()][k] = Candidate { pre: other, w: 0.03, reserved: false };
+    }
+    // Drive c this window: c is not pooled => pressure eviction must bind it.
+    v2.accumulate_input_current(&net, &[c]);
+    v2.tick(&[c, post]);
+    let _ = v2.window(&mut net, Tick(100));
+    let has_c = v2.candidates[post.idx()].iter().any(|cand| cand.pre == c);
+    assert!(has_c, "fe: pressure eviction must bind the fired channel c={} in the pool", c.0);
+}

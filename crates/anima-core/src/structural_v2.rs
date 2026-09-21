@@ -90,6 +90,14 @@ pub struct V2Plasticity {
 }
 
 impl V2Plasticity {
+    /// Debug accessor for tests.
+    #[allow(dead_code)]
+    pub fn debug_fired(&self, post: usize) -> &std::collections::BTreeSet<u32> {
+        &self.fired_channels[post]
+    }
+}
+
+impl V2Plasticity {
     /// Build candidate pools in the frozen order (neuron-id order, partners
     /// channel-id then neuron-id; D8: no candidates onto input neurons).
     pub fn new(net: &mut Network, params: V2Params, e6: Option<E6Params>) -> Self {
@@ -101,7 +109,7 @@ impl V2Plasticity {
             }
             let mut pool = Vec::with_capacity(params.c_slots);
             while pool.len() < params.c_slots {
-                match draw_candidate(net, &pool, post, &params) {
+                match draw_candidate(net, &pool, post, &params, None) {
                     Some(pre) => pool.push(Candidate { pre, w: params.w_c_init, reserved: false }),
                     None => break,
                 }
@@ -173,8 +181,9 @@ impl V2Plasticity {
             return;
         }
         // Fired input channels this tick (per post neuron) for the reserve
-        // pool-pressure test — tracked when the reserve is on.
-        let track_channels = self.dormant_reserve_enabled();
+        // pool-pressure test / first-exposure allocation — tracked when
+        // the reserve OR the allocation rule is on.
+        let track_channels = self.dormant_reserve_enabled() || self.alloc_residual_enabled();
         for &pre in spikes {
             if pre.0 >= net.channels.len() as u32 {
                 continue; // input-channel afferents only (D8)
@@ -329,6 +338,14 @@ impl V2Plasticity {
     ) -> Vec<Candidate> {
         let post_id = NeuronId(post as u32);
         let reserve = self.dormant_reserve_enabled();
+        // First-exposure allocation: candidate draws bias to this neuron's
+        // currently-firing input channels when the allocation rule is on.
+        let fe_fired: Option<std::collections::BTreeSet<u32>> =
+            if self.alloc_residual_enabled() {
+                Some(self.fired_channels[post].clone())
+            } else {
+                None
+            };
         let mut i = 0;
         while i < pool.len() {
             let pre = pool[i].pre;
@@ -397,14 +414,14 @@ impl V2Plasticity {
                 // Slot now occupied by a real synapse; withdraw candidate
                 // and redraw fresh (the old pre is now connected).
                 pool.swap_remove(i);
-                if let Some(npre) = draw_candidate(net, &pool, post, &self.params) {
+                if let Some(npre) = draw_candidate(net, &pool, post, &self.params, fe_fired.as_ref()) {
                     pool.push(Candidate { pre: npre, w: self.params.w_c_init, reserved: false });
                 }
             } else if (pool[i].w < self.params.theta_die) && !(reserve && pool[i].reserved) {
                 // Death → redraw. Reserved candidates never die on
                 // inactivity (floor at theta_die).
                 pool.swap_remove(i);
-                if let Some(npre) = draw_candidate(net, &pool, post, &self.params) {
+                if let Some(npre) = draw_candidate(net, &pool, post, &self.params, fe_fired.as_ref()) {
                     pool.push(Candidate { pre: npre, w: self.params.w_c_init, reserved: false });
                 }
             } else {
@@ -416,16 +433,19 @@ impl V2Plasticity {
         // channel fired with no pool candidate. Evict by priority:
         // un-reserved > reserved-at-floor > eligible-waiting, ties by
         // lowest pool index; replacement = the missing fired channel.
-        if reserve {
+        if reserve || self.alloc_residual_enabled() {
             self.reserve_pressure_evict(net, post, &mut pool, post_id);
         }
         pool
     }
 
-    /// Dormant reserve pool pressure (docs/x-clla-dormant-reserve.md §1):
-    /// when every slot is reserved or eligible-waiting and a channel that
-    /// fired on this neuron has no candidate, evict one per the priority
-    /// ladder and draw the missing fired channel.
+    /// Candidate pool pressure (docs/x-clla-dormant-reserve.md §1, reused by
+    /// first-exposure allocation docs/x-clla-first-exposure-audit.md §5/§8):
+    /// when a channel that fired on this neuron has no pool candidate and no
+    /// evictable-free slot exists, evict one per the priority ladder and bind
+    /// the missing fired channel. Priority: un-reserved lowest-w (index tie)
+    /// then reserved-at-floor (index tie) then eligible-waiting (index tie).
+    /// No new state; w/reserved/permanence/index only.
     fn reserve_pressure_evict(
         &mut self,
         net: &Network,
@@ -435,10 +455,6 @@ impl V2Plasticity {
     ) {
         if pool.len() < self.params.c_slots {
             return;
-        }
-        let all_held = pool.iter().all(|c| c.reserved);
-        if !all_held {
-            return; // un-reserved slots exist; new draws fit normally
         }
         // P2: a fired input channel with no matching candidate
         let fired = &self.fired_channels[post];
@@ -694,11 +710,21 @@ impl V2Plasticity {
 /// p_cand_in), then unconnected non-input neurons (neuron-id order,
 /// Bernoulli p_cand_rec). No duplicate against live synapses or other
 /// candidates; D8: never target an input neuron (post is never input).
+///
+/// First-exposure allocation (docs/x-clla-first-exposure-audit.md §8):
+/// when `bias_fired` is Some, the currently-firing input channels of
+/// `post` are tried FIRST in channel-id order (deterministic, no RNG
+/// draw, skip already-connected/pooled); only if no fired channel is
+/// bindable does the draw fall back to the frozen random path. This lets
+/// a novel input acquire a candidate at first exposure. flag-off / empty
+/// fired set => exact frozen random path (identity: no RNG consumed by
+/// the bias branch).
 fn draw_candidate(
     net: &mut Network,
     pool: &[Candidate],
     post: usize,
     params: &V2Params,
+    bias_fired: Option<&std::collections::BTreeSet<u32>>,
 ) -> Option<NeuronId> {
     use rand::Rng;
     let connected = |pre: NeuronId| -> bool {
@@ -710,6 +736,19 @@ fn draw_candidate(
         }
         pool.iter().any(|c| c.pre == pre)
     };
+    // (0) First-exposure allocation: if enabled and this neuron saw firing
+    // input channels this window, try them first in channel-id order.
+    // Deterministic (no RNG consumed so the flag-off path is identical),
+    // skips already-connected/pooled channels; falls back to the frozen
+    // random draw when none is bindable.
+    if let Some(fired) = bias_fired {
+        for &ch in fired.iter() {
+            let pre = NeuronId(ch);
+            if pre.0 < net.channels.len() as u32 && !connected(pre) {
+                return Some(pre);
+            }
+        }
+    }
     // (1) input channels, channel-id order, acceptance p_cand_in.
     for ch in 0..net.channels.len() {
         let pre = net.channels[ch].target;
