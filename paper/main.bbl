@@ -62,6 +62,17 @@
 \newblock docs/e3b-protocol.md.
 \newblock Execution record; hypothesis weakened.
 
+\bibitem{e4proto}
+{ANIMA project}.
+\newblock E4 protocol: U3 homeostatic structural growth (and e4b--e4f, u3b
+  execution records in the commit lineage 52b6d54--cface8b).
+\newblock docs/e4-protocol.md.
+
+\bibitem{xplorlog}
+{ANIMA project}.
+\newblock Exploratory log (x-series).
+\newblock docs/xplor-log.md.
+
 \bibitem{fe}
 {ANIMA project}.
 \newblock First-exposure allocation: execution record.
@@ -106,6 +117,11 @@
   \url{https://github.com/anima/internal/blob/main/docs/ANIMA_OVERVIEW.md}.
 \newblock Living summary; no claim overrides a frozen protocol record.
 
+\bibitem{xplor2}
+{ANIMA project}.
+\newblock Second architectural review: the missing capability.
+\newblock docs/xplor2-arch-review.md.
+
 \bibitem{wgrowth}
 {ANIMA project}.
 \newblock Second-block synaptic weight growth: causal audit.
@@ -121,6 +137,11 @@
 \newblock V2.1 information-carrying audit; includes the stage-c retraction.
 \newblock docs/v2{\_}1-info-audit.md.
 \newblock Read-only audit; ungrounded record corrected.
+
+\bibitem{xspecdrive}
+{ANIMA project}.
+\newblock X-series drive-gated slow-state specification.
+\newblock docs/x-spec-drive-gated.md.
 
 \bibitem{gerstner2002}
 Wulfram Gerstner and Werner~M. Kistler.
