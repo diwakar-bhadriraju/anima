@@ -1,0 +1,62 @@
+Table~\ref{tab:substrate} lists the frozen substrate parameters used
+throughout Phase I; the authoritative spec is the V2 protocol
+\cite{v2proto,overview}.
+
+\input{tables/substrate.tex}
+
+\subsection{Neuron and network dynamics}
+
+Non-input neurons integrate
+\begin{equation}
+  \frac{dv_i}{dt} = \frac{-(v_i - v_{\mathrm{rest}}) + i_{\mathrm{syn},i} + i_{\mathrm{ext},i}
+     - i_{\mathrm{adapt},i} + u_i}{\tau_m},
+  \label{eq:dv}
+\end{equation}
+discretized at 1 ms with exponential kernel decay for
+\(i_{\mathrm{syn}}\) (\(\tau_{\mathrm{syn}}\)), adaptation
+\(i_{\mathrm{adapt}}\) (E3-era U1; injection
+\(\texttt{adaptation\_gain}=0.05\) per spike), and the slow depolarizing
+state \(u\) (V2.1),
+\begin{equation}
+  u_i(t+1) = u_i(t)\, e^{-1/\tau_s} + \beta\cdot
+  \mathbf{1}[i \text{ spiked at } t],
+\end{equation}
+with \(\beta=0\) restoring byte-identical V2 behavior. A neuron spikes
+when \(v_i \ge v_{\mathrm{th}}\) after its refractory period; it resets
+\(v_i\) to \(v_{\mathrm{rest}}\) and deposits \(a\cdot w\) (excitatory)
+or \(-a\cdot w\) (inhibitory) onto each postsynaptic target, with a
+one-tick transmission delay. Throughout Phase I the birth triggers were
+disabled
+(\texttt{birth\_trigger = "none"}); all results concern the fixed
+population.
+
+\subsection{Sensory interface and curriculum}
+
+Each input channel produces deterministic Poisson trains (seeded per
+pattern, repetition, and channel): 8 channels fire at 20 Hz for 500 ms,
+followed by 1500 ms of silence. Patterns \(A\), \(C\), and \(B\) are
+channel groups; pattern \(D = A \cup C\) (channels 0--15, same rate) is
+used as the composition probe. The curriculum is a configurable stage
+schedule; the CLLA-era corpus uses three orders of patterns over three
+seeds:
+\begin{itemize}
+\item \texttt{il}: \(A/C\) interleaved, 20 presentations each (40 total);
+\item \texttt{bac}: 20\(\times A\), then 20\(\times C\);
+\item \texttt{bca}: 20\(\times C\), then 20\(\times A\);
+\item \texttt{d}: 40\(\times D\) (composition probe, informative only
+in most CLLA records).
+\end{itemize}
+
+\subsection{Plasticity in normative form}
+
+STDP is the pairwise additive trace rule
+\cite{bipoo1998,gerstner2002}, applied per tick as
+\begin{equation}
+  \Delta w = a^+\, \text{pre-trace} \cdot \mathbf{1}[\text{post fired}]
+            - a^-\, \text{post-trace} \cdot \mathbf{1}[\text{pre fired}],
+\end{equation}
+with trailing traces \(\tau_\pm=20\) ms and weights clamped to
+\([0,1]\). Where the implemented equations deviate from the normative
+form (notably the dimensionality of the allocation gate's drive
+estimate; \S\ref{sec:allocation}, \S\ref{sec:repro}), the records are
+explicit, and the paper preserves the correction history.

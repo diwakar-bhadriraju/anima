@@ -1,0 +1,52 @@
+If activity rungs cannot persist information, the weights must: they
+survive silence by construction (they are only changed by plasticity
+events), and the record shows they are the substrate's persistent store.
+The plasticity-as-memory audit \cite{synmem} established this with four
+independent verdicts.
+
+\paragraph{Persistence (G1, G2).}
+Cross-run training (A-only vs.\ C-only, same seed, identical initial
+weights) produces distinct persistent configurations: cosine 0.119,
+selectivity \(\pm 0.8\)--\(0.9\), 91\% leave-one-pair-out run
+identification. Selectivity develops monotonically through S1 and
+\emph{continues to develop in silence} (\(+0.903 \to +0.914\), driven by
+pruning of residual non-A mass --- 617\(\to\)309 live afferents),
+while the matrix itself changes only \(\sim\)1.4\% across 20 s of
+silence. Structure persists; activity decays (activity rungs decay
+3.5--7\(\times\) in the same window: \(u\)-norm 7.999\(\to\)2.282,
+internal spikes 479/s \(\to\) 71/s).
+
+\paragraph{Create/maintain mechanics (G4).}
+The causal records (E15--E17, SDE series) attribute organization to a
+specific subset of mechanisms: M2 normalization (per-neuron \(t_e\)
+budget) is \emph{required} for the separated regime (M2-off destroys
+separation; E16), while STDP is not individually necessary for the
+afferent-selection trajectory (STDP-off reproduces it near-verbatim,
+E16), and M3/M4 topology dynamics are not necessary either (E17).
+Maintenance is M2 cadence plus M4 pruning; passive decay
+(\(10^{-6}\)/tick) is the dominant single eraser of first-block mass
+(SDE-C2: decay-off preserves the first cohort in 6/6 blocked runs;
+residual skew \(\approx 0.07\)--\(0.09\) remains). Retrieval is a
+dynamics function: the REV1 phase-reversal experiment re-expresses an
+early-established configuration with zero plasticity events and
+\(\le 3\%\) weight change (E12--E17) --- forward dynamics through
+stored weights.
+
+\paragraph{What is not established at this layer (G8).}
+Re-expression of a stored configuration by a later input exists at the
+association/trace level; \emph{episode-specific} reinstatement under
+alternation does not --- the alternating store superposes
+(§\ref{sec:interference}) and no later \(A\)-presentation reinstates an
+A-configuration distinguishable from the adjacent C-configuration.
+
+\begin{quote}
+\textbf{Demonstrated:} synaptic structure is the persistent store;
+creation requires budget normalization; retention is bounded by decay
+and order; retrieval-by-forward-dynamics exists for trace-level
+configurations.\\[1pt]
+\textbf{Supported:} the information bottleneck is shared by every
+persistent substrate tested (weights and \(u\) show the same
+superposition signature), hence the limiting factor is the shared
+additive store under a shared budget, not the substrate identity
+\cite{synmem}.
+\end{quote}

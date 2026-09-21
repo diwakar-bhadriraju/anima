@@ -1,0 +1,68 @@
+Phase I's methodology is the paper's main methodological contribution:
+a way of running negative experiments in which the negative is
+attributable. Five practices recur in every era.
+
+\paragraph{Frozen protocols.}
+A protocol document (configuration, arms, measurement definitions,
+falsifier inequalities, verdict rule) is committed before any
+implementation. Amendments are separate user-approved documents. The
+protocol text, not the result, governs the verdict; the CLLA bundle
+protocol \cite{cllaprot} is the canonical example, with falsifiers
+F1--F7 and a binary verdict rule (\S\ref{sec:clla}).
+
+\paragraph{Identity gates.}
+Every mechanism is implemented behind a configuration flag whose
+default is off. Before any flag-on run is interpreted, a flag-off run
+must reproduce the committed baseline byte-for-byte: the event-stream
+FNV-1a hash and every snapshot frame. The CLLA-era identity anchor is
+the same-seed alternated baseline (152{,}254-row event stream, hash
+\texttt{9647ea8a0ca4dbd2}), reproduced exactly by the unbounded,
+bounded, rule, reserve, first-exposure, and source-correction
+implementations \cite{cllarecord,bbounded,rule,reserve,fe,fec}. The
+recruitment-gain implementation additionally re-verified flag-off
+byte-identity against the corrected-fe baseline before its matrix
+\cite{rg8}. This gate makes ``the flag did nothing'' a measured
+condition rather than a claim.
+
+\paragraph{Deterministic replay and read-only audits.}
+Every run is preserved under \texttt{runs/<id>/} with telemetry chunks,
+snapshots (1 s cadence), metrics, and report. Audits --- the
+information-bottleneck audit \cite{synmem}, the V2.1 information audit
+\cite{infoaudit}, the weight-growth, drive, and recruitment audits
+\cite{wgrowth,drive} --- are read-only instruments over committed
+artifacts: they never re-run the organism. This lets later epochs
+re-examine earlier epochs' claims at full resolution.
+
+\paragraph{Falsifiers and preservation of failure.}
+Experiments pre-register the inequality whose failure destroys the
+hypothesis (e.g., CLLA F1--F7; allocation S1 second-block/first-block
+mass ratio \(\ge 0.5\)). Failures are preserved with their runs,
+including aborts: 6 of 12 unbounded-CLLA runs aborted on the runaway
+detector, and the record reports them rather than re-running the
+survivors \cite{cllarecord}. Abort-loaded verdicts follow the frozen
+rule (``uninformative $\Rightarrow$ FAIL'').
+
+\paragraph{Exploratory versus formal experiments.}
+X-series and SDE-series probes run without E-numbers and cannot carry
+falsifier verdicts; formal E-numbered experiments and CLLA-era
+registered experiments carry the verdict language. Promotion requires
+an interesting, discriminating, reproducible result \cite{overview}.
+The recruitment-gain experiment (§\ref{sec:rg}) is a registered
+experiment without an E-number, closed under its own outcome rules.
+
+\paragraph{Record corrections preserved.}
+Where the record itself was defective, the correction is part of the
+record, not a silent edit. Two are scientifically relevant and appear in
+this paper: the V2.1 Stage-C validation table was committed without
+executing any Stage-C runs; the information audit discovered that the
+referenced runs do not exist, retracted the verdict as ungrounded, and
+added an integrity regression test preventing phantom run references
+\cite{infoaudit,overview}. And the CLLA capability protocol's F2/F6
+measurement windows (presentations 21--40 of each pattern) are empty by
+construction of the interleaved curriculum (20 presentations per
+pattern); the capability record reports F2/F6 as unmeasurable under the
+frozen definition rather than substituting a window, and reports the
+closest available window as a non-decisive diagnostic \cite{capability}.
+A third correction --- the first-exposure allocator source vacuity ---
+is handled in \S\ref{sec:allocation} because it changed the mechanism
+under test.

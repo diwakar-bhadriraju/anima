@@ -1,0 +1,67 @@
+The slow depolarizing state \(u\) (V2.1) was the designated candidate
+for a persistent, intrinsic memory that does not depend on synaptic
+structure. Phase I's evidence against that role is unusually complete
+because the audits measured what \(u\) actually does during and after
+the stimulus, and because one claim was retracted when its runs turned
+out not to exist.
+
+\subsection{What \(u\) is, measured}
+
+\(u\) tracks the organism's own spiking through a first-order filter:
+per-spike increment \(\beta\), decay \(\tau_s\). Three measured facts
+\cite{infoaudit}:
+
+\begin{enumerate}
+\item \textbf{It saturates during the stimulus.} Means rise
+monotonically with cumulative exposure and plateau at a flux balance
+(W1: \(\bar u\to 1.32\) by presentation \(\sim\)30; W2:
+\(\bar u\to 0.86\), still rising at drive end). A saturating integrator
+cannot encode cumulative episode history beyond its equilibrium.
+\item \textbf{Persistence without structure.} After stimulus removal
+the population does not relax: the active core self-sustains as
+deterministic pacemaking --- 500 spikes/s on the refractory ceiling
+(2 ms refractory \(\Rightarrow\) 500 Hz), Fano factors \(\approx 0\),
+5--6 active neurons of 52, Gini concentration \(0.80 \to 0.93\) over
+silence. The persistent activity is a clock, not a code
+\cite{infoaudit}.
+\item \textbf{The only tested claim of a discriminative \(u\) is
+retracted.} The V2.1 Stage-C validation table claimed temporal-capacity
+unchanged at the rule-selected operating point; the referenced runs do
+not exist in the repository. The information audit discovered the
+phantom reference, retracted the verdict as ungrounded (``unsupported,
+not refuted --- unmeasured''), and added an integrity regression that
+fails any record citing nonexistent runs \cite{infoaudit}.
+\end{enumerate}
+
+\subsection{The historical wedge: \(u\) fails during the stimulus, not only after it}
+
+The standard memory objection to an integrator is that it decays after
+stimulus offset. The ANIMA record shows something stronger: in the
+regimes where episode identity was tested, the persistent quantities
+fail to distinguish episodes \emph{while the stimulus is still
+present}. The alternating-store cosine after adjacent \(A\) and \(C\)
+presentations converges to 0.99 (\S\ref{sec:bottleneck}) --- the state
+after an \(A\) presentation is already near-identical to the state after
+the adjacent \(C\), at a measurement taken 2 s apart with exactly one
+intervening presentation \cite{synmem}. The V2.2 latch design
+(discussed next) was in part motivated by this timing: it attempted to
+make a per-neuron bistable bit the carrier, under u-driven SET/RESET
+thresholds --- and failed as a carrier (latches decode the curriculum at
+chance in all 120 stage-2 runs; \(\eta_{\mathrm{rel}}=1.0\)
+self-cancels) \cite{overview}. The E18--E21 temporal-capacity series
+bracketed the same wedge from the output side: no antecedent-dependent
+divergence over 800 ms; output responses stimulus-locked with zero
+endogenous output activity; temporal capacity below 50 ms
+\cite{overview}.
+
+\begin{quote}
+\textbf{Demonstrated:} scalar intrinsic persistence (\(u\)) is
+self-sustaining but information-poor (saturated mean, pacemaker core,
+Fano \(\approx 0\)); the V2.2 latch carrier failed 120-run tests; the
+temporal carry of the substrate is below 50 ms.\\[1pt]
+\textbf{Supported:} episode discriminability fails inside the stimulus
+window, hence the bottleneck is not post-offset decay but
+representation-integration collapse.\\[1pt]
+\textbf{Not established / retracted:} the Stage-C capacity claim is
+ungrounded and retracted; no A/C contrast in \(u\) was ever executed.
+\end{quote}

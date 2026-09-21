@@ -1,0 +1,38 @@
+The notation below is used consistently throughout the paper and the
+records. Implementations may differ in scale conventions (e.g.\
+network-total vs.\ per-neuron current); where a number is quoted, the
+paper states the convention.
+
+\begin{center}
+\small
+\begin{tabular}{ll}
+\toprule
+Symbol & Meaning \\
+\midrule
+\(N = 52\) & internal/output neurons (ids 24--75) \\
+\(a = 52\) & synaptic amplitude (current per spike \(= a\cdot w\)) \\
+\(w\) & synaptic weight, \([0,1]\) \\
+\(t_e = 0.8\) & M2 per-neuron excitatory budget \\
+\(P_i\) & per-neuron protected (consolidated) mass \\
+\(p_{\max} = 0.75\) & protected cap fraction; cap \(p_{\max} t_e = 0.60\) \\
+\(W_i = t_e - P_i\) & working (unconsolidated) budget \\
+\(R_i = I_{p,i}/(I_{p,i}+I_{w,i})\) & protected fraction of delivered input current (allocation gate) \\
+\(I_{W,i}\) & working (unconsolidated) input-channel current delivered to \(i\) \\
+\(I_{\mathrm{rec}}, I_{\mathrm{inh}}\) & recurrent excitatory / M6 inhibitory current \\
+\(v_i, v_{\mathrm{th}}=1, \tau_m=20\) & membrane potential, threshold, membrane time constant (ms) \\
+\(u_i\) & V2.1 slow state; \(+\beta\)/spike, decay \(\tau_s\) \\
+\(\beta = 0.0046875, \tau_s = 5000\) & the e24 cell used in the CLLA era \\
+\(k_g = 8.0\) & frozen recruitment-gain magnitude \\
+\(i_{\mathrm{boost},i}\) & recruitment-gain current (registration A; capped in B) \\
+\(\theta_{\mathrm{perm}} = 0.05, w_{\mathrm{c,perm}} = 0.02\) & M3 permanence threshold / bootstrap weight \\
+\end{tabular}
+\end{center}
+
+Conventions: ``posts/n'' is the fraction of the 52 neurons that fired
+at least once in a presentation window; ``burst rate'' is the
+presentation-window mean internal spike rate; ``protected mean'' is the
+mean weight over live consolidated synapses of a cohort; ``drive end''
+is the snapshot at \(t=84{,}000\) ms (the e24 convention);
+per-presentation timing is 500 ms on / 1500 ms off. Where the records
+report network-total currents (e.g.\ 81.38 total vs.\ 1.565 per neuron
+at first C), the paper quotes the per-neuron value.

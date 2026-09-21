@@ -1,0 +1,39 @@
+\resizebox{\textwidth}{!}{%
+% Figure 1 — ANIMA architecture + experimental philosophy (schematic).
+% Every annotation in the right panel is established in the cited records.
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=2pt, minimum height=6mm, font=\small,
+              align=center, inner sep=3pt},
+  spec/.style={fill=blue!8}, emerge/.style={fill=green!8},
+  arrow/.style={-{Stealth[length=2.2mm]}, thick}
+]
+  % layer 1: input
+  \node[box, spec] (inp) at (0, 0) {24 input channels\\groups A / C / B};
+  % layer 2: network
+  \node[box, spec] (net) at (4.2, 0) {LIF neurons\\40 internal + 12 output};
+  % layer 3: plasticity (box to the right)
+  \node[box, spec, minimum width=3.2cm] (plast) at (9.0, 0) {local plasticity\\STDP, M2 budget $t_e$,\\M3/M4 candidates/prune,\\M6 inhibition (per synapse)};
+  \draw[arrow] (inp) -- node[above, font=\small] {deterministic Poisson, 20 Hz} (net);
+  \draw[arrow] (net) -- node[above, font=\small] {weights $w$} (plast);
+  \draw[arrow] (plast) to[bend left=30] node[below, font=\small] {budget} (net);
+  % environment / curriculum
+  \node[box, spec, minimum width=8.9cm] (env) at (4.6, -1.5) {curriculum (frozen schedule): isolated / blocked (bac, bca) / alternating (il); 2 s cadence};
+  \draw[arrow] (env) -- (inp);
+
+  % right panel: philosophy
+  \node[box, emerge, font=\small, minimum width=6.9cm, text width=6.5cm] (p1) at (13.4, 1.15)
+    {\textbf{Specified:} I/O boundary, environment, curriculum,\\resource caps, local plasticity laws};
+  \node[box, emerge, font=\small, minimum width=6.9cm, text width=6.5cm] (p2) at (13.4, -0.35)
+    {\textbf{Not specified:} architecture, assemblies, readout,\\task semantics, labels, reward};
+  \node[box, font=\small, minimum width=6.9cm, text width=6.5cm] (p3) at (13.4, -1.85)
+    {\textbf{Must emerge:} organization $\to$ persistence $\to$\\retrieval (the Phase I ladder)};
+
+  % bottom: causal narrowing strip
+  \node[box, minimum width=13.6cm, text width=13.2cm, fill=gray!6] (strip) at (6.8, -3.6)
+    {\footnotesize
+    organization $\to$ transient representation $\to$ episode-identity loss
+    $\to$ intrinsic-\(u\) poverty $\to$ synaptic store $\to$ interference
+    $\to$ protection $\to$ stability $\to$ allocation $\to$
+    first-exposure allocation $\to$ recruitment \;\; (details \S\ref{sec:allocation}--\ref{sec:rg})};
+\end{tikzpicture}
+}

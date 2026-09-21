@@ -1,0 +1,100 @@
+With stability established, the frozen question became allocation:
+\emph{can a local mechanism prevent first-arrival starvation of a later
+distinct configuration?} Each registered experiment tightened the
+answer and moved the identified bottleneck one step downstream. All
+five share the identical identity gate (flag-off byte-identity
+\texttt{9647ea8a0ca4dbd2}), the identical 12-run matrix (bac/bca/il/d
+\(\times\) three seeds), and the identical primary endpoint:
+second-block protected mass \(\ge 0.5 \times\) first-block protected
+mass.
+
+\subsection{Residual allocation gate (rule)}
+
+The gate (protocol \cite{cllaprot} extension, record \cite{rule})
+multiplies candidate accumulation by \(g_i = \max(0,1-R_i)\) with
+headroom > 0, where \(R_i = I_{p,i}/(I_{p,i}+I_{w,i})\) is the
+protected-share of the neuron's delivered input current. The
+implementation behaves exactly as specified --- the gate sat at
+\(g = 1.0\) through the entire second block (\(R\)-median 0.000),
+headroom was reserved (0.249--0.294 vs.\ 0.155--0.161 in the no-rule
+runs), and first-block permanence decelerated (170 events, 8.5/pres,
+vs.\ 364, 18.2/pres) --- yet the primary endpoint failed 6/6 (ratios
+0.008--0.192 vs.\ the 0.5 bar). The trajectory instrument located the
+failure \emph{upstream of the rule}: the second-block working substrate
+is destroyed during the first block (live unconsolidated C-channel
+afferents \(197 \to 77\) under M2 normalization of the shrinking
+working budget and M4 pruning), so at second-block onset
+\(g=1\) with almost nothing to accumulate. Verdict: the gate is not the
+bottleneck; substrate availability is \cite{rule}. Alternating
+coexistence preserved (F1-il 3/3).
+
+\subsection{Dormant-candidate reserve}
+
+The reserve (record \cite{reserve}) lets ever-coactive candidates
+survive dormancy at a floor instead of dying, protecting pre-associations
+across inactive periods. The mechanism works measurably --- 90--255
+reserved candidates per run survive --- but at second-block onset in the
+blocked arms the reserved C-cohort (channels 8--15) is exactly
+\emph{zero} (mean over the A block: reserved A-cohort 123.7, C-cohort
+0.0); the block-2 permanence count is 38 vs.\ 35 without the reserve.
+The record classifies the outcome as \emph{neither} preservation
+failure \emph{nor} flux failure: a trigger keyed on ``ever-coactive''
+is satisfiable only by the pattern that has already been active. The
+reserve is vacuous for a genuinely first-seen pattern by the semantics
+of its own trigger \cite{reserve}.
+
+\subsection{First-exposure allocation}
+
+The next amendment biases candidate redraw/eviction toward channels
+that fired in the current window, so a currently active novel input can
+bind candidate slots before churn eliminates its substrate (record
+\cite{fe}). Primary endpoint still failed 6/6 (ratios 0.072--0.216),
+but the causal path became exact: first C permanence at \(t = 47{,}400\)
+--- 2.4 s after block onset, 10\(\times\) faster than baseline;
+permanence events 41 vs.\ 35 (allocator-only) and 38 (reserve);
+block-1 allocation \emph{increased} (248 vs.\ 170 events --- the
+mechanism strengthens whatever is currently active). The binding supply
+was capped by two interacting facts: only \(\approx 0.71\) visible
+channels/neuron survived at onset (visibility cap), and the
+redraw-bias branch was structurally inert (\texttt{connected()}
+excludes exactly the visible channels it would have preferred). The
+implementation audit (\cite{feimpl}) identified the latter as a spec
+vacuity --- the bias could never fire --- and the next amendment
+corrected the source.
+
+\subsection{Source-selection correction}
+
+The corrected source reads the module's per-window firing record
+instead of afferent-derived channel sets, making all firing channels
+observable regardless of synapse survival (record \cite{fec}). Supply
+tripled (41 \(\to\) 61 C-cohort permanence events); first permanence at
+2.5 s; primary endpoint still failed 6/6 (ratios 0.046--0.193).
+The classification that survived into the paper's central question:
+flux improved but remained asymmetric (3.05/pres C vs.\ 13.2/pres A),
+and the measured residual bottleneck was \emph{post-permanence weight
+growth + working-afferent churn} --- newly protected second-block
+synapses consolidate at \(w\approx 0.02\) and grow little (mean 0.054
+vs.\ the first block's 0.096) because the working C afferents that
+would drive their LTP keep being destroyed (29 \(\to\) 11 across the
+second block itself) by M2's working-mass squeeze. The record
+registered the two candidate amendments it did not run (e1:
+consolidation-time protection of a working-afferent fraction; e2:
+protected-path LTP growth) \cite{fec}. Figure~\ref{fig:decomp} plots
+the final state of this decomposition.
+
+\subsection{What the sequence ruled out}
+
+\begin{itemize}
+\item Allocation gating: \textbf{ruled out as the limiter} --- the gate
+did nothing wrong and changed nothing.
+\item Dormant preservation: \textbf{ruled out} --- preservation works,
+but has nothing preservable before first contact.
+\item First-exposure visibility: \textbf{fixed then ruled out} --- the
+source correction removed the vacuity; supply tripled.
+\item Flux (candidate accumulation rate): \textbf{supported as
+secondary} --- asymmetric (3.05 vs.\ 13.2/pres) but not the binding
+constraint.
+\item Working-substrate churn against the \emph{new} protected
+structure: \textbf{the measured residual} --- leads directly to the
+recruitment question (\S\ref{sec:recruitment}).
+\end{itemize}

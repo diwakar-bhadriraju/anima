@@ -1,0 +1,111 @@
+% ANIMA Phase I white paper — main file.
+% Compile: tectonic main.tex (or pdflatex+bibtex+pdflatex x2).
+\documentclass[11pt]{article}
+
+\usepackage[margin=1.05in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{established}{RGB}{23,120,53}
+\definecolor{supported}{RGB}{50,130,200}
+\definecolor{partial}{RGB}{220,150,20}
+\definecolor{notest}{RGB}{180,40,40}
+\definecolor{cEst}{RGB}{23,120,53}
+\definecolor{cDem}{RGB}{50,130,200}
+\definecolor{cPar}{RGB}{220,150,20}
+\definecolor{cNo}{RGB}{180,40,40}
+\emergencystretch=2em
+
+\title{\bfseries ANIMA Phase I: Emergent Organization and the\\ Architectural Limits of Persistent Learning in a\\ Minimally Specified Spiking Nervous System}
+\author{ANIMA project \\ Experimental developmental artificial nervous system --- Phase I record}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{sections/00-abstract.tex}
+\end{abstract}
+
+\parbox{\textwidth}{\raggedright\textbf{Keywords:} emergent organization; spiking neural substrate; persistent synaptic structure; synaptic interference; allocation; identity discipline; pre-registration; minimal specification.}\par\medskip
+
+\tableofcontents
+
+\section{Introduction}\label{sec:intro}
+\input{sections/01-introduction.tex}
+
+\section{Design Philosophy}\label{sec:philosophy}
+\input{sections/02-philosophy.tex}
+
+\section{The ANIMA Substrate}\label{sec:substrate}
+\input{sections/03-substrate.tex}
+
+\section{Experimental Methodology}\label{sec:method}
+\input{sections/04-methodology.tex}
+
+\section{Emergent Sensory Organization}\label{sec:organization}
+\input{sections/05-organization.tex}
+
+\section{The Persistent-State Information Bottleneck}\label{sec:bottleneck}
+\input{sections/06-bottleneck.tex}
+
+\section{Intrinsic Persistence Is Not Sensory Memory}\label{sec:u}
+\input{sections/07-intrinsic.tex}
+
+\section{Synaptic Plasticity as Persistent Structure}\label{sec:synaptic}
+\input{sections/08-synaptic.tex}
+
+\section{Synaptic Interference: Isolated, Blocked, and Alternating Regimes}\label{sec:interference}
+\input{sections/09-interference.tex}
+
+\section{Consolidation-Locked Allocation (CLLA)}\label{sec:clla}
+\input{sections/10-clla.tex}
+
+\section{Allocation Experiments}\label{sec:allocation}
+\input{sections/11-allocation.tex}
+
+\section{The Novel-Pattern Recruitment Bottleneck}\label{sec:recruitment}
+\input{sections/12-recruitment.tex}
+
+\section{The Fixed-\(k_g\) Recruitment-Gain Experiment}\label{sec:rg}
+\input{sections/13-rg.tex}
+
+\section{Phase I Synthesis}\label{sec:synthesis}
+\input{sections/14-synthesis.tex}
+
+\section{Limitations}\label{sec:limitations}
+\input{sections/15-limitations.tex}
+
+\section{Discussion}\label{sec:discussion}
+\input{sections/16-discussion.tex}
+
+\section{Conclusion}\label{sec:conclusion}
+\input{sections/17-conclusion.tex}
+
+\section{Future Work}\label{sec:future}
+\input{sections/18-future.tex}
+
+\section{Reproducibility and Artifact Availability}\label{sec:repro}
+\input{sections/19-repro.tex}
+
+\appendix
+\section{Experimental Lineage}\label{app:lineage}
+\input{sections/A-lineage.tex}
+
+\section{Notation}\label{app:notation}
+\input{sections/B-notation.tex}
+
+\section{Additional Quantitative Results}\label{app:quant}
+\input{sections/C-quant.tex}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

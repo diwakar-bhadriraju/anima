@@ -1,0 +1,23 @@
+\resizebox{\textwidth}{!}{%
+% Figure 8 — Phase I capability map (colored grid).
+\begin{tikzpicture}[
+  cell/.style={draw, rounded corners=1pt, minimum width=7.4cm, font=\small, align=left, inner sep=2.5pt}
+]
+  \node[cell, fill=cEst!15] at (0, 0)    {\textbf{Established}\\
+    sensory-specific afferent organization \\
+    transient per-presentation representations \\
+    synaptic reorganization and structural persistence \\
+    bounded protected structure (stability at the cap)};
+  \node[cell, fill=cDem!15] at (0, -1.75) {\textbf{Demonstrated under condition}\\
+    alternating coexistence (F1-il 3/3, protected ratio 0.53--0.59) \\
+    trace-level re-expression (REV1, zero plasticity events)};
+  \node[cell, fill=cPar!15] at (0, -3.15) {\textbf{Partial / supported, non-decisive}\\
+    response separation (adjacent-window F2 diagnostics) \\
+    M2 budget partition rescue (blocked-only)};
+  \node[cell, fill=cNo!15] at (0, -4.8)   {\textbf{Not established / failed its role}\\
+    scalar intrinsic memory ($u$); temporal carry $\ge$ 50 ms \\
+    blocked-order coexistence; episode-specific retrieval \\
+    sequential allocation; novel-pattern recruitment \textbf{(open)} \\
+    closed-loop memory behavior};
+\end{tikzpicture}
+}

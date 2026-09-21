@@ -1,0 +1,120 @@
+The recruitment audits localized the bottleneck; the fixed-mechanism
+experiment tested the smallest hypothesized amendment: a local,
+novelty-dependent recruitment gain that transiently raises a neuron's
+recruitability when its input is unexplained and its post activity is
+sparse. The design review \cite{designreview} derived the form from
+existing local quantities only --- the allocation rule's unexplained
+fraction \(1-R\) and the neuron's own working input current \(I_W\) ---
+and concluded that a single new dimensionless magnitude \(k_g\) was
+unavoidable (every existing constant is \(\le 1\times\); the required
+bootstrap is \(\ge 6\)--\(10\times\) under the measured drive\(\to\)
+posts map, whose middle band [4.2, 19] current units is unmeasured by
+any committed presentation). Per the pre-registration mandate the
+parameter was not fitted: the user froze the first mechanism test at
+the lowest defensible value,
+
+\begin{equation}
+  i_{\mathrm{boost},i}(t) = k_g \cdot \max(0,\, 1 - R_i(t)) \cdot I_{W,i}(t),
+  \qquad k_g = 8.0,
+  \label{eq:rg}
+\end{equation}
+
+with everything else byte-identical to the committed configuration,
+including the identity gate and the frozen endpoint bars
+\cite{designreview}. The experiment was executed in two registered
+arms.
+
+\subsection{Registration A: uncapped (k\_g = 8.0)}
+
+Nine gain arms (bac/bca/il \(\times\) three seeds) against the nine
+committed baselines, all flag-off byte-identical \cite{rg8}.
+Endpoints: 4a zero runaway trips (PASS, failures \([]\) in all arms);
+4b block-1 first-exposure burst band (FAIL --- pres 1--5 mean
+185.9--201.0 Hz vs.\ the [100, 200] Hz bar, with pres-1 at 391--449 Hz
+vs.\ 57--94 baseline); 4c first-pattern posts at presentation 20
+preserved (PASS, ratio 1.00--1.04); 4d protected cap (PASS, pinned at
+0.6000 as in baseline); and the three primary recruitment endpoints
+(all FAIL): first-novel posts/n \(\ge 0.5\) (measured 0.00--0.19),
+novel permanence \(\ge 150\) (0--22), protected novel end-mass
+\(\ge 0.09\) (0.000--0.058).
+
+The mechanism of failure was measured, not inferred: the full-gate
+boost on the \emph{first block's own} first exposures
+(\(I_W \approx 12\), \(R=0\) \(\Rightarrow\) boost \(\approx 96\),
+drive \(\approx 108\) vs.\ the normal 38) drove pres-1 bursts to
+391--449 Hz; the hyperactive block then \emph{accelerated} the churn
+that destroys the late pattern's substrate (C-cohort prunes in block 1:
+195--215 vs.\ 164--187), so at first C exposure the surviving working
+current was 0.000--0.14/neuron vs.\ 1.565 baseline --- and the boost is
+input-proportional: \(I_W = 0 \Rightarrow\) boost \(= 0\) by
+\eqref{eq:rg} itself. The mechanism never engaged at its target moment.
+Per the frozen interpretation rule, a 4b failure classifies as a
+\emph{recruitment-gain operating-point failure first}; the weak-pattern
+recruitment hypothesis was not falsified by registration A
+\cite{rg8}.
+
+\subsection{Registration B: threshold-completion cap}
+
+The separately registered amendment \cite{rg8c} clamps the boost at the
+current needed to reach threshold in one step,
+
+\begin{equation}
+  i_{\mathrm{boost},i}(t) = \min\!\Big(
+    k_g \cdot \max(0,1-R_i(t)) \cdot I_{W,i}(t),\;
+    \max(0,\,(v_{\mathrm{th}} - v_i(t))\,\tau_m/dt)
+  \Big),
+\end{equation}
+
+parameter-free (existing \(v_{\mathrm{th}}=1\), \(\tau_m = 20\),
+\(dt=1\)); the clamp was implemented per-\emph{neuron} after a
+per-synapse first pass was caught in review, with a discriminating unit
+test (two afferents, summed raw boost 41.6 \(>\) cap 20 \(\Rightarrow\)
+one clamped boost). Identity gate and suites passed; all nine arms
+completed, zero failures.
+
+Results against the same bars \cite{rg8c}: 4a PASS; 4b aggregate
+5-presentation means 175.6--189.1 Hz inside the band --- but pres-1
+remained 378--440 Hz, and under the strict per-presentation reading 4b
+is still outside the band in every arm; the cap moved pres-1 only
+391 \(\to\) 378 Hz. The mechanism is now understood: the per-tick cap
+tops a below-threshold neuron to threshold on every tick while input is
+ongoing, sustaining \(\approx 1\) spike/tick (refractory-limited)
+regardless of boost magnitude --- the overshoot is
+rate-sustained, not magnitude-sustained. The primary endpoints still
+failed everywhere (first-novel posts 0.00--0.19; novel permanence
+5--15; protected novel end-mass 0.000--0.092, reaching 0.09 in exactly
+one arm with only 5 protected synapses); IL preservation stayed partial
+(C posts 1.08--1.21\(\times\), permanence 97/74/105 vs.\ the \(\pm20\%\)
+of 98 band); gap activity remained elevated (2.3--27.0 vs.\
+0.45--5.94 Hz baseline).
+
+\subsection{Why the experiment was closed}
+
+Per the pre-registered outcome rules, each arm was closed at its
+failure: no reparameterization, no bracketing, no post-hoc threshold
+change, no E-number. The honest verdict language of the records is
+preserved here:
+
+\begin{quote}
+Registration A: \textbf{operating-point failure} --- 4b fails; the
+weak-pattern recruitment hypothesis is \emph{not falsified} (the
+mechanism never fired at first exposure because its own block-1 side
+effect destroyed the substrate it amplifies).\\[2pt]
+Registration B: the cap repairs the aggregate operating point but not
+the first-exposure rate; the primary endpoints fail everywhere. The
+measured reason is structural: churn precedes exposure (even capped,
+block-1 prunes of the late cohort run 193--221 vs.\ 157--187
+baseline), and the boost is input-proportional, so a membrane-side gain
+has almost nothing to amplify at first contact (surviving working
+current 0.00--0.19/neuron vs.\ 1.565). Under the registration B
+outcome rule (4b pass + primary fail \(\Rightarrow\) falsified at this
+substrate), the records state the hypothesis as \emph{falsified at this
+substrate under the corrected operating point}, while noting that
+neither registration achieved a clean block-1 operating point, so the
+falsification claim is bounded by the residual operating distortion
+\cite{rg8c}.
+\end{quote}
+
+Both registrations were closed per protocol; the threshold-completion
+cap is recorded as the designated, tested alternative; no further
+parameter was selected from the results.

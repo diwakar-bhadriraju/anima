@@ -1,0 +1,67 @@
+\subsection{Repository structure}
+
+The experimental record lives in the project repository:
+\texttt{configs/} (frozen configurations, one file per arm),
+\texttt{crates/} (substrate and instruments; read-only analysis
+examples including \texttt{cross\_cosine}, \texttt{read\_rates},
+\texttt{rg8eval}, \texttt{clla\_traj}, and this paper's
+\texttt{papermass}), \texttt{docs/} (protocols, execution records,
+audits, correction records; filename and status conventions in
+\S\ref{app:lineage}), and \texttt{runs/} (preserved runs
+\texttt{runs/\allowbreak<exp\_id>-\allowbreak<UTC>Z/} with
+\texttt{telemetry/} (deterministic event chunks), \texttt{snapshots.
+bin.zst} (1 s state), \texttt{metrics.json}, \texttt{report.md};
+\texttt{runs/} is disk-only and gitignored, and an integrity regression
+fails any record that cites a nonexistent run \cite{overview}).
+
+\subsection{Lineage and commit discipline}
+
+The record is linear and amendable only by user-approved protocol
+changes. The most consequential corrections, with their provenance:
+
+\begin{itemize}
+\item \textbf{V2.1 Stage-C retraction.} A validation table citing
+nonexistent runs was committed; the information audit found the
+phantom reference, retracted the verdict as ungrounded (unsupported,
+not refuted), and added the phantom-reference integrity regression
+\cite{infoaudit}.
+\item \textbf{CLLA F2/F6 frozen-window emptiness.} The frozen windows
+(presentations 21--40 of each pattern) are empty under the frozen
+interleaved curriculum (20 presentations per pattern); the capability
+record reports the falsifiers as unmeasurable under the frozen
+definition and publishes adjacent-window diagnostics as non-decisive
+\cite{capability}.
+\item \textbf{First-exposure allocator source vacuity.} The redraw
+bias could never fire as specified (visible \texttt{connected()}
+channels are exactly those the bias would select); the implementation
+audit named the vacuity, and a user-approved source correction
+(replace afferent-derived channel sets with the module firing record)
+tripled the measured bind supply (41 \(\to\) 61 permanence events)
+\cite{feimpl,fec}.
+\item \textbf{Drive-gate dimensionality (X-series).} The
+\(I_{\mathrm{aff}}\) gate used bare weight sums instead of
+membrane-scale current (\(\texttt{amplitude}\times w\)); the
+mechanism review corrected the definition (reusing the existing
+\(v_{\mathrm{th}}\), no new parameter) before the CLLA-era drive
+analyses \cite{overview}.
+\item \textbf{Recruitment-gain cap implementation.} Registration B's
+cap was first implemented per synapse; review caught that a
+per-synapse clamp cannot bind a per-neuron sum; the two-pass
+per-neuron clamp was implemented and discriminated by a unit test
+before the matrix ran \cite{rg8c}.
+\end{itemize}
+
+\subsection{Reproducible analysis}
+
+All quantitative claims in this paper trace to preserved runs and
+committed instruments. The figure scripts in \texttt{paper/scripts/}
+rerun the instruments on the preserved runs and draw the figures;
+Table~\ref{tab:findings} collects the key quantitative anchors with
+their sources.
+
+\subsection{Determinism}
+
+Same seed \(\Rightarrow\) byte-identical telemetry (single-run
+determinism is a substrate guarantee, verified by duplicate-run hash
+equality in the E1 era and by the flag-off identity gates of every
+CLLA-era implementation \cite{overview,cllarecord}).

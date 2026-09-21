@@ -1,0 +1,60 @@
+The operating constraints that shaped every experiment are documented
+in the charter and decision log \cite{overview,decisionlog}. They are
+restated here because they are load-bearing for the interpretation of
+every result.
+
+\paragraph{Specified interfaces, not architectures.}
+The project defines the sensory front end (input channels with
+deterministic Poisson spike trains per presentation), the output
+boundary (ordinary plastic neurons whose spikes are additionally
+emitted as output activity --- a role tag, not a cell type), the
+environment/curriculum (an ordered schedule of pattern presentations),
+resource limits (neuron, synapse, per-neuron budget caps), and the
+plasticity laws (STDP, weight normalization, candidate/prune machinery,
+anti-Hebbian inhibition). It never defines assemblies, readout circuits,
+or any intermediate organization.
+
+\paragraph{Local rules.}
+Every mechanism is required to read only per-neuron or per-synapse
+state. This is enforced loosely in design and strictly at review: the
+CLLA falsifier F5 requires static conformance --- consolidation and
+allocation decision paths may not read pattern identity, channel-group
+membership tests, presentation counts, or any global state
+\cite{cllaprot,cllarecord}.
+
+\paragraph{Finite resources.}
+A neuron owns a total excitatory budget \(t_e = 0.8\) (weight units, M2
+normalization) and a candidate pool of six slots; consolidation may
+protect at most \(p_{\max} t_e = 0.60\) of the budget; budgets bind
+synapse creation (M5, \(b_e = 40\) excitatory afferents per neuron).
+Resource limits are treated as part of the specification, not as an
+implementation nuisance.
+
+\paragraph{No semantic supervision.}
+All presented patterns are examples; the curriculum is a configurable
+schedule, not a set of preinstalled concepts. The organism is never told
+which pattern it is seeing, whether a response was correct, or that a
+pattern is ``novel.''
+
+\paragraph{Reproducibility and freeze discipline.}
+Protocols are committed before implementation; amendments are logged
+and user-approved; every execution is byte-deterministic under a seeded
+Xoshiro generator; a flag-off ``identity gate'' must reproduce the
+committed baseline byte-for-byte (event-stream hash and snapshot
+frames) before any flag-on run is interpreted; and negative results are
+preserved with their runs \cite{overview,cllaprot}. Several protocol
+defects were discovered only by this discipline and are reported as
+such (\S\ref{sec:clla}, \S\ref{sec:method}).
+
+\begin{figure}[t]
+\centering
+\input{figures/fig1-architecture.tex}
+\caption{\textbf{ANIMA architecture and experimental philosophy.}
+Top: the specified boundary --- 24 input channels (groups A, C, B),
+64 LIF neurons (40 internal, 12 output plus input neurons), sparse
+seeded wiring, local plasticity laws, deterministic curriculum. Bottom
+left: the charter---what is specified vs.\ what must emerge. Bottom
+right: the phase progression --- the causal narrowing of the persistent-
+learning failure reported in this paper (detail in \S\ref{sec:synthesis}).}
+\label{fig:architecture}
+\end{figure}

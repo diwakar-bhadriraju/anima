@@ -1,0 +1,38 @@
+\begin{table}[t]
+\centering
+\caption{\textbf{Key quantitative findings and their primary sources.}
+All values are as recorded; per-neuron currents are marked.}
+\label{tab:findings}
+\small
+\begin{tabular}{p{6.2cm}p{6.2cm}l}
+\toprule
+Finding & Value & Source \\
+\midrule
+A-trained afferent selectivity & \(+0.906\); 49/52 neurons & \cite{synmem} \\
+Cross-run configuration cosine & 0.119; LOPO run-identity 91\% & \cite{synmem} \\
+Late-S1 cross-pattern cosine (E3/E3b) & 0.673 / 0.740 (bar 0.60) & \cite{e3proto,e3bproto} \\
+Adjacent-state cosine under alternation & 0.972 \(\to\) 0.990 & \cite{synmem} \\
+Structure vs.\ activity persistence (20 s silence) & cos 0.986--0.993 vs.\ \(u\) 3.5\(\times\), spikes 6.7\(\times\) decay & \cite{synmem} \\
+\(u\) plateau / Fano / core & \(\bar u\to 1.32\); Fano \(\approx 0\); 5--6 neurons & \cite{infoaudit} \\
+Temporal capacity & \(<\) 50 ms (\(D_{L{-}NF}=0.0815\)) & \cite{overview} \\
+Blocked overwrite (recency) & BAC end A-mass 0.068 (from 0.208) & \cite{synmem} \\
+Decay as dominant eraser & decay-off preserves first cohort 6/6 (residual \(\sim0.07\)--0.09) & \cite{overview} \\
+Unbounded CLLA runaway & 6/12 aborts; \(P\) to 7.9 vs.\ cap 0.60 & \cite{cllarecord} \\
+Bounded CLLA & 12/12 complete; \(P\) pinned 0.6000; rates 3.5--6.5 Hz & \cite{bbounded} \\
+CLLA capability & F1: il 3/3 PASS; blocked 6/6 FAIL; F3/4/5/7 PASS 12/12 & \cite{capability} \\
+Allocation rule primary & ratios 0.008--0.192 (bar 0.5); \(w_C\) 197\(\to\)77 in block 1 & \cite{rule} \\
+Reserve C-cohort at onset & 0.0 reserved (A 123.7) & \cite{reserve} \\
+fe time-to-permanence & 2.4 s; 41 events (supply) & \cite{fe} \\
+fec supply post-correction & 61 events; 3.05/pres (C) vs.\ 13.2/pres (A) & \cite{fec} \\
+fec protected end-mass & C 2.98 (mean 0.054) vs.\ A 22.87 (mean 0.096) & \cite{fec} \\
+First-C post collapse & 1{,}697 \(\to\) 101 spikes (17\(\times\)); C sustains 101--222 & \cite{wgrowth} \\
+STDP net on C cohort (C block) & \(-21.63\) over 1{,}961 events & \cite{wgrowth} \\
+First-C drive deficit & \(I_{\mathrm{aff}}\) 1.57 vs.\ 11.98 (7.7\(\times\)); \(I_{\mathrm{rec}}\) 0.05 vs.\ 6.90 & \cite{drive} \\
+IL control first-C & \(I_{\mathrm{aff}}\) 11.13, \(I_{\mathrm{rec}}\) 7.05, posts 1.00; C perms 98 \(\approx\) A 95 & \cite{drive} \\
+rg8 4b (pres-1--5 mean) & 185.9--201.0 Hz (bar [100,200]); pres-1 391--449 & \cite{rg8} \\
+rg8 first-C substrate & \(I_W\) 0.000--0.14 vs.\ 1.565 baseline & \cite{rg8} \\
+rg8c 4b aggregate & 175.6--189.1 Hz; pres-1 378--440 & \cite{rg8c} \\
+rg8c primary endpoints & posts 0.00--0.19; perms 5--15; end-mean 0.000--0.092 & \cite{rg8c} \\
+\bottomrule
+\end{tabular}
+\end{table}

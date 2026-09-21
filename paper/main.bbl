@@ -1,0 +1,147 @@
+\begin{thebibliography}{10}
+
+\bibitem{cllaprot}
+{ANIMA project}.
+\newblock Anima clla protocol (frozen bundle-level test).
+\newblock docs/anima-clla-protocol.md.
+\newblock Frozen protocol; F1--F7.
+
+\bibitem{v2proto}
+{ANIMA project}.
+\newblock Anima v2 protocol (frozen substrate).
+\newblock docs/anima-v2-protocol.md.
+\newblock Frozen protocol record.
+
+\bibitem{rule}
+{ANIMA project}.
+\newblock Clla allocation-rule experiment: execution record.
+\newblock docs/anima-clla-rule-record.md.
+
+\bibitem{bbounded}
+{ANIMA project}.
+\newblock Clla bounded-protection amendment: viability verdict.
+\newblock docs/anima-clla-bounded-record.md.
+
+\bibitem{capability}
+{ANIMA project}.
+\newblock Clla capability experiment: execution record.
+\newblock docs/anima-clla-capability-record.md.
+\newblock F2/F6 windows unexecutable: protocol defect recorded.
+
+\bibitem{cllarecord}
+{ANIMA project}.
+\newblock Clla run record: bundle verdict not supported.
+\newblock docs/anima-clla-record.md.
+\newblock Unbounded-protection execution.
+
+\bibitem{decisionlog}
+{ANIMA project}.
+\newblock Decision log.
+\newblock docs/decision-log.md.
+
+\bibitem{reserve}
+{ANIMA project}.
+\newblock Dormant-candidate reserve: execution record.
+\newblock docs/anima-clla-reserve-record.md.
+
+\bibitem{e1proto}
+{ANIMA project}.
+\newblock E1 protocol: Stdp-driven assembly formation + novelty response.
+\newblock docs/e1-protocol.md.
+\newblock Frozen protocol + execution record.
+
+\bibitem{e24proto}
+{ANIMA project}.
+\newblock E24 protocol: Regime-selection capacity.
+\newblock docs/anima-e24-protocol.md.
+\newblock Formal negative result.
+
+\bibitem{e3bproto}
+{ANIMA project}.
+\newblock E3b protocol: U1 lateral inhibition.
+\newblock docs/e3b-protocol.md.
+\newblock Execution record; hypothesis weakened.
+
+\bibitem{fe}
+{ANIMA project}.
+\newblock First-exposure allocation: execution record.
+\newblock docs/anima-clla-fe-record.md.
+
+\bibitem{feimpl}
+{ANIMA project}.
+\newblock First-exposure allocator implementation/spec audit.
+\newblock docs/x-clla-fe-impl-audit.md.
+
+\bibitem{drive}
+{ANIMA project}.
+\newblock First-exposure drive-recruitment audit.
+\newblock docs/x-clla-drive-audit.md.
+
+\bibitem{fec}
+{ANIMA project}.
+\newblock First-exposure source-correction: execution record.
+\newblock docs/anima-clla-fec-record.md.
+\newblock Supersedes the afferent-derived source; vacuity fixed.
+
+\bibitem{rg8}
+{ANIMA project}.
+\newblock Fixed k\_g=8 recruitment-gain experiment: result (registration a).
+\newblock docs/x-clla-rg8-result.md.
+
+\bibitem{designreview}
+{ANIMA project}.
+\newblock Local novelty-dependent recruitment gain: mechanism design review.
+\newblock docs/x-clla-recruitment-design-review.md.
+
+\bibitem{synmem}
+{ANIMA project}.
+\newblock Plasticity-as-memory audit (g1--g8).
+\newblock docs/x-synmem-audit.md.
+\newblock Read-only audit of committed runs.
+
+\bibitem{overview}
+{ANIMA project}.
+\newblock Program overview \& current state.
+\newblock
+  \url{https://github.com/anima/internal/blob/main/docs/ANIMA_OVERVIEW.md}.
+\newblock Living summary; no claim overrides a frozen protocol record.
+
+\bibitem{wgrowth}
+{ANIMA project}.
+\newblock Second-block synaptic weight growth: causal audit.
+\newblock docs/x-clla-weightgrowth-audit.md.
+
+\bibitem{rg8c}
+{ANIMA project}.
+\newblock Threshold-completion cap: result (registration b).
+\newblock docs/x-clla-rg8c-cap.md, docs/x-clla-rg8c-result.md.
+
+\bibitem{infoaudit}
+{ANIMA project}.
+\newblock V2.1 information-carrying audit; includes the stage-c retraction.
+\newblock docs/v2{\_}1-info-audit.md.
+\newblock Read-only audit; ungrounded record corrected.
+
+\bibitem{gerstner2002}
+Wulfram Gerstner and Werner~M. Kistler.
+\newblock {\em Spiking Neuron Models: Single Neurons, Populations, Plasticity}.
+\newblock Cambridge University Press, 2002.
+
+\bibitem{hebb1949}
+Donald~O. Hebb.
+\newblock {\em The Organization of Behavior}.
+\newblock Wiley, 1949.
+
+\bibitem{bipoo1998}
+Guo qiang Bi and Mu~ming Poo.
+\newblock Synaptic modifications in cultured hippocampal neurons: dependence on
+  spike timing, synaptic strength, and postsynaptic cell type.
+\newblock {\em Journal of Neuroscience}, 18(24):10464--10472, 1998.
+
+\bibitem{song2000}
+Sen Song, Kenneth~D. Miller, and Larry~F. Abbott.
+\newblock Competitive hebbian learning through spike-timing-dependent synaptic
+  plasticity.
+\newblock {\em Nature Neuroscience}, 3:919--926, 2000.
+
+\end{thebibliography}

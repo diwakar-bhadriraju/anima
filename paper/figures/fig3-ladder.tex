@@ -1,0 +1,27 @@
+\resizebox{\textwidth}{!}{%
+% Figure 3 — the information-loss ladder (schematic with measured annotations).
+\begin{tikzpicture}[
+  rung/.style={draw, rounded corners=2pt, minimum width=3.4cm,
+               minimum height=9mm, align=center, font=\small},
+  arr/.style={-{Stealth[length=2mm]}, thick}
+]
+  \node[rung, fill=green!8]  (r1) at (0, 0)   {afferent structure\\\footnotesize persistent, selective};
+  \node[rung, fill=gray!8]   (r2) at (0, -1.3) {instantaneous spikes\\\footnotesize activity, not stored};
+  \node[rung, fill=gray!8]   (r3) at (0, -2.6) {windowed counts\\\footnotesize stimulus-locked};
+  \node[rung, fill=gray!8]   (r4) at (0, -3.9) {cumulative counts\\\footnotesize $u$: +$\beta$/spike, $\tau_s$};
+  \node[rung, fill=red!8]    (r5) at (0, -5.2) {intrinsic scalar $u$\\\footnotesize persistent, info-poor};
+  \draw[arr] (r1) -- (r2); \draw[arr] (r2) -- (r3);
+  \draw[arr] (r3) -- (r4); \draw[arr] (r4) -- (r5);
+  % measured annotations
+  \node[font=\footnotesize, align=left, text width=6.3cm] (a1) at (4.6, 0.35)
+    {selectivity $\pm0.8$--$0.9$,\\91\% run-identity decode \cite{synmem}};
+  \node[font=\footnotesize, align=left, text width=6.3cm] (a3) at (4.6, -2.25)
+    {off-window cosine $\ge 0.999$;\\temporal carry $< 50$ ms (E21)};
+  \node[font=\footnotesize, align=left, text width=6.3cm] (a4) at (4.6, -3.55)
+    {$\bar u$ saturates $\to 1.32$ under drive;\\alternating-$u$ cosine $\to 1$};
+  \node[font=\footnotesize, align=left, text width=6.3cm] (a5) at (4.6, -4.9)
+    {Fano $\approx 0$; pacemaker core (5--6 neurons);\\Gini 0.80 $\to$ 0.93 \cite{infoaudit}};
+  \node[font=\footnotesize, align=left, text width=6.3cm] (a2) at (4.6, -0.95)
+    {within-class $0.97$--$0.99$ across S1 halves;\\cross-class $0.70$--$0.81$ \cite{e1proto}};
+\end{tikzpicture}
+}

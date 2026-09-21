@@ -1,0 +1,62 @@
+Biological nervous systems are not engineered as circuits; they develop.
+A research program that takes development seriously therefore faces a
+choice of specification: prescribe the final organization (a designed
+network), or prescribe only the materials and the laws and ask whether
+organization arises. The ANIMA project takes the second path. Its
+charter fixes only the sensory boundary, the output boundary, the
+environment and curriculum, finite resource limits, and fundamental
+local plasticity laws, and requires that the organism --- a population
+of spiking neurons --- develop useful, stable, adaptive internal
+organization through interaction, without any prescription of the final
+organization \cite{overview,decisionlog}.
+
+Three commitments follow from this framing and structure everything
+reported here. First, \emph{minimal specification}: no task-specific
+semantic variables, no labels, no reward or credit assignment, no
+hidden supervision, and no hand-designed internal architecture. The
+organism's ``concepts'' are whatever its plasticity laws and its
+curriculum make of its inputs. Second, \emph{locality}: all mechanisms
+operate on local state --- membrane potentials, arriving currents,
+synaptic weights, and per-neuron budgets. Third, \emph{determinism and
+discipline}: every experiment is frozen in writing before
+implementation, runs under a single seeded random number generator so
+that same-seed reproduction is byte-identical, is gated by a
+flag-off identity check against the committed baseline, and preserves
+its negative results \cite{overview}.
+
+The research question of Phase I is deliberately modest in form and
+demanding in content:
+
+\begin{quote}
+\emph{In a minimally specified spiking substrate with local plasticity
+and finite resources, what internal organization emerges, what of it
+persists, and what are the architectural limits of persistent,
+retrievable learning under sequential experience?}
+\end{quote}
+
+The answer, as measured rather than assumed, is summarized by the
+progression in Figure~\ref{fig:architecture} and developed through the
+rest of the paper. The phrase ``architectural limits'' is used
+advisedly: Phase I's contribution is not a system that works, but a
+map of the causal chain through which each candidate substrate failed,
+with the failure point identified at each step. The final step ---
+recruiting postsynaptic activity for a genuinely novel pattern that
+arrives late in a blocked curriculum --- is a measurement of where the
+current architecture stops, not a claim that the class of architectures
+is exhausted.
+
+\subsection{Relation to related work}
+
+The substrate is an orthodox leaky-integrate-and-fire (LIF) population
+with pairwise additive spike-timing-dependent plasticity (STDP)
+\cite{gerstner2002,bipoo1998}. The aspiration --- that competitive
+Hebbian learning organizes selective assemblies --- has a long
+theoretical lineage \cite{hebb1949,song2000}. ANIMA differs from that
+lineage in its discipline rather than its ingredients: organization is
+never scored by a task the experimenter cares about; the curriculum is
+a fixed, deterministic schedule of synthetic pattern presentations; and
+every mechanism claim is tested under flag-off byte-identity control.
+The value of the record is therefore mostly negative: it shows, under
+these controls, exactly which attractive properties of the ingredients
+fail to materialize, and where successive local amendments move the
+failure.

@@ -1,0 +1,71 @@
+\subsection{Representation}
+
+Phase I demonstrates that a minimally specified spiking substrate
+develops sensory-specific organization (afferent selectivity
+\(\pm 0.8\)--\(0.9\); 91\% run-identity decode of per-neuron afferent
+vectors; repeatable per-presentation count vectors). It equally
+demonstrates that the transient representation is weak where it
+matters: cross-pattern response separation stalled near 0.67--0.74
+against a 0.60 bar, and the two dynamics interventions (adaptation,
+lateral inhibition) moved it in the wrong direction
+\cite{e1proto,e3bproto}. The binding problem of this organism is
+representational: 24 afferents drive one 40-neuron recurrent pool
+through random sparse wiring, so every readout mixes patterns. Nothing
+in the record suggests this is fixable by further rate dynamics; the
+only lever that has ever moved coexistence is budget partition (V2.3,
+blocked-only) \cite{overview,synmem}.
+
+\subsection{Persistence}
+
+Persistence has two measured faces. Structural persistence is real and
+bounded by mechanics: weights survive silence (matrix drift \(\sim
+1.4\%\)/20 s), decay is the dominant eraser (SDE-C2), and bounded
+protection stops the runaway that unbounded protection caused
+\cite{bbounded,cllarecord}. Activity persistence is information-poor:
+the V2.1 slow state self-sustains but saturates, and its endogenous
+form is deterministic pacemaking \cite{infoaudit}. The paper's
+strongest persistence claim is negative and precisely delimited: no
+persistent substrate measured in Phase I retains episode identity
+through repeated or alternated exposure --- including, in the testable
+case, during the stimulus itself.
+
+\subsection{Interference}
+
+Interference is order-dependent and budget-mediated. Isolated
+training selects; blocked training overwrites; alternation superposes
+into a third configuration. The causal probes attribute the erasure to
+passive decay acting through M2's shrinking working budget, with M4 as
+the executing pruner; STDP's \(a^-/a^+\) asymmetry is secondary
+(SDE-D). Protection fixes stability, not interference: even with
+bounded protected structure, blocked order captures the budget for the
+latest block \cite{capability}. Interference is therefore best
+described as an \emph{allocation} phenomenon --- competition for a
+shared local budget --- rather than a plasticity-sign phenomeno.
+
+\subsection{Allocation}
+
+The allocation sequence is the paper's procedural core: five
+registered experiments, each gated byte-identical, each moving the
+identified bottleneck one step downstream (gate \(\to\) trigger
+semantics \(\to\) visibility \(\to\) source \(\to\) post-permanence
+growth). The final measured residual is that the working substrate of a
+not-yet-presented pattern is dismantled before its first exposure, and
+that even a corrected allocator cannot grow the protected structure
+once substrate is gone. This is the point where Phase I's causal
+narrowing arrives at the architectural frontier: allocation works when
+the pattern is active, and fails for patterns that have never been
+active --- which is exactly the class that sequential memory requires.
+
+\subsection{Recruitment}
+
+The recruitment deficit is the frontier's content: a genuinely new
+late-arriving pattern cannot recruit postsynaptic activity because its
+afferent substrate was churned away, and no membrane-side,
+input-proportional gain can amplify a substrate that is not there. The
+IL control proves the stimulus is not at fault. Two registered
+mechanism tests bounded the hypothesis without resolving it; the
+threshold-completion cap fixed the aggregate operating point but could
+not repair first-exposure rate or substrate survival. The discussion
+stops here by intent: Phase I's evidence supports a direction
+(architectures for multiple independently retrievable persistent
+representations under sequential experience), not a design.

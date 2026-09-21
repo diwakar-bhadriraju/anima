@@ -1,0 +1,84 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Relation to related work}{4}{subsection.1.1}%
+\contentsline {section}{\numberline {2}Design Philosophy}{4}{section.2}%
+\contentsline {paragraph}{Specified interfaces, not architectures.}{4}{section*.2}%
+\contentsline {paragraph}{Local rules.}{4}{section*.3}%
+\contentsline {paragraph}{Finite resources.}{4}{section*.4}%
+\contentsline {paragraph}{No semantic supervision.}{4}{section*.5}%
+\contentsline {paragraph}{Reproducibility and freeze discipline.}{4}{section*.6}%
+\contentsline {section}{\numberline {3}The ANIMA Substrate}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Neuron and network dynamics}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Sensory interface and curriculum}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Plasticity in normative form}{6}{subsection.3.3}%
+\contentsline {section}{\numberline {4}Experimental Methodology}{6}{section.4}%
+\contentsline {paragraph}{Frozen protocols.}{7}{section*.9}%
+\contentsline {paragraph}{Identity gates.}{7}{section*.10}%
+\contentsline {paragraph}{Deterministic replay and read-only audits.}{7}{section*.11}%
+\contentsline {paragraph}{Falsifiers and preservation of failure.}{7}{section*.12}%
+\contentsline {paragraph}{Exploratory versus formal experiments.}{7}{section*.13}%
+\contentsline {paragraph}{Record corrections preserved.}{7}{section*.14}%
+\contentsline {section}{\numberline {5}Emergent Sensory Organization}{8}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Afferent organization}{8}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Transient spike-pattern separation}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Per-presentation count structure}{8}{subsection.5.3}%
+\contentsline {section}{\numberline {6}The Persistent-State Information Bottleneck}{9}{section.6}%
+\contentsline {paragraph}{Rung 1: afferent structure.}{9}{section*.16}%
+\contentsline {paragraph}{Rung 2: instantaneous spikes.}{9}{section*.17}%
+\contentsline {paragraph}{Rung 3: windowed counts.}{9}{section*.18}%
+\contentsline {paragraph}{Rung 4: cumulative counts.}{9}{section*.19}%
+\contentsline {paragraph}{Rung 5: intrinsic scalar \(u\).}{10}{section*.20}%
+\contentsline {subsection}{\numberline {6.1}The dilution result across repeated presentations}{10}{subsection.6.1}%
+\contentsline {section}{\numberline {7}Intrinsic Persistence Is Not Sensory Memory}{10}{section.7}%
+\contentsline {subsection}{\numberline {7.1}What \(u\) is, measured}{10}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}The historical wedge: \(u\) fails during the stimulus, not only after it}{11}{subsection.7.2}%
+\contentsline {section}{\numberline {8}Synaptic Plasticity as Persistent Structure}{12}{section.8}%
+\contentsline {paragraph}{Persistence (G1, G2).}{12}{section*.23}%
+\contentsline {paragraph}{Create/maintain mechanics (G4).}{13}{section*.24}%
+\contentsline {paragraph}{What is not established at this layer (G8).}{13}{section*.25}%
+\contentsline {section}{\numberline {9}Synaptic Interference: Isolated, Blocked, and Alternating Regimes}{13}{section.9}%
+\contentsline {paragraph}{Isolated.}{13}{section*.26}%
+\contentsline {paragraph}{Blocked.}{13}{section*.27}%
+\contentsline {paragraph}{Alternating.}{14}{section*.28}%
+\contentsline {paragraph}{Causal decomposition.}{14}{section*.29}%
+\contentsline {section}{\numberline {10}Consolidation-Locked Allocation (CLLA)}{15}{section.10}%
+\contentsline {subsection}{\numberline {10.1}The mechanisms}{15}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}The four-record sequence}{15}{subsection.10.2}%
+\contentsline {section}{\numberline {11}Allocation Experiments}{16}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Residual allocation gate (rule)}{16}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Dormant-candidate reserve}{17}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}First-exposure allocation}{17}{subsection.11.3}%
+\contentsline {subsection}{\numberline {11.4}Source-selection correction}{17}{subsection.11.4}%
+\contentsline {subsection}{\numberline {11.5}What the sequence ruled out}{17}{subsection.11.5}%
+\contentsline {section}{\numberline {12}The Novel-Pattern Recruitment Bottleneck}{18}{section.12}%
+\contentsline {subsection}{\numberline {12.1}Event-level decomposition (weight-growth audit)}{18}{subsection.12.1}%
+\contentsline {subsection}{\numberline {12.2}Drive decomposition and the IL control (drive audit)}{19}{subsection.12.2}%
+\contentsline {section}{\numberline {13}The Fixed-\(k_g\) Recruitment-Gain Experiment}{19}{section.13}%
+\contentsline {subsection}{\numberline {13.1}Registration A: uncapped (k\_g = 8.0)}{20}{subsection.13.1}%
+\contentsline {subsection}{\numberline {13.2}Registration B: threshold-completion cap}{20}{subsection.13.2}%
+\contentsline {subsection}{\numberline {13.3}Why the experiment was closed}{21}{subsection.13.3}%
+\contentsline {section}{\numberline {14}Phase I Synthesis}{21}{section.14}%
+\contentsline {section}{\numberline {15}Limitations}{23}{section.15}%
+\contentsline {paragraph}{Scale and stimulus regime.}{23}{section*.35}%
+\contentsline {paragraph}{No closed loop.}{23}{section*.36}%
+\contentsline {paragraph}{Protocol defects bound several verdicts.}{24}{section*.37}%
+\contentsline {paragraph}{Operating-point confounds.}{24}{section*.38}%
+\contentsline {paragraph}{Theoretical claims are minimal.}{24}{section*.39}%
+\contentsline {paragraph}{What is not claimed about failure.}{24}{section*.40}%
+\contentsline {section}{\numberline {16}Discussion}{24}{section.16}%
+\contentsline {subsection}{\numberline {16.1}Representation}{24}{subsection.16.1}%
+\contentsline {subsection}{\numberline {16.2}Persistence}{24}{subsection.16.2}%
+\contentsline {subsection}{\numberline {16.3}Interference}{25}{subsection.16.3}%
+\contentsline {subsection}{\numberline {16.4}Allocation}{25}{subsection.16.4}%
+\contentsline {subsection}{\numberline {16.5}Recruitment}{25}{subsection.16.5}%
+\contentsline {section}{\numberline {17}Conclusion}{25}{section.17}%
+\contentsline {section}{\numberline {18}Future Work}{26}{section.18}%
+\contentsline {section}{\numberline {19}Reproducibility and Artifact Availability}{26}{section.19}%
+\contentsline {subsection}{\numberline {19.1}Repository structure}{26}{subsection.19.1}%
+\contentsline {subsection}{\numberline {19.2}Lineage and commit discipline}{27}{subsection.19.2}%
+\contentsline {subsection}{\numberline {19.3}Reproducible analysis}{27}{subsection.19.3}%
+\contentsline {subsection}{\numberline {19.4}Determinism}{27}{subsection.19.4}%
+\contentsline {section}{\numberline {A}Experimental Lineage}{27}{appendix.A}%
+\contentsline {section}{\numberline {B}Notation}{29}{appendix.B}%
+\contentsline {section}{\numberline {C}Additional Quantitative Results}{29}{appendix.C}%
+\contentsline {subsection}{\numberline {C.1}Key quantitative findings}{29}{subsection.C.1}%
+\contentsline {subsection}{\numberline {C.2}Registration-B running details}{29}{subsection.C.2}%

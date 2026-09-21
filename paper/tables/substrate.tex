@@ -1,0 +1,32 @@
+\begin{table}[t]
+\centering
+\caption{\textbf{Substrate specification (frozen V2; the V2 protocol
+\cite{v2proto}).} All values commit in the committed configuration
+files; later experiments change only the listed flags.}
+\label{tab:substrate}
+\footnotesize
+\begin{tabular}{p{3.4cm}p{5.4cm}p{6.4cm}}
+\toprule
+Layer / mechanism & Value & Note \\
+\midrule
+Tick & 1 ms & deterministic; seeded \\
+Input channels & 24 (groups \(A=0..7\), \(C=8..15\), \(B=16..23\)) & pure spike sources (D8): no internal state \\
+Internal / output neurons & 40 / 12 (ids 24..75, \(N=52\)) & LIF; output is a role tag \\
+LIF & \(\tau_m = 20\) ms, \(v_{\mathrm{rest}} = 0\), \(v_{\mathrm{th}} = 1\), refractory 2 ms & \\
+Synaptic current & \(\tau_{\mathrm{syn}} = 5\) ms, amplitude \(a = 52\) & current per spike \(= a\cdot w\) \\
+Initial wiring & M1: input \(p=0.5\), recurrent \(p=0.2\), weak weights & seeded \\
+STDP & pairwise additive; \(\tau_\pm = 20\) ms, \(a^+=0.005\), \(a^-=0.0053\) & E1 amendment A1 operating point \\
+Passive decay & \(10^{-6}\)/tick & \\
+M2 normalization & per-neuron excitatory budget \(t_e = 0.8\) & multiplicative rescale of live incoming \\
+M3 candidates & 6 slots; \(w_{\mathrm{c,init}}=0.01\), \(\theta_{\mathrm{perm}}=0.05\), \(w_{\mathrm{c,perm}}=0.02\) & co-active windows \\
+M4 pruning & \(\theta_{\mathrm{prune}} = 0.005\), 10 windows & excitatory only \\
+M5 budgets & \(b_e = 40\) exc / \(b_i = 10\) inh per neuron & \\
+M6 inhibition & anti-Hebbian; \(w_{\mathrm{inh,max}} = 0.10\) & \\
+E6 & per-channel rate balance, history-derived & no labels \\
+V2.1 slow state & \(u\): \(+\beta\)/spike, decay \(\tau_s\); \(\beta=0.0046875\), \(\tau_s=5000\) ms & the e24 cell used by all CLLA-era runs \\
+Resource detector & runaway: population mean \(>50\) Hz sustained 5 s & abort with failure record \\
+Curriculum cadence & 500 ms presentation @ 20 Hz/channel; 1500 ms off & 2 s per presentation \\
+Seeds & 20260912, 424242, 9001 & frozen \\
+\bottomrule
+\end{tabular}
+\end{table}
