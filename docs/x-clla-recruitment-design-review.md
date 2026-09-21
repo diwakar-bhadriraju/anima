@@ -237,45 +237,91 @@ ONLY new quantity; the rule's form, gate, domain, bounds,
 temporal semantics and self-limiting structure are all fully
 determined by existing local quantities (sections 1–8).
 
+DECISION (2026-09-21, user): freeze the first mechanism test at
+k_g = 8.0 exactly — the lowest value in the retrospective
+plausible-bootstrap bracket — as a fixed mechanism constant,
+NOT a fitted magnitude. No parameter selection from observed
+response, no adaptation, no post-execution adjustment (§10).
+
 ## 10. The SINGLE smallest frozen experiment (protocol only, NOT run)
 
-PURPOSE: measure the unmeasured drive→posts map band [4.2, ~19]
-so that k_g becomes a MEASURED value (k_g := I_cross / 1.565),
-never a chosen one. This removes the only free parameter from
-the design — by construction.
+FIXED-MECHANISM TEST, k_g = 8.0 exactly. No i_ext dose-response,
+no parameter selection from the outcome, no post-hoc bracket.
 
-- Config: committed clla-fe-s20260912-bac seed/config, organism
-  dynamics UNCHANGED — the recruitment rule is NOT implemented.
-- Instrument: the existing per-neuron external current probe
-  mechanism (network.rs i_ext, "used by probes/tests");
-  telemetry as in the audited runs.
-- Design: during seconds-block C presentations (pres 21–30),
-  inject i_ext = L on every internal neuron that received
-  working C current in the preceding C presentation (a set
-  defined by the run's own telemetry, no labels), L ∈ {0, 2, 4,
-  6, 8} current units — one presentation per level, fixed
-  ascending order, L = 0 first (control re-measurement of the
-  plateau).
-- Measures: posts/n AND internal spike RATE per presentation
-  (rate matters: posts saturate at 1.0 — the rate curve
-  determines how close to the 50 Hz guard the crossing sits).
-- Pre-registered outcomes:
-  - PASS: monotone increase, posts ≥ 0.5/n at some L ≤ 8, no
-    runaway, and an L = 0 A re-test (pres 31) retains A posts ≥
-    0.9 × baseline (no damage to the established representation).
-  - FAIL: runaway (existing detector) or posts stay < 0.5 at
-    L = 8 → the map band extends higher than the pre-registered
-    bracket; a pre-registered stage-2 probe at L ∈ {10, 12, 16}
-    then resolves the crossing (two-stage titration, not tuning).
-- Output: I_cross (smallest L with posts ≥ 0.5) → k_g :=
-  I_cross / 1.565, a measured constant with the form already
-  frozen by this review. The rule (equation of §1) may then be
-  implemented ONLY as a follow-up experiment with that single
-  measured k_g and the §9 safety criteria as gates.
+PURPOSE: answer, with a single pre-frozen magnitude,
+"Does the local recruitment gain allow first-exposure novel
+patterns to recruit enough posts to establish protected
+synaptic structure?" — CLLA baseline vs CLLA + gain.
 
-This is the single smallest experiment: it changes NOTHING about
-the organism (probe-only), measures the one missing datum, and
-converts the unavoidable parameter into a measurement.
+- Mechanism (the §1 equation with k_g = 8.0, everything else
+  byte-identical to the committed clla-fe configuration).
+- Models: blocked orders BAC and BCA (both established), all
+  three existing seeds (s20260912, s9001, s424242).
+- Baselines: the 9 committed source-correction runs
+  (clla-fe-*20260921T1533*, bac/bca/il × 3 seeds) — already on
+  disk; no new baseline runs.
+- Gain arms: 9 NEW runs — bac × 3 seeds, bca × 3 seeds, plus
+  3 IL-with-gain runs (IL preservation, §10.2).
+- Config: clla-fe-s{seed}-{order}.toml + the single new flag
+  (gain_enabled = true, k_g = 8.0); identical stimulus TOMLs,
+  identical seeds, identical telemetry.
+
+### 10.1 Predeclared primary endpoints (all must pass)
+
+1. SECOND-BLOCK PROTECTED MASS: mean C protected weight at
+   end of block 2 (last snapshot, t ≥ 100,000) ≥ 0.09.
+   (Baseline 0.054; A-parity 0.096 — the bar is the A-block
+   reference, not the baseline.)
+2. FIRST-C POST ACTIVITY: posts/n at pres 21 (first C) ≥ 0.5
+   (baseline 0.12).
+3. PERMANENCE RATE: C-block permanence events ≥ 150 per run
+   (baseline 61; A-block 264).
+4. STABILITY: zero failures in every gain arm (runaway
+   detector, resource limits, birth limits); A-block behavior
+   preserved — A posts/n at pres 20 ≥ 0.9 × that arm's
+   baseline pres-20 value; no protected-cap violation (max P
+   per neuron ≤ p_max_frac × t_e = 0.6 + 1e-6, from
+   snapshots).
+5. IL PRESERVATION: the 3 IL-with-gain runs must keep C posts
+   mean ≥ 0.8 × the committed IL baseline mean and C permanence
+   within ±20% of baseline (98) — the alternating coexistence
+   must not be damaged by the gain.
+6. NO ENDOGENOUS-TRIGGERED BOOST: inter-presentation gap spike
+   activity (non-input spikes in the 2 s gaps) within ±0.5 Hz
+   of the corresponding baseline arm — the §5 double-zero must
+   hold in vivo.
+
+No decoder. k_g is NOT adjusted after execution; no upward
+bracketing on failure.
+
+### 10.2 Outcome rules
+
+- PASS (all of 1–6): the fixed mechanism test succeeds at its
+  minimal defensible magnitude; report the full comparison
+  (drive decomposition, R trajectories, weight curves) and ONLY
+  THEN consider a separate, later magnitude study as an
+  independent question.
+- FAIL: STOP and report the failure mechanism from telemetry —
+  localize the chain (drive → posts → recurrent engagement →
+  permanence → protected mass) at the first link that did not
+  move, with the measured per-presentation numbers. No
+  reparameterization in the same registration.
+- The i_ext dose-response probe discussed in the earlier draft
+  is REJECTED as a parameter-selection device. It is retained
+  only if explicitly desired later as READ-ONLY diagnostic
+  evidence for failure localization (post-mortem tooling on the
+  failed telemetry, same committed tooling) and can never
+  determine a magnitude.
+
+### 10.3 Risk note (recorded, not acted on)
+
+Per §8's counterfactual, k_g = 8 is the BORDERLINE point of the
+bracket: first-presentation posts ≈ 0.34 without recurrence,
+0.44–0.50 with A-type recurrence. The test is therefore
+two-sided informative: pass → mechanism confirmed at its lowest
+credible magnitude; fail → the mechanism is insufficient at the
+most defensible low value and the failure mechanism is the
+deliverable. Both outcomes are clean; neither invites tuning.
 
 ## 11. Architectural status
 
@@ -296,16 +342,21 @@ accounting (headroom gate inherited, no synapse operations).
 ## 12. Summary
 
 - Form: fully determined by existing local quantities.
-- Magnitude: k_g ∈ [6, 10] REQUIRED, NOT derivable from
+- Magnitude: k_g ∈ [6, 10] required, NOT derivable from
   existing constants — the single unavoidable new parameter;
-  per mandate: STOP and report instead of inventing.
+  FROZEN AT k_g = 8.0 exactly by user decision as a fixed
+  mechanism constant for the first test (§9, §10). No
+  parameter selection from observed response.
 - Pacemaker: zero by double construction (§5).
 - Positive feedback: bounded, self-limiting via consolidation,
   adaptation, inhibition, refractory, guard (§6).
 - CLLA/M2/M6: untouched; accounting intact (§7).
 - Counterfactual: brackets the crossing but cannot resolve it —
   the map's middle band is unmeasured (§8).
-- Next: the frozen map probe (§10) turns k_g into a measurement.
+- Next: the frozen fixed-mechanism comparison (§10): CLLA
+  baseline vs CLLA + local recruitment gain at k_g = 8.0,
+  blocked BAC/BCA × 3 existing seeds + IL preservation arms,
+  six predeclared endpoints, PASS/FAIL-STOP outcome rules.
 
 No implementation, no runs, no tuning, no E-number.
 
