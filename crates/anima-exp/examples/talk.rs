@@ -92,6 +92,8 @@ fn cosc(a: &[f32], b: &[f32]) -> f32 {
 fn load(run_dir: &str, net: &mut Network) -> (Vec<f32>, Vec<f32>, u64) {
     let snaps = read_snapshots(&std::path::Path::new(run_dir).join("snapshots.bin.zst")).expect("snapshots");
     let last = snaps.last().expect(">=1 snapshot");
+    let w_before: f32 = net.synapses.iter().map(|s| s.w).sum::<f32>();
+    let n_loaded = last.synapses.len();
     for (i, s) in net.synapses.iter_mut().enumerate() {
         if let Some(ss) = last.synapses.get(i) {
             if let Some(w) = ss.w { s.w = w; }
@@ -99,6 +101,8 @@ fn load(run_dir: &str, net: &mut Network) -> (Vec<f32>, Vec<f32>, u64) {
             if ss.track != 0 { s.track = ss.track; }
         }
     }
+    let w_after: f32 = net.synapses.iter().map(|s| s.w).sum::<f32>();
+    println!("  weight check: sum before={w_before:.3} snapshotSyn={n_loaded} mySyn={} sum-after={w_after:.3}", net.synapses.len());
     // neuron dynamic state (v, slow depolarization, latch) - without this
     // the loaded brain is cold/at-rest and won't sustain its trained firing
     for (i, n) in net.neurons.iter_mut().enumerate() {
@@ -176,19 +180,17 @@ fn main() {
         let tr = if sym == "QUIET" { vec![] } else if ALPHABET.iter().any(|(s, _)| *s == sym) { symbol_trains(&sym, seed) }
             else { println!("unknown: {sym}"); continue };
         println!("input spikes this beat: {} (A/C/D=8ch x 20Hz; QUIET=0)", tr.len());
+        // two-beat probe: beat 1 = settle (builds on slow tau~5s dynamics),
+        // beat 2 = the decoded response. Restart tick from load marker.
+        tick = Tick(tick0);
         let mut out = vec![0.0f32; 12];
-        for _ in 0..BEAT_MS {
-            let frame = InputFrame { tick, spikes: vec![] }; // placeholder; real below
-            let _ = frame;
-            break;
-        }
-        // real: present beat ticks with the symbol's spikes
-        tick = Tick(tick0); // restart from trained state marker for a clean single beat
-        for t in 0..BEAT_MS {
-            let frame = InputFrame { tick, spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
-            let ev = net.step(&frame);
-            for c in &ev.spikes { if (64..76).contains(&c.0) { out[(c.0 - 64) as usize] += 1.0; } }
-            tick = Tick(tick.0 + 1);
+        for beat in 0..2u32 {
+            for t in 0..BEAT_MS {
+                let frame = InputFrame { tick, spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
+                let ev = net.step(&frame);
+                if beat == 1 { for c in &ev.spikes { if (64..76).contains(&c.0) { out[(c.0 - 64) as usize] += 1.0; } } }
+                tick = Tick(tick.0 + 1);
+            }
         }
         let amp = out.iter().sum::<f32>() / 12.0;
         let (rhoa, rhoc) = (cosc(&out, &ra), cosc(&out, &rc));
