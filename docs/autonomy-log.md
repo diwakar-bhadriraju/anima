@@ -168,3 +168,18 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   (a real mechanism asset) but NO route converts it to anticipation.
   Next candidates recorded (overlap curriculum, readout coerced post,
   structural-growth-targeted) - approval required, no tuning.
+
+## D-15 - adjacent-gap probe: Level-4 temporal prediction CLOSED (representational + dynamic)
+
+- Shrank S1 gap to 40/100 ms (STDP reach) on base E-nogain, 3 seeds x2
+  gaps. Out PI 0/3 reach +0.05 at either gap; post-X state is decaying-X
+  memory, never Y-tuned even adjacent. 3/6 runs RUNAWAY (fast-STDP
+  bridging over-amplifies the all-excitatory pool).
+- Verdict: NOT a bridging-mechanism limit - REPRESENTATIONAL + DYNAMIC.
+  Concordant with E3b (single shared pool mixes readouts) and the whole
+  E4/d_elig/d_ing family (plasticity consolidation unopposed -> runaway).
+  Level-4 temporal prediction via STDP transition learning CLOSED across
+  gap scale and mechanism family. Confirmed assets: alternation
+  retrieval (L3), protectable gap bridge (d_ing).
+- Next (approval): (r1) substrate representation change, (r2) accept L3
+  bound + move ladder to another rung, (r3) inhibition-with-gate-risk.

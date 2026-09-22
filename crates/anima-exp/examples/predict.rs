@@ -67,9 +67,10 @@ fn main() {
                 let (t0, p0) = (pres[i].0, pres[i].1.clone());
                 let (t1, p1) = (pres[i + 1].0, pres[i + 1].1.clone());
                 if t1 <= t0 || t1 - t0 > 2100 || p0 == p1 { continue; }
+                let gs = (t0 + 500).min(t1.saturating_sub(1)); // full gap [t0+500, t1)
                 let mut v = vec![0.0f32; n];
                 for (st, s) in &spk {
-                    if *st >= t1.saturating_sub(500) && *st < t1 && *s >= lo && *s < hi {
+                    if *st >= gs && *st < t1 && *s >= lo && *s < hi {
                         v[(s - lo) as usize] += 1.0;
                         gap_spikes += 1;
                     }

@@ -85,3 +85,46 @@ not patching this one):
   regression history) now that the gap bridge is protectable.
 
 STOP - falsified; protective premise confirmed; evidence preserved.
+## Amendment (D-15): adjacent-gap probe — temporal prediction CLOSED at gap scales AND mechanism families
+
+Purpose (docs/phase3/level4-adjacent-protocol.md): separate a bridging
+(mechanism) limit from a representational/dynamic limit by shrinking the
+il S1 inter-presentation gap (off_ms) into STDP reach (tau_plus 20 ms;
+arms 40 ms ~2 tau, 100 ms ~5 tau). Pure curriculum change on the
+committed E-nogain platform; 3 seeds x {40,100} ms.
+
+RESULT (output prediction index PI; falsifier bar +0.05 in >= 2/3 seeds):
+- 100 ms arm: out PI = +0.0035 / +0.0094 / -0.0206  (0/3 reach bar)
+-  40 ms arm: out PI = -0.0417 / (s9001 n=6, early) / -0.0461 (0/3)
+- STABILITY: 3/6 adjacent runs FAILED runaway-activity (gap40: 20260912,
+  9001; gap100: 9001). Fast-STDP bridging drives the all-excitatory
+  recurrent pool into the runaway regime.
+- Pool PI ~ 0 throughout; post-X state is decaying-X memory, never
+  Y-tuned, even at 40 ms gap.
+
+CONCLUSION: the substrate does NOT learn forward X->Y anticipation via
+plateau of its STDP even when temporally adjacent. The three prior
+falsifications (d_elig, d_elig_ro, d_ing) were NOT merely bridging-
+mechanism failures: representation is the binding constraint. This is
+concordant with E3b's "binding problem is REPRESENTATIONAL": the single
+shared 40-neuron all-excitatory pool with 3.8% random connectivity mixes
+every readout, so order-specific forward structure cannot form, and
+plasticity reweighting over-amplifies toward runaway (recurring
+E4-family theme) with no inhibition to oppose consolidation.
+
+LEVEL-4 TEMPORAL PREDICTION VIA STDP-BASED TRANSITION LEARNING: CLOSED
+across gap scale (40 ms .. 1500 ms) and mechanism family (all-edges LTP,
+readout LTP, inhibitory-gated readout). Boundary recorded.
+
+NEXT (approval required; NOT another plateau/readout/STDP patch — the
+root is representation + dynamics in the single shared pool):
+- (r1) substrate-level representation change (connectivity/density of
+  the pool, or overlapping sub-populations) — a major substrate change;
+- (r2) accept the Level-3 bound (robust alternation retrieval + now-
+  protectable bridge are the confirmed assets) and move the ladder to a
+  different capability rung (e.g. generalization, closed-loop action on
+  the existent retrieval), recording temporal prediction as empirically
+  out of reach of THIS substrate;
+- (r3) an inhibitory/structural substrate where consolidation is opposed
+  (the E3b/E4-family root), with the honest gate risk that adding
+  inhibition previously WEAKENED separation.
