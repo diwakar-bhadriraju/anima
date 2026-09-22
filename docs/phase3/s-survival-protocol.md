@@ -212,3 +212,30 @@ Death rule tightened while here: activity-out-of-bounds OR recognition
 collapse must hold for a full r_window (10 beats), not 1 beat, to trip
 death (a single quiet/fast beat is not death). Regression: run must
 reach the full beat horizon or a clearly attributable mid-run death.
+
+## D-30 — survival-loop first finding: the autonomous loop locks onto one known pattern (degenerate closed loop)
+
+Smoke (clla-surv-min, warm-start S1->SURV): 30 beats, no death, mean_v=
+1.000, but ALL beats present and decode A (A=30 C=0 W=0 Q=0). The
+organism orbits a single known pattern forever: world starts on A, it
+recognizes A, world keeps A, it keeps recognizing A. Viability is
+trivially perfect and the known-vs-novel falsifier CANNOT fire because
+the organism never encounters D (novel). This is a REAL result (an
+organism that prefers its comfortable known state and stays there is
+behaviorally sensible) but it makes the frozen PRIMARY endpoint
+undetectable: with full-observed-ministry, known-vs-novel can't be
+measured and kvs_diff is computed on an empty novel set (garbage).
+
+DECISION (registration, not tuning): the environment must occasionally
+force novelty so the falsifier is measurable, while keeping the organism
+autonomy otherwise. Amend the world-update rule: with probability p_novel
+(e.g. 0.2, frozen), the world presents the NEVER-TRAINED D probe instead
+of following the organism's action; otherwise (0.8) the organism's
+action selects the next stimulus (approach known / withdraw). This
+preserves organism autonomy while guaranteeing the closed loop actually
+tests known-vs-novel (D is never trained, stays NOVEL, refs fixed at
+S1-end - D-24/D-26). p_novel and the D-probe are pre-registered here
+(no post-hoc tuning on results).
+Recorded: the first, uninformed closed-loop finding (self-selected
+single-pattern orbit) is preserved; the amended rule makes the frozen
+falsifier testable.
