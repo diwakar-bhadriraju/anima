@@ -156,3 +156,42 @@ a new harness mode:
    identity) + drive + codebook. 3. Unit tests + identity gate. 4. Run 3
    seeds. 5. Measure known-vs-novel differential + persistence. 6. Verdict.
 STOP - frozen D-22 + D-23.
+
+## D-24 — GAP semantics + ref-drift policy (frozen before implementation)
+
+(1) GAP world state semantics: WITHDRAW -> GAP presents one single
+silence beat (no stimulus, duration = one 500 ms beat), THEN the world
+re-presents a stimulus (the loop continues; the organism is not
+stranded in silence). GAP beats are EXCLUDED from the recognition-rate
+r(t) accumulation (r(t) counts only beats that carry a known stimulus
+A/C; gap beats and novel beats are not "recognition failures" - they are
+separately reported). Rationale: r(t) must measure recognition of known
+stimuli, not appearances of non-known ones.
+
+(2) PLASTICITY DURING THE LOOP + REF DRIFT policy: the loop runs with
+STDP plastic LY ON (the "learns by experience, no retrain" claim must
+hold inside the loop; the organism keeps adapting as it lives). Because
+plasticity is on, A_ref / C_ref (the codebook references) are not
+static:
+
+  FROZEN POLICY: refs are FIXED AT S1-END - captured once after the
+  formation stage, then held constant for the entire closed loop.
+  Rationale: (a) a live organism's "template" for what it knows is its
+  memory at the time it entered its world; (b) re-estimating refs each
+  beat would make the codebook chase the organism and erode the
+  known-vs-novel distinction (a novel stimulus that starts to be learned
+  would silently promote itself to "known" via ref drift, confounding
+  the falsifier). We accept that S1-end refs may drift out of date as
+  the organism learns in-loop; that drift is MEASURED (report ref-to-
+  current-response cosine over the run) and, if large, becomes evidence
+  about learning dynamics - not a reason to re-normalize mid-run.
+
+  Consequence to pre-register: the frozen th_known / q_floor thresholds
+  are calibrated against S1-end refs; if in-loop plasticity moves the
+  responses far from the S1-end refs, the codebook's confidence may
+  degrade over the run - that degradation is part of the measured
+  outcome (report final ref-response drift per seed), not a tuning
+  target.
+
+No post-hoc tuning; both policies are decided here and documented in the
+falsifier's interpretation.
