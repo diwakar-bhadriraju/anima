@@ -126,6 +126,10 @@ pub struct V2Section {
     /// side; docs/x-clla-recruitment-design-review.md §10). false = identity.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub recruit_gain: bool,
+    /// Phase II-A D-core context tracks (docs/x-phase2-a-protocol.md).
+    /// false = identity.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_core: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

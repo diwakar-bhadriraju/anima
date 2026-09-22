@@ -36,6 +36,10 @@ pub struct NeuronState {
     /// serialization when None so flag-off runs stay byte-identical to V2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub g_drive: Option<f32>,
+    /// Phase II-A D-core: learned context prototypes (K*24 f32), omitted
+    /// when the mechanism is off / never updated (byte identity).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ctx_protos: Option<Vec<f32>>,
     pub dormant: bool,
     pub retired: bool,
     pub born: u64,
@@ -52,6 +56,13 @@ pub struct SynapseState {
     /// serialize byte-identically to the committed baseline.
     #[serde(default, skip_serializing_if = "snapshot_bool_false")]
     pub consolidated: bool,
+    /// Phase II-A D-core context tag. Omitted when 0 (flag-off identity).
+    #[serde(default, skip_serializing_if = "snapshot_zero_u8")]
+    pub track: u8,
+}
+
+fn snapshot_zero_u8(v: &u8) -> bool {
+    *v == 0
 }
 
 fn snapshot_bool_false(b: &bool) -> bool {
@@ -252,10 +263,10 @@ mod tests {
                 tick: 10,
                 neurons: vec![NeuronState {
                     id: 0, class: "input".into(), v: Some(0.0), rate_hz: Some(1.0),
-                    u_slow: None, z_latch: None, g_drive: None,
+                    u_slow: None, z_latch: None, g_drive: None, ctx_protos: None,
                     dormant: false, retired: false, born: 0,
                 }],
-                synapses: vec![SynapseState { id: 0, pre: 0, post: 1, w: Some(0.2), plastic: true, consolidated: false }],
+                synapses: vec![SynapseState { id: 0, pre: 0, post: 1, w: Some(0.2), plastic: true, consolidated: false, track: 0 }],
             }).unwrap();
             rec.write_snapshot(&NetworkStateSnapshot {
                 tick: 20,

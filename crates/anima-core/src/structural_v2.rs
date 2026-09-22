@@ -9,7 +9,9 @@
 //! Determinism: every random draw comes from `net.rng` in a fixed order;
 //! iteration is over Vec index order; tie-breaks by lowest SynapseId.
 
-use crate::network::{NeuronClass, NeuronId, Network, SynapseId, Tick, V2Params};
+use crate::network::{
+    dcore_alpha_p, dcore_theta_sim, dcore_tracks, NeuronClass, NeuronId, Network, SynapseId, Tick, V2Params,
+};
 use crate::rate_balance::{E6Params, RateBalance};
 
 /// One candidate afferent (M3): a contact with a weight that can become a
@@ -80,6 +82,17 @@ pub struct V2Plasticity {
     /// Zeroed at each window START; R = res_ip/(res_ip+res_iw) read at M3.
     res_ip: Vec<f32>,
     res_iw: Vec<f32>,
+    /// Phase II-A D-core: per-neuron per-track protected/working input
+    /// current (len 2*n, index i*K+t). Zero always when d_core off.
+    res_ip_t: Vec<f32>,
+    res_iw_t: Vec<f32>,
+    /// Phase II-A D-core: per-neuron per-channel delivered-current window
+    /// accumulator (len n * dcore_tracks() * 24, row-major i*24+c).
+    /// The neuron's own usage vector x_i(w).
+    ctx_acc: Vec<f32>,
+    /// Phase II-A D-core: current window context per neuron (0/1),
+    /// computed at window start from ctx_acc; used for M3 tagging.
+    cur_ctx: Vec<u8>,
     /// Allocation gate g per neuron for the current window.
     res_gate: Vec<f32>,
     /// Dormant reserve (docs/x-clla-dormant-reserve.md): per-neuron set of
@@ -95,6 +108,37 @@ impl V2Plasticity {
     pub fn debug_fired(&self, post: usize) -> &std::collections::BTreeSet<u32> {
         &self.fired_channels[post]
     }
+}
+
+/// Cosine of two 24-dim vectors (0 when either norm is 0).
+fn cosine_row(a: &[f32], b: &[f32]) -> f32 {
+    let mut num = 0.0f32; let mut na = 0.0f32; let mut nb = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        num += x * y; na += x * x; nb += y * y;
+    }
+    if na <= 0.0 || nb <= 0.0 { 0.0 } else { num / (na.sqrt() * nb.sqrt()) }
+}
+
+/// D-core tie/novelty rule: track with the smaller protected mass
+/// (deterministic; ties => lower index). Pure function of snapshot state.
+fn protected_track_choice(net: &Network, post: usize, k: usize) -> u8 {
+    let mut p = vec![0.0f32; k];
+    if let Some(incoming) = net.incoming.get(post) {
+        for &sid in incoming.iter() {
+            let s = &net.synapses[sid.idx()];
+            if s.silent_ticks != u64::MAX && !s.inhibitory && s.consolidated {
+                let t = (s.track as usize).min(k - 1);
+                p[t] += s.w;
+            }
+        }
+    }
+    let mut best = 0u8;
+    for t in 1..k {
+        if p[t] < p[best as usize] {
+            best = t as u8;
+        }
+    }
+    best
 }
 
 impl V2Plasticity {
@@ -128,6 +172,10 @@ impl V2Plasticity {
             rate_balance: e6.map(RateBalance::new),
             res_ip: vec![0.0; n],
             res_iw: vec![0.0; n],
+            res_ip_t: vec![0.0; n * dcore_tracks()],
+            res_iw_t: vec![0.0; n * dcore_tracks()],
+            ctx_acc: vec![0.0; n * 24],
+            cur_ctx: vec![0; n],
             res_gate: vec![1.0; n],
             fired_channels: (0..n).map(|_| std::collections::BTreeSet::new()).collect(),
         }
@@ -177,7 +225,7 @@ impl V2Plasticity {
     /// afferent; excitatory only; post internal). No-op when the rule is
     /// off — accumulators stay zero and res_gate stays 1.0 (identity).
     pub fn accumulate_input_current(&mut self, net: &Network, spikes: &[NeuronId]) {
-        if !self.alloc_residual_enabled() && !self.dormant_reserve_enabled() {
+        if !self.alloc_residual_enabled() && !self.dormant_reserve_enabled() && !self.d_core_enabled() {
             return;
         }
         // Fired input channels this tick (per post neuron) for the reserve
@@ -205,6 +253,15 @@ impl V2Plasticity {
                 if track_channels && i < self.fired_channels.len() {
                     self.fired_channels[i].insert(pre.0);
                 }
+                if self.d_core_enabled() && (i * 24 + pre.0 as usize) < self.ctx_acc.len() {
+                    self.ctx_acc[i * 24 + pre.0 as usize] += cur;
+                    let t = (s.track as usize).min(dcore_tracks() - 1);
+                    if s.consolidated {
+                        self.res_ip_t[i * dcore_tracks() + t] += cur;
+                    } else {
+                        self.res_iw_t[i * dcore_tracks() + t] += cur;
+                    }
+                }
                 if s.consolidated {
                     self.res_ip[i] += cur;
                 } else {
@@ -212,6 +269,16 @@ impl V2Plasticity {
                 }
             }
         }
+    }
+
+    /// Phase II-A D-core flag (docs/x-phase2-a-protocol.md).
+    pub fn d_core_enabled(&self) -> bool {
+        self.params.d_core
+    }
+
+    /// Current window context of a neuron (tests/instrumentation).
+    pub(crate) fn current_ctx(&self, post: usize) -> u8 {
+        self.cur_ctx.get(post).copied().unwrap_or(0)
     }
 
     /// Dormant-reserve flag (docs/x-clla-dormant-reserve.md).
@@ -225,6 +292,67 @@ impl V2Plasticity {
         self.candidates[post].iter()
             .map(|c| (c.pre.0, c.w, c.reserved, c.w >= self.params.theta_permanent))
             .collect()
+    }
+
+    /// Phase II-A D-core (protocol §6): per-neuron context update from the
+    /// JUST-FINISHED window's per-channel delivered-current vectors.
+    /// Deterministic; consumes NO RNG. Skipped entirely when d_core is
+    /// off (identity).
+    fn ctx_update(&mut self, net: &mut Network, _tick: Tick) {
+        let k = dcore_tracks();
+        let dims = 24usize;
+        for i in 0..net.neurons.len() {
+            if net.neurons[i].class == NeuronClass::Input {
+                continue;
+            }
+            // protocol §6.2a: no working input current delivered => no update
+            let w_work = self.res_iw_t[i * k] + self.res_iw_t[i * k + 1];
+            if w_work <= 0.0 {
+                continue;
+            }
+            let row = &self.ctx_acc[i * dims..(i + 1) * dims];
+            let mut ctx = 0u8;
+            let mut best = -1.0f32;
+            let protos = net.neurons[i].ctx_protos.clone(); // local copy (borrow-safe)
+            if protos.is_empty() {
+                // bootstrap: both prototypes zero => novel bind to lower
+                // protected track (tie rule), hard set
+                let pt = protected_track_choice(net, i, k);
+                ctx = pt;
+                let mut v = net.neurons[i].ctx_protos.clone();
+                if v.len() < k * dims { v.resize(k * dims, 0.0); }
+                v[pt as usize * dims..(pt as usize + 1) * dims].copy_from_slice(row);
+                net.neurons[i].ctx_protos = v;
+            } else {
+                for t in 0..k {
+                    let p = &protos[t * dims..(t + 1) * dims];
+                    let sval = cosine_row(p, row);
+                    if sval > best {
+                        best = sval;
+                        ctx = t as u8;
+                    }
+                }
+                if best >= dcore_theta_sim() {
+                    // reuse: soft update winning prototype
+                    let mut v = net.neurons[i].ctx_protos.clone();
+                    if v.len() < k * dims { v.resize(k * dims, 0.0); }
+                    for d in 0..dims {
+                        let idx = ctx as usize * dims + d;
+                        v[idx] += dcore_alpha_p() * (row[d] - v[idx]);
+                    }
+                    net.neurons[i].ctx_protos = v;
+                } else {
+                    // novel bind: hard set on the less-protected track
+                    let pt = protected_track_choice(net, i, k);
+                    ctx = pt;
+                    let mut v = net.neurons[i].ctx_protos.clone();
+                    if v.len() < k * dims { v.resize(k * dims, 0.0); }
+                    v[pt as usize * dims..(pt as usize + 1) * dims].copy_from_slice(row);
+                    net.neurons[i].ctx_protos = v;
+                }
+            }
+            self.cur_ctx[i] = ctx;
+        }
     }
 
     /// Compute the allocation gate for every neuron from the JUST-FINISHED
@@ -252,6 +380,15 @@ impl V2Plasticity {
         // --- E6 step 0 (frozen §3.1): φ ← EMA(previous window counts) ---
         if let Some(rb) = self.rate_balance.as_mut() {
             rb.window_start();
+        }
+
+        // --- Phase II-A D-core: context update from the JUST-FINISHED
+        // window, BEFORE any per-track budget/pass runs (protocol §6.2) ---
+        if self.d_core_enabled() {
+            self.ctx_update(net, tick);
+            self.ctx_acc.fill(0.0);
+            self.res_ip_t.fill(0.0);
+            self.res_iw_t.fill(0.0);
         }
 
         // --- CLLA allocation rule: compute g from the JUST-FINISHED window's
@@ -399,6 +536,12 @@ impl V2Plasticity {
                 self.evict_for(net, post_id, events);
                 let w = self.params.w_c_permanent;
                 let syn = net.add_synapse(pre, post_id, w, true, tick);
+                if self.d_core_enabled() {
+                    // Phase II-A protocol §7: M3-born synapse receives the
+                    // neuron's CURRENT window context tag (deterministic;
+                    // initial wiring keeps the default 0).
+                    net.synapses[syn.idx()].track = self.cur_ctx[post_id.idx()];
+                }
                 // CLLA: consolidate at permanence iff (a) mechanism on,
                 // (b) candidate weight cleared w_consolidate_min (protocol:
                 // 0.05 = theta_permanent, so this holds exactly when the
@@ -567,6 +710,54 @@ impl V2Plasticity {
     /// m2_buckets = 1 (default) is the exact baseline path (identity).
     fn normalize(&mut self, net: &mut Network) {
         let n_buckets = self.params.m2_buckets.max(1);
+        // Phase II-A D-core (protocol §4/§7): per-track normalization.
+        // Working target per populated track T_t = (t_e - P_tot)/n_pop
+        // (V2.3 capacity-matched family; total <= t_e ALWAYS); consolidated
+        // synapses excluded exactly as the CLLA branch below.
+        if self.d_core_enabled() {
+            let k = dcore_tracks();
+            for post in 0..net.neurons.len() {
+                if net.neurons[post].class == NeuronClass::Input {
+                    continue;
+                }
+                let incoming: Vec<SynapseId> = net.incoming[post].clone();
+                let post_id = NeuronId(post as u32);
+                let p_tot = self.consolidated_mass(net, post_id);
+                let mut w_sum = [0.0f32; 2];
+                for &sid in &incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
+                        let t = (s.track as usize).min(k - 1);
+                        w_sum[t] += s.w;
+                    }
+                }
+                let populated: Vec<usize> = (0..k).filter(|&t| w_sum[t] > 0.0).collect();
+                if populated.is_empty() {
+                    continue;
+                }
+                let target = self.params.t_e - p_tot;
+                if target <= 0.0 {
+                    continue;
+                }
+                let per_track = target / populated.len() as f32;
+                for &t in &populated {
+                    if (w_sum[t] - per_track).abs() < 1e-9 {
+                        continue;
+                    }
+                    let factor = per_track / w_sum[t];
+                    for sid in incoming.iter().copied() {
+                        let s = &mut net.synapses[sid.idx()];
+                        if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated {
+                            continue;
+                        }
+                        if (s.track as usize).min(k - 1) == t {
+                            s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                        }
+                    }
+                }
+            }
+            return;
+        }
         // CLLA (docs/anima-clla-protocol.md §3.7): consolidated synapses are
         // excluded from normalization. Working budget = t_e - P; factor =
         // (t_e - P)/W applied to working (unconsolidated) only, clamped to

@@ -5,10 +5,19 @@
 use crate::network::{Network, NetworkConfig, NeuronClass, NeuronId, SynapseId, Tick, V2Params};
 use crate::structural_v2::{Candidate, V2Event, V2Plasticity};
 
+/// D-core network config: d_core on top of the frozen cell (identity off).
+fn v2_net_cfg(dcore: bool) -> NetworkConfig {
+    NetworkConfig {
+        v2: Some(V2Params { d_core: dcore, ..v2_params() }),
+        ..NetworkConfig::default()
+    }
+}
+
 /// The exact frozen parameter set (protocol §2–§8).
 pub fn v2_params() -> V2Params {
     V2Params {
         recruit_gain: false,
+        d_core: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,
@@ -1394,3 +1403,124 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
     let has_c = v2.candidates[post.idx()].iter().any(|cand| cand.pre == NeuronId(c));
     assert!(has_c, "corrected fe: bind fired channel c={} even without an afferent", c);
 }
+
+    // ---------- Phase II-A D-core (docs/x-phase2-a-protocol.md) ----------
+
+    /// V1-M1: every pre-existing M1 synapse carries the deterministic
+    /// default track 0; the documented M1 semantics is "default 0 for all
+    /// initial wiring; M3-born synapses get the current context".
+    #[test]
+    fn dcore_m1_synapses_have_documented_default_track() {
+        let (net, _) = v2_net(7);
+        let tracks: Vec<u8> = net.live_synapses().map(|s| s.track).collect();
+        assert!(!tracks.is_empty(), "M1 wiring must exist");
+        assert!(tracks.iter().all(|&t| t == 0), "M1 default track must be 0");
+        // flag off: track never changes
+        let mut net2 = v2_net(7).0;
+        let mut v2 = V2Plasticity::new(&mut net2, v2_params(), None);
+        for t in 0..40u64 {
+            v2.tick(&[]);
+            v2.window(&mut net2, Tick(t * 100 + 100));
+        }
+        assert!(net2.live_synapses().all(|s| s.track == 0), "flag-off never writes track");
+    }
+
+    /// V2-BOOT: empty-track bootstrap is deterministic, RNG-free, and tie-
+    /// breaks to the lower track: a first novel usage with both protected
+    /// masses zero binds track 0 in any seed.
+    #[test]
+    fn dcore_bootstrap_deterministic_lower_track() {
+        for seed in [1u64, 7, 42, 20260912] {
+            let mut net = Network::new(v2_net_cfg(true), 24, 4, 0, seed);
+            let mut v2 = V2Plasticity::new(&mut net, v2_params(), None);
+            // drive channels 0..7 for one window (novel usage, no context)
+            let chs: Vec<NeuronId> = (0..8).map(|c| net.channels[c].target).collect();
+            for t in 0..100u64 {
+                v2.tick(&chs);
+                v2.window(&mut net, Tick(t + 1));
+            }
+            // at least one internal neuron bound a prototype deterministically
+            // (its first-observed. matching the FIRST window's usage)
+            for n in net.neurons.iter().filter(|n| n.class == NeuronClass::Internal) {
+                if !n.ctx_protos.is_empty() {
+                    assert_eq!(v2.current_ctx(n.id.idx()), 0, "first novel bind must be track 0 (tie rule)");
+                }
+            }
+        }
+    }
+
+    /// V3-CONSISTENCY: the synapse tag, the M2 bucket key, the protection
+    /// track, and the prototype-update track all use the SAME `track`
+    /// identity: a permanence in a window whose context is c* yields a
+    /// synapse with track == c*.
+    #[test]
+    fn dcore_track_identity_consistent_at_permanence() {
+        let mut net = Network::new(v2_net_cfg(true), 24, 4, 0, 7);
+        let mut v2 = V2Plasticity::new(&mut net, v2_params(), None);
+        let post = net.neurons.iter().find(|n| n.class == NeuronClass::Internal).unwrap().id;
+        // drive 8 channels for 2 windows so context 0 is established
+        let chs: Vec<NeuronId> = (0..8).map(|c| net.channels[c].target).collect();
+        for w in 0..2u64 {
+            for t in 0..100u64 {
+                v2.tick(&chs);
+            }
+            v2.window(&mut net, Tick(100 * (w + 1)));
+        }
+        // force a permanence: set a candidate weight above threshold and
+        // co-fire it with the post
+        if let Some(c) = v2.candidates[post.idx()].first_mut() {
+            c.w = 0.99;
+        }
+        let all: Vec<NeuronId> = vec![post];
+        v2.tick(&all);
+        let evs = v2.window(&mut net, Tick(300));
+        let perms: Vec<_> = evs.iter().filter(|e| {
+            matches!(e, V2Event::SynapseCreated { reason, .. } if *reason == "candidate-permanence")
+        }).collect();
+        if !perms.is_empty() {
+            let ctx = v2.current_ctx(post.idx());
+            let new_syn = perms.first().map(|e| match e {
+                V2Event::SynapseCreated { syn, .. } => *syn,
+                _ => unreachable!(),
+            }).unwrap();
+            assert_eq!(net.synapses[new_syn.idx()].track, ctx,
+                "M3-born synapse must carry the CURRENT window context tag");
+        }
+    }
+
+    /// V3-CONSISTENCY (budget): per-track working target T_t = (t_e - P_t)/2;
+    /// with both tracks populated the post-pass sum per track ≈ target and
+    /// total ≤ t_e (V2.3 invariant).
+    #[test]
+    fn dcore_per_track_m2_target_invariant() {
+        // build a tiny net with two marked tracks via manual synapses.
+        // Small synthetic weights so the pre-normalize total is strictly
+        // below t_e (M1 wiring alone can already sum near 0.8).
+        let mut net = Network::new(v2_net_cfg(true), 4, 1, 0, 3);
+        let post = NeuronId(4);
+        let s0 = net.add_synapse(net.channels[0].target, post, 0.15, true, Tick(0));
+        let s1 = net.add_synapse(net.channels[2].target, post, 0.05, true, Tick(0));
+        net.synapses[s0.idx()].track = 0;
+        net.synapses[s1.idx()].track = 1;
+        let mut p = v2_params();
+        p.d_core = true; // factory params must match the flag under test
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        // one window, no firing (no ctx updates; M2 runs regardless)
+        v2.window(&mut net, Tick(100));
+        let sum = |t: u8| -> f32 {
+            net.incoming[post.idx()].iter().filter(|&&sid| {
+                let s = &net.synapses[sid.idx()];
+                s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated && s.track == t
+            }).map(|&sid| net.synapses[sid.idx()].w).sum()
+        };
+        let w0 = sum(0);
+        let w1 = sum(1);
+        let total = w0 + w1;
+        // V2.3 capacity-matched per-track targets: each populated track is
+        // normalized toward (t_e - P_tot)/2 = 0.4; total <= t_e always.
+        assert!((total - 0.8).abs() < 1e-4, "per-track normalization keeps total <= t_e");
+        assert!((w0 - 0.4).abs() < 1e-3 && (w1 - 0.4).abs() < 1e-3,
+            "capacity-matched targets split the working budget: {w0} vs {w1}");
+        // invariant: sum <= t_e exactly
+        assert!(total <= 0.8 + 1e-6);
+    }

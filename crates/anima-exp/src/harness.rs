@@ -770,6 +770,7 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         alloc_residual: v.alloc_residual,
         dormant_reserve: v.dormant_reserve,
         recruit_gain: v.recruit_gain,
+        d_core: v.d_core,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,
@@ -839,6 +840,12 @@ fn network_snapshot(net: &Network) -> anima_telemetry::recorder::NetworkStateSna
                 } else {
                     None
                 },
+                ctx_protos: if net.cfg.v2.as_ref().is_some_and(|v| v.d_core)
+                    && !n.ctx_protos.is_empty() {
+                    Some(n.ctx_protos.clone())
+                } else {
+                    None
+                },
                 dormant: n.dormant_since.is_some(),
                 retired: n.retired,
                 born: n.born.0,
@@ -853,6 +860,7 @@ fn network_snapshot(net: &Network) -> anima_telemetry::recorder::NetworkStateSna
                 w: anima_telemetry::events::f32_json(s.w),
                 plastic: s.plastic,
                 consolidated: s.consolidated,
+                track: s.track,
             })
             .collect(),
     }

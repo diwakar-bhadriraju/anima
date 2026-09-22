@@ -317,7 +317,10 @@ pub fn stdp_tick(
     // mass accumulator for the LTP clip. Recomputed per post neuron the
     // pass visits (a fired neuron appears once in `spikes` per tick).
     let clla = net.cfg.v2.as_ref().map_or(false, |v| v.assembly_protect);
+    let dcore = net.cfg.v2.as_ref().map_or(false, |v| v.d_core);
+    let dcore_k = crate::network::dcore_tracks();
     let mut clla_p: Option<f32> = None;
+    let mut clla_p2: Option<[f32; 2]> = None;
     let mut clla_post: Option<NeuronId> = None;
     let mut self_t_e: f32 = 0.8;
     let mut self_p_max: f32 = 0.75;
@@ -337,19 +340,32 @@ pub fn stdp_tick(
             // class is first touched in this pass, compute P (a local read
             // of the neuron's own live consolidated incoming) BEFORE any
             // mutable borrow. Accumulated across this post's synapses.
+            // D-core: per-track P and per-track cap (p_max*t_e/K).
             if clla && is_consolidated && clla_post != Some(post) {
                 clla_post = Some(post);
                 let v2 = net.cfg.v2.as_ref().unwrap();
                 self_t_e = v2.t_e;
                 self_p_max = v2.p_max_frac;
-                clla_p = Some(net.incoming[post.idx()].iter().fold(0.0f32, |acc, &sid2| {
-                    let s2 = &net.synapses[sid2.idx()];
-                    if s2.silent_ticks != u64::MAX && !s2.inhibitory && s2.consolidated {
-                        acc + s2.w
-                    } else {
-                        acc
+                if dcore {
+                    let mut p2 = [0.0f32; 2];
+                    for &sid2 in &net.incoming[post.idx()] {
+                        let s2 = &net.synapses[sid2.idx()];
+                        if s2.silent_ticks != u64::MAX && !s2.inhibitory && s2.consolidated {
+                            let t = (s2.track as usize).min(dcore_k - 1);
+                            p2[t] += s2.w;
+                        }
                     }
-                }));
+                    clla_p2 = Some(p2);
+                } else {
+                    clla_p = Some(net.incoming[post.idx()].iter().fold(0.0f32, |acc, &sid2| {
+                        let s2 = &net.synapses[sid2.idx()];
+                        if s2.silent_ticks != u64::MAX && !s2.inhibitory && s2.consolidated {
+                            acc + s2.w
+                        } else {
+                            acc
+                        }
+                    }));
+                }
             }
             // Skip synapses whose pre ALSO fired this tick (coincident — net
             // zero, assigned neither sign).
@@ -369,15 +385,27 @@ pub fn stdp_tick(
             // P <= p_max_frac * t_e at every tick. Flag off => clla false =>
             // consolidated never set => bit-exact baseline path (identity).
             if clla && is_consolidated {
-                let cap = self_p_max * self_t_e;
-                let headroom = cap - clla_p.unwrap_or(0.0);
+                let (cap, headroom_opt) = if dcore {
+                    let t = (s.track as usize).min(dcore_k - 1);
+                    let cap_t = crate::network::dcore_track_cap(self_p_max, self_t_e);
+                    let p_t = clla_p2.map_or(0.0, |p| p[t]);
+                    (cap_t, Some(cap_t - p_t))
+                } else {
+                    (self_p_max * self_t_e, None)
+                };
+                let headroom = headroom_opt.unwrap_or_else(|| cap - clla_p.unwrap_or(0.0));
                 if headroom <= 0.0 {
                     continue; // skip protected LTP when the class is full
                 }
                 let dw = params.a_plus * pre_t * gate * beta;
                 let dw_eff = dw.min(headroom);
                 let w_new = (s.w + dw_eff).min(params.w_max);
-                if let Some(p) = clla_p.as_mut() {
+                if dcore {
+                    if let Some(p) = clla_p2.as_mut() {
+                        let t = (s.track as usize).min(dcore_k - 1);
+                        p[t] += w_new - s.w; // track applied increment exactly
+                    }
+                } else if let Some(p) = clla_p.as_mut() {
                     *p += w_new - s.w; // track applied increment exactly
                 }
                 s.w = w_new;

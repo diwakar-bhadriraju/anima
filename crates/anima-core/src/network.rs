@@ -122,6 +122,28 @@ pub fn is_zero_f32(v: &f32) -> bool {
     *v == 0.0
 }
 
+/// serde skip helper: omit zero u8 fields (D-core track tags must not
+/// appear in flag-off snapshots — byte-identity).
+pub fn is_zero_u8(v: &u8) -> bool {
+    *v == 0
+}
+
+// ---- Phase II-A frozen constants (docs/x-phase2-a-protocol.md §4) ----
+/// K: context tracks per neuron (architectural floor; K=2 keeps per-track
+/// caps writable at Phase I scales).
+pub fn dcore_tracks() -> usize { 2 }
+/// Similarity threshold (cosine): inside the measured separation band
+/// (within 0.85--0.89 vs cross 0.15--0.40).
+pub fn dcore_theta_sim() -> f32 { 0.5 }
+/// Prototype soft-update rate per structural window (~88% convergence in
+/// 20 windows; window cadence, no new timescale).
+pub fn dcore_alpha_p() -> f32 { 0.1 }
+/// Per-track protected cap = p_max_frac * t_e / K (computed at runtime
+/// from the frozen constants; 0.75*0.8/2 = 0.30 at the frozen cell).
+pub fn dcore_track_cap(p_max_frac: f32, t_e: f32) -> f32 {
+    p_max_frac * t_e / dcore_tracks() as f32
+}
+
 fn v22_theta_mean() -> f32 { 2.0 }
 fn v22_plateau_mean() -> f32 { 0.9 }
 fn v22_phi_rel() -> f32 { 0.5 }
@@ -182,6 +204,18 @@ pub struct Neuron {
     pub rg_w: f32,
     #[serde(default, skip_serializing_if = "is_zero_f32")]
     pub rg_p: f32,
+    /// Phase II-A D-core per-track recruitment accumulators (K floats,
+    /// empty/zero when off): window protected/working input current split
+    /// by track tag.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rg_p2: Vec<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rg_w2: Vec<f32>,
+    /// Phase II-A D-core learned context prototypes: K x 24 f32
+    /// (K x n_input_channels), empty when off (byte identity). Online
+    /// k-means on the neuron's own delivered per-channel current.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ctx_protos: Vec<f32>,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -217,6 +251,12 @@ pub struct Synapse {
     /// iff assembly_protect && weight ≥ w_consolidate_min && cap headroom.
     #[serde(default, skip_serializing_if = "is_false")]
     pub consolidated: bool,
+    /// Phase II-A D-core (docs/x-phase2-a-protocol.md §7): context track
+    /// tag (0/1). Deterministic default 0 for ALL pre-existing (M1)
+    /// wiring; set for M3-born synapses at permanence to the neuron's
+    /// current context. Skipped when 0 (flag-off byte identity).
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub track: u8,
 }
 
 /// Pure spike source — the last deterministic stage of the organism's "body"
@@ -373,6 +413,13 @@ pub struct V2Params {
     /// baseline (identity).
     #[serde(default, skip_serializing_if = "is_false")]
     pub recruit_gain: bool,
+    /// Phase II-A (docs/x-phase2-a-protocol.md): D-core context tracks.
+    /// false = every D-core branch skipped = byte-identical baseline
+    /// (identity). Requires assembly_protect + recruit_gain to be
+    /// meaningful; the flag alone is inert without drive (verified in the
+    /// identity runs of the registration).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_core: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -456,6 +503,10 @@ pub struct Network {
     /// the post-loop clamped boost pass, reset same tick). Zero always when
     /// recruit_gain is off (identity).
     pub rg_tick: Vec<f32>,
+    /// D-core per-track gates (2 per neuron; zeros when off).
+    pub rg_gate2: Vec<f32>,
+    /// D-core per-track per-tick working current (2 per neuron; zeros when off).
+    pub rg_tick2: Vec<f32>,
 }
 
 impl Network {
@@ -496,6 +547,9 @@ impl Network {
                 tau_het_rel: 1.0,
                 rg_w: 0.0,
                 rg_p: 0.0,
+                rg_p2: Vec::new(),
+                rg_w2: Vec::new(),
+                ctx_protos: Vec::new(),
                 dormant_since: None,
                 retired: false,
             });
@@ -526,6 +580,9 @@ impl Network {
                 tau_het_rel: 1.0,
                 rg_w: 0.0,
                 rg_p: 0.0,
+                rg_p2: Vec::new(),
+                rg_w2: Vec::new(),
+                ctx_protos: Vec::new(),
                 dormant_since: None,
                 retired: false,
             });
@@ -551,6 +608,9 @@ impl Network {
                 tau_het_rel: 1.0,
                 rg_w: 0.0,
                 rg_p: 0.0,
+                rg_p2: Vec::new(),
+                rg_w2: Vec::new(),
+                ctx_protos: Vec::new(),
                 dormant_since: None,
                 retired: false,
             });
@@ -569,6 +629,8 @@ impl Network {
         seed,
         rg_gate: vec![0.0; n_total],
         rg_tick: vec![0.0; n_total],
+        rg_gate2: vec![0.0; n_total * dcore_tracks()],
+        rg_tick2: vec![0.0; n_total * dcore_tracks()],
     };
 
         // Wiring (frozen order, docs/anima-v2-protocol.md §2):
@@ -704,6 +766,7 @@ impl Network {
         let id = SynapseId(self.synapses.len() as u32);
         self.synapses.push(Synapse {
             id,
+            track: 0,
             pre,
             post,
             w: w.clamp(self.cfg.w_min, self.cfg.w_max),
@@ -928,21 +991,46 @@ impl Network {
         // boundaries (the allocation rule's existing cadence). Flag off =>
         // all branches skipped => byte-identical baseline.
         let rg_on = self.cfg.v2.as_ref().is_some_and(|v| v.recruit_gain);
+        let dcore = self.cfg.v2.as_ref().is_some_and(|v| v.d_core);
         if rg_on {
             let wt = self.cfg.v2.as_ref().map_or(100u64, |v| v.window_ticks);
             if self.tick.0 % wt == 0 {
                 for n in self.neurons.iter_mut() {
                     n.rg_p = 0.0;
                     n.rg_w = 0.0;
+                    if dcore {
+                        for v in n.rg_p2.iter_mut() { *v = 0.0; }
+                        for v in n.rg_w2.iter_mut() { *v = 0.0; }
+                    }
                 }
             }
-            for i in 0..self.rg_gate.len() {
-                let (p, w) = {
+            if dcore {
+                // per-track gates: g_t = max(0, 1 - R_t); R_t = protected
+                // share of the track's delivered input current (silence
+                // convention: no current => R := 1 => gate 0). Value
+                // BEFORE this tick's deposits (accumulators from prior
+                // ticks of this window).
+                for i in 0..self.rg_gate.len() {
                     let n = &self.neurons[i];
-                    (n.rg_p, n.rg_w)
-                };
-                let tot = p + w;
-                self.rg_gate[i] = if tot > 0.0 { (1.0 - p / tot).max(0.0) } else { 0.0 };
+                    let p2 = if n.rg_p2.len() >= dcore_tracks() { Some((n.rg_p2[0], n.rg_p2[1])) } else { None };
+                    let w2 = if n.rg_w2.len() >= dcore_tracks() { Some((n.rg_w2[0], n.rg_w2[1])) } else { None };
+                    let (p0, p1) = p2.unwrap_or((0.0, 0.0));
+                    let (w0, w1) = w2.unwrap_or((0.0, 0.0));
+                    for (j, (p, w)) in [(p0, w0), (p1, w1)].iter().enumerate() {
+                        let tot = p + w;
+                        self.rg_gate2[i * dcore_tracks() + j] =
+                            if tot > 0.0 { (1.0 - p / tot).max(0.0) } else { 0.0 };
+                    }
+                }
+            } else {
+                for i in 0..self.rg_gate.len() {
+                    let (p, w) = {
+                        let n = &self.neurons[i];
+                        (n.rg_p, n.rg_w)
+                    };
+                    let tot = p + w;
+                    self.rg_gate[i] = if tot > 0.0 { (1.0 - p / tot).max(0.0) } else { 0.0 };
+                }
             }
         }
         let n_channels = self.channels.len();
@@ -960,14 +1048,27 @@ impl Network {
                 let current = if s.inhibitory { -k } else { k };
                 let pidx = post.idx();
                 if rg_on && src_input && !s.inhibitory {
+                    let t = if dcore { (s.track as usize).min(1) } else { 0 };
                     let n = &mut self.neurons[pidx];
                     if s.consolidated {
-                        n.rg_p += k;
+                        if dcore {
+                            if n.rg_p2.len() < dcore_tracks() { n.rg_p2.resize(dcore_tracks(), 0.0); }
+                            n.rg_p2[t] += k;
+                        } else {
+                            n.rg_p += k;
+                        }
                         n.i_syn += current;
                     } else {
-                        n.rg_w += k;
-                        self.rg_tick[pidx] += k; // per-tick per-neuron sum
-                        n.i_syn += current;
+                        if dcore {
+                            if n.rg_w2.len() < dcore_tracks() { n.rg_w2.resize(dcore_tracks(), 0.0); }
+                            n.rg_w2[t] += k;
+                            self.rg_tick2[pidx * dcore_tracks() + t] += k;
+                            n.i_syn += current;
+                        } else {
+                            n.rg_w += k;
+                            self.rg_tick[pidx] += k; // per-tick per-neuron sum
+                            n.i_syn += current;
+                        }
                     }
                 } else {
                     self.neurons[pidx].i_syn += current;
@@ -982,15 +1083,26 @@ impl Network {
         // i_syn into the next step (1-tick lag). Flag off => skipped.
         if rg_on {
             for i in 0..self.rg_tick.len() {
-                let k = self.rg_tick[i];
-                if k > 0.0 {
+                let raw = if dcore {
+                    let mut r = 0.0;
+                    for t in 0..dcore_tracks() {
+                        let k = self.rg_tick2[i * dcore_tracks() + t];
+                        r += k_g * self.rg_gate2[i * dcore_tracks() + t] * k;
+                        self.rg_tick2[i * dcore_tracks() + t] = 0.0;
+                    }
+                    r
+                } else {
+                    let k = self.rg_tick[i];
+                    self.rg_tick[i] = 0.0;
+                    k_g * self.rg_gate[i] * k
+                };
+                if raw > 0.0 {
                     let cap = ((p.v_th - self.neurons[i].v) * p.tau_m).max(0.0);
-                    let boost = (k_g * self.rg_gate[i] * k).min(cap);
+                    let boost = raw.min(cap);
                     if boost > 0.0 {
                         self.neurons[i].i_syn += boost;
                     }
                 }
-                self.rg_tick[i] = 0.0;
             }
         }
 
@@ -1445,6 +1557,7 @@ mod tests {
     fn v2_params_min() -> V2Params {
         V2Params {
             recruit_gain: false,
+            d_core: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,
