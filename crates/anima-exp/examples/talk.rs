@@ -1,15 +1,18 @@
 //! Phase III I/O layer (docs/phase3/io-encoder-decoder-plan.md D-25/D-26):
-//! two-way demo. Self-contained (no anima_exp lib dep): builds the
-//! committed E-nogain brain from the FROZEN clla-arex-s20260912 params,
-//! trains S1 (A/C) with the same STDP machinery, captures A_ref/C_ref at
-//! S1-end (the codebook refs), then runs a REPL: you type a symbol
-//! (A/C/D/QUIET) -> it presents one 500 ms beat deterministically ->
-//! decodes the 12-neuron output to {A, C, NOVEL, UNSURE, QUIET} + hex.
+//! FAITHFUL two-way demo. Loads a COMMITTED trained brain (final snapshot)
+//! and the A/C output-reference vectors from the run's own S1 telemetry
+//! (D-26 ref provenance; mirrors the verified outselect.rs counting loop),
+//! then REPL: type a symbol (A/C/D/QUIET) -> present one deterministic
+//! beat (NO plasticity in-session) -> decode 12-neuron output to
+//! {A, C, NOVEL, UNSURE, QUIET} + raw hex.
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use anima_core::network::{InputChannelId, InputFrame, Network, NetworkConfig, Tick, V2Params};
 use anima_core::plasticity::{stdp_tick, StdpParams, Traces};
+use anima_telemetry::recorder::read_snapshots;
+use anima_telemetry::TelemetryReader;
+use anima_telemetry::events::Payload;
 
 const BEAT_MS: u64 = 500;
 const ALPHABET: [(&str, &[u32]); 3] = [
@@ -19,8 +22,6 @@ const ALPHABET: [(&str, &[u32]); 3] = [
 ];
 const RATE_HZ: f32 = 20.0;
 
-/// Frozen E-nogain run params (configs/clla-arex-s20260912-il.toml) --
-/// keep byte-identical to the committed control so the brain is the same.
 fn frozen_v2() -> V2Params {
     V2Params {
         p_in: 0.5, w_in_lo: 0.02, w_in_hi: 0.06, p_rec: 0.2, w_rec_lo: 0.005, w_rec_hi: 0.02,
@@ -57,8 +58,6 @@ fn derive_seed64(master: u64, a: u64, b: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
     (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB) ^ (z >> 31)
 }
-
-/// Deterministic Poisson trains for one symbol beat (same convention as env.rs).
 fn symbol_trains(sym: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
     let Some(chans) = ALPHABET.iter().find(|(s, _)| *s == sym).map(|(_, c)| c.to_vec()) else { return vec![] };
     let lambda = RATE_HZ / 1000.0;
@@ -77,7 +76,6 @@ fn symbol_trains(sym: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
     out.sort_unstable();
     out
 }
-
 fn cent(v: &[f32]) -> f32 { v.iter().sum::<f32>() / v.len() as f32 }
 fn cosc(a: &[f32], b: &[f32]) -> f32 {
     let (am, bm) = (cent(a), cent(b));
@@ -89,65 +87,107 @@ fn cosc(a: &[f32], b: &[f32]) -> f32 {
     if na <= 0.0 || nb <= 0.0 { 0.0 } else { n / (na.sqrt() * nb.sqrt()) }
 }
 
+/// Load trained weights (final snapshot) + S1 output refs (verified
+/// two-pass outselect.rs counting, S1 presentations only).
+fn load(run_dir: &str, net: &mut Network) -> (Vec<f32>, Vec<f32>, u64) {
+    let snaps = read_snapshots(&std::path::Path::new(run_dir).join("snapshots.bin.zst")).expect("snapshots");
+    let last = snaps.last().expect(">=1 snapshot");
+    for (i, s) in net.synapses.iter_mut().enumerate() {
+        if let Some(ss) = last.synapses.get(i) {
+            if let Some(w) = ss.w { s.w = w; }
+            s.consolidated = ss.consolidated;
+            if ss.track != 0 { s.track = ss.track; }
+        }
+    }
+    // neuron dynamic state (v, slow depolarization, latch) - without this
+    // the loaded brain is cold/at-rest and won't sustain its trained firing
+    for (i, n) in net.neurons.iter_mut().enumerate() {
+        if let Some(ns) = last.neurons.get(i) {
+            if let Some(v) = ns.v { n.v = v; }
+            if let Some(u) = ns.u_slow { n.u_slow = u; }
+            if let Some(z) = ns.z_latch { n.z_latch = z; }
+            n.retired = ns.retired;
+        }
+    }
+    // refs: pres (S1 A/C) + output spike list, per-presentation window
+    let reader = TelemetryReader::open(&std::path::Path::new(run_dir).join("telemetry")).unwrap();
+    let idx = reader.chunk_index();
+    let mut pres: Vec<(u64, String)> = vec![];
+    let mut spk: Vec<(u64, u32)> = vec![];
+    for c in 0..idx.len() {
+        for row in reader.chunk_rows(c).unwrap() {
+            if let Ok(e) = row.envelope("e") {
+                match &e.payload {
+                    Payload::StimulusPresented { pattern_id, stage } => {
+                        if stage == "S1" && (pattern_id == "A" || pattern_id == "C") {
+                            pres.push((row.t, pattern_id.clone()));
+                        }
+                    }
+                    Payload::Spike { n } => if (64..76).contains(&n.0) { spk.push((row.t, n.0)); },
+                    _ => {}
+                }
+            }
+        }
+    }
+    pres.sort_by_key(|p| p.0);
+    let mut refs: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+    let mut cnt: std::collections::BTreeMap<String, u32> = Default::default();
+    for (t, p) in &pres {
+        let mut v = vec![0.0f32; 12];
+        for (st, s) in &spk { if *st >= *t && *st < t + BEAT_MS { v[(s - 64) as usize] += 1.0; } }
+        let e = refs.entry(p.clone()).or_insert_with(|| vec![0.0f32; 12]);
+        for i in 0..12 { e[i] += v[i]; }
+        *cnt.entry(p.clone()).or_insert(0) += 1;
+    }
+    for (p, v) in refs.iter_mut() { let c = cnt[p] as f32; for x in v.iter_mut() { *x /= c; } }
+    let (ra, rc) = (refs.get("A").cloned().unwrap_or(vec![0.0; 12]), refs.get("C").cloned().unwrap_or(vec![0.0; 12]));
+    (ra, rc, last.tick)
+}
+
 fn main() {
-    let seed: u64 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(20260912);
+    let mut run_dir: Option<String> = None;
+    let mut seed: u64 = 20260912;
+    let mut rest = std::env::args().skip(1);
+    while let Some(a) = rest.next() {
+        match a.as_str() {
+            "--load" => run_dir = rest.next(),
+            _ => if let Ok(n) = a.parse::<u64>() { seed = n; },
+        }
+    }
+    let run_dir = run_dir.expect("usage: talk --load <run_dir> [seed]");
     let mut net = frozen_net(seed);
     let params = StdpParams { tau_plus: 20.0, tau_minus: 20.0, a_plus: 0.005, a_minus: 0.0053,
         decay: 1e-6, w_min: 0.0, w_max: 1.0 };
     let mut traces = Traces::new(&net, 20.0);
-
-    // ---- S1 training: interleaved A/C, 20 reps, 500ms beat + 1500ms gap ----
-    let mut out_refs: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
-    let mut out_cnt: std::collections::BTreeMap<String, u32> = Default::default();
-    let mut tick = Tick(0);
-    for _rep in 0..20usize {
-        for sym in ["A", "C"] {
-            let tr = symbol_trains(sym, seed);
-            let mut beat = vec![0.0f32; 12];
-            for t in 0..BEAT_MS {
-                let frame = InputFrame { tick, spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
-                let ev = net.step(&frame);
-                traces.step(&net, &ev.spikes);
-                for c in &ev.spikes { if (64..76).contains(&c.0) { beat[(c.0 - 64) as usize] += 1.0; } }
-                stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
-                tick = Tick(tick.0 + 1);
-            }
-            let e = out_refs.entry(sym.to_string()).or_insert_with(|| vec![0.0f32; 12]);
-            for i in 0..12 { e[i] += beat[i]; }
-            *out_cnt.entry(sym.to_string()).or_insert(0) += 1;
-            for _ in 0..1500 { // inter-beat gap
-                let frame = InputFrame { tick, spikes: vec![] };
-                let ev = net.step(&frame); traces.step(&net, &ev.spikes);
-                stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
-                tick = Tick(tick.0 + 1);
-            }
-        }
-    }
-    for (p, v) in out_refs.iter_mut() { let c = *out_cnt.get(p).unwrap_or(&0) as f32; for x in v.iter_mut() { *x /= c.max(1.0); } }
-    let (ra, rc) = (out_refs.get("A").cloned().unwrap_or_else(|| vec![0.0; 12]), out_refs.get("C").cloned().unwrap_or_else(|| vec![0.0; 12]));
-
-    // codebook frozen thresholds (calibrated from S1 at first use; D-25)
-    let th_known: f32 = 0.20;
-    let q_floor: f32 = 1.0;
-    println!("ANIMA I/O demo (seed {seed}) - S1 trained. refs: A-vs-A={:.3} C-vs-C={:.3}",
-        cosc(&ra, &ra), cosc(&rc, &rc));
-    println!("Type a symbol [A, C, D, QUIET, q=quit]");
+    let (ra, rc, tick0) = load(&run_dir, &mut net);
+    println!("loaded {run_dir} at t={tick0}");
+    println!("refA=[{}]", ra.iter().map(|x| format!("{x:.0}")).collect::<Vec<_>>().join(","));
+    println!("refC=[{}]", rc.iter().map(|x| format!("{x:.0}")).collect::<Vec<_>>().join(","));
+    println!("ref cross-cos(A,C)={:.3}  |A|={:.1} |C|={:.1}", cosc(&ra, &rc), cent(&ra), cent(&rc));
+    let th_known = 0.20; let q_floor = 1.0;
     let stdin = std::io::stdin();
-    let mut line = String::new();
+    let mut tick = Tick(tick0);
     loop {
         print!("> "); use std::io::Write; std::io::stdout().flush().ok();
-        line.clear();
+        let mut line = String::new();
         if stdin.read_line(&mut line).is_err() { break; }
         let sym = line.trim().to_uppercase();
         if sym == "Q" || sym == "QUIT" { break; }
         let tr = if sym == "QUIET" { vec![] } else if ALPHABET.iter().any(|(s, _)| *s == sym) { symbol_trains(&sym, seed) }
-            else { println!("unknown symbol: {sym}"); continue };
+            else { println!("unknown: {sym}"); continue };
+        println!("input spikes this beat: {} (A/C/D=8ch x 20Hz; QUIET=0)", tr.len());
         let mut out = vec![0.0f32; 12];
+        for _ in 0..BEAT_MS {
+            let frame = InputFrame { tick, spikes: vec![] }; // placeholder; real below
+            let _ = frame;
+            break;
+        }
+        // real: present beat ticks with the symbol's spikes
+        tick = Tick(tick0); // restart from trained state marker for a clean single beat
         for t in 0..BEAT_MS {
             let frame = InputFrame { tick, spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
-            let ev = net.step(&frame); traces.step(&net, &ev.spikes);
+            let ev = net.step(&frame);
             for c in &ev.spikes { if (64..76).contains(&c.0) { out[(c.0 - 64) as usize] += 1.0; } }
-            stdp_tick(&params, &mut net, &traces, &ev.spikes, 1.0, None);
             tick = Tick(tick.0 + 1);
         }
         let amp = out.iter().sum::<f32>() / 12.0;
