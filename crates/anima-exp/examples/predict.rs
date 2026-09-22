@@ -83,6 +83,29 @@ fn main() {
             let fmt = |v: &Vec<f32>| if v.is_empty() { "n/a".into() } else { format!("n={} mean={:+.4}", v.len(), v.iter().sum::<f32>() / v.len() as f32) };
             for (p, v) in &pi { println!("{name}[{glabel}] PI(after {p} -> next): {}", fmt(v)); }
             let all: Vec<f32> = pi.values().flatten().cloned().collect();
+            // S3 re-exposure transfer: consecutive SAME-pattern presentations
+            // (e.g. A,A in S3A). With the LONG gap, is the post-X state
+            // anticipation of the co-trained associate? Same PI definition
+            // but only p0==p1 (same-pattern) windows are counted.
+            let refs2 = refs.clone();
+            let mut s3: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+            for i in 0..pres.len().saturating_sub(1) {
+                let (t0, p0e) = (pres[i].0, pres[i].1.clone());
+                let (t1, p1e) = (pres[i + 1].0, pres[i + 1].1.clone());
+                if t1 <= t0 || t1 - t0 > 2400 || p0e != p1e { continue; } // same pattern only
+                let mut v = vec![0.0f32; n];
+                for (st, s2) in &spk {
+                    let g2 = (t0 + 500).min(t1.saturating_sub(1));
+                    if *st >= g2 && *st < t1 && *s2 >= lo && *s2 < hi { v[(s2 - lo) as usize] += 1.0; }
+                }
+                let pr = refs2.get(&p0e).cloned().unwrap_or_else(|| vec![0.0f32; n]);
+                // the associate is the OTHER pattern: find any p != p0e
+                let sr = refs2.iter().find(|(p, _)| *p != &p0e).map(|(_, vv)| vv.clone()).unwrap_or(pr.clone());
+                s3.entry(p0e.clone()).or_default().push(cos(&v, &sr) - cos(&v, &pr));
+            }
+            for (p, v) in &s3 { println!("{name}[{glabel}] S3transfer(after {p} alone -> associate): {}", fmt(v)); }
+            let s3all: Vec<f32> = s3.values().flatten().cloned().collect();
+            if !s3all.is_empty() { println!("{name}[{glabel}] S3transfer all: {}", fmt(&s3all)); }
             println!("{name}[{glabel}] PI all: {}   | late-gap spikes {gap_spikes}/{n_gaps} = {:.1}/gap",
                 if all.is_empty() { "n/a".into() } else { format!("n={} mean={:+.4}", all.len(), all.iter().sum::<f32>() / all.len() as f32) },
                 gap_spikes as f32 / n_gaps.max(1) as f32);

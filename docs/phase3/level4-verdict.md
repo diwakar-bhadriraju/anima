@@ -94,13 +94,16 @@ arms 40 ms ~2 tau, 100 ms ~5 tau). Pure curriculum change on the
 committed E-nogain platform; 3 seeds x {40,100} ms.
 
 RESULT (output prediction index PI; falsifier bar +0.05 in >= 2/3 seeds):
-- 100 ms arm: out PI = +0.0035 / +0.0094 / -0.0206  (0/3 reach bar)
--  40 ms arm: out PI = -0.0417 / (s9001 n=6, early) / -0.0461 (0/3)
-- STABILITY: 3/6 adjacent runs FAILED runaway-activity (gap40: 20260912,
-  9001; gap100: 9001). Fast-STDP bridging drives the all-excitatory
-  recurrent pool into the runaway regime.
+VALID (curriculum-complete, failures=[]) runs only:
+- 100 ms arm: out PI = +0.0035 (s20260912) / -0.0206 (s424242)  (0/2 reach)
+-  40 ms arm: out PI = -0.0461 (s424242)  (0/1 reach; only 1 valid)
+- FAIL cells (excluded from PI, preserved per protocol): 3/6 adjacent
+  runs ended runaway-activity. Timing: adj40-s20260912 t=29983;
+  adj40-s9001 t=10264; adj100-s9001 t=10264. NOTE duty-cycle confound:
+  40 ms gap = 92% input duty vs 25% at 1500 ms, so near-continuous drive
+  may trip the 50 Hz/5 s runaway detector independent of association.
 - Pool PI ~ 0 throughout; post-X state is decaying-X memory, never
-  Y-tuned, even at 40 ms gap.
+  Y-tuned, even at 40 ms gap. Among VALID runs no anticipation appears.
 
 CONCLUSION: the substrate does NOT learn forward X->Y anticipation via
 plateau of its STDP even when temporally adjacent. The three prior
@@ -128,3 +131,33 @@ root is representation + dynamics in the single shared pool):
 - (r3) an inhibitory/structural substrate where consolidation is opposed
   (the E3b/E4-family root), with the honest gate risk that adding
   inhibition previously WEAKENED separation.
+
+
+## Amendment (D-16): S3-transfer measured on the completed adjacent arms
+
+The D-15 in-training-gap PI is confounded by X-tail decay and skipped the
+S3 probes (predict.rs skipped same-pattern consecutive presentations).
+The actual transfer question: after ADJACENT training (40/100 ms), does
+a LONE re-exposure at 1500 ms (S3A/S3C) anticipate the co-trained
+associate? Measured on the completed arms (new predict S3-transfer group
+- same-pattern consecutive-gap windows only):
+
+arm                          pool S3transfer   out S3transfer
+adj100-s20260912  (valid)      -0.0014            +0.0040
+adj100-s424242    (valid)      -0.0856            -0.0117
+adj40-s424242     (valid)      -0.0860            -0.1067
+
+0/3 pooled reach +0.05 (all ~0 or negative; the per-pattern split
+after-C +0.06/+0.08 vs after-A -0.05/-0.09 is the same rate-asymmetry
+artifact seen untrained, not anticipation). NO transfer: adjacency
+training built no forward transition to carry to the long gap.
+
+FINAL (D-15 + D-16): the E-nogain substrate does NOT acquire a forward
+X->Y transition via its STDP at ANY gap (40 ms .. 1500 ms): no
+in-gap anticipation (valid runs ~0/-), no S3-transfer to the long gap,
+plus 3/6 adjacent runs runaway under the elevated duty cycle. The
+representational/dynamic limit (single shared all-excitatory pool, E3b
+concordant) fully closes Level-4 temporal prediction in this substrate.
+Confirmed assets remain: L3 alternation retrieval + d_ing-protectable
+bridge. Next directions (r1/r2/r3) per the D-15 NEXT block - approval
+required; no patch/tuning of this family.
