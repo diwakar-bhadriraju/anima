@@ -1635,6 +1635,7 @@ mod tests {
         d_claim: false,
         d_sparse: false,
         d_elig: false,
+        d_elig_ro: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,
