@@ -253,3 +253,20 @@ Implications for the program:
   ladder: highest-value cheapest is (a) progressive acquisition demo on
   the existing substrate (curriculum change only), then (b) selection
   loop, then (c) structural growth when gated.
+
+## D-21 - progressive-acquisition demo: PARTIAL (acquisition PASS, retention FAIL)
+
+Curriculum-only run (S1 A/C -> S1D NEW pattern D 30 reps -> S3A/S3C/S3D
+probes; no A/C exposure during S1D). 3 seeds, no runaway.
+- ACQUISITION: D formed online+retained (S3D cos-self 0.80/0.91/0.92 vs
+  its S1D ref; rho>0 vs A/C in 5/6). NEW pattern learned by experience,
+  no retrain: CONFIRMED - core LLM-alternative claim evidenced.
+- RETENTION: A/C re-expression degrades after D (S3 cos-self 0.9->0.1-0.4
+  subs); C selectivity sign flips in 2/3 seeds; S3 rates -45..-76% vs
+  no-D control. Catastrophic-forgetting half of the LLM problem IS
+  present, in miniature. d_claim/d_core protection did NOT prevent it.
+- Root: single shared all-excitatory pool reuses neurons for new
+  patterns, reorganizing old assemblies (same ceiling as D-09..D-19).
+- Next (approval required): selective memory protection during
+  acquisition - pattern-gated plasticity or structured allocation; now
+  concretely motivated by this measured forgetting.
