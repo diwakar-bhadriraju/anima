@@ -1,7 +1,15 @@
 # Phase III Level-5 r2 Slice-1 verdict — closed-loop action
 
-Status: FALSIFIED as-registered (D-17 criterion), with a MAP-CONDITIONING
-confound that must be reported. 2026-09-22.
+> SUPERSEDED-CORRECTION (D-19): the body below was written before the
+> hardened per-trial measurement. D-19 (bottom) REFUTES its two key
+> interpretive claims: the action channel is STRONG not weak (per-trial
+> S3 decode 100% in all seeds), and the collapse-to-A is organism
+> structure not map artifact. Read the D-19 amendment as authoritative;
+> the body's "weak action surface" and "map-conditioning confound"
+> claims are RETRACTED there. 2026-09-22.
+
+Status: FALSIFIED-AS-REGISTERED (D-17), with superseding measurement
+corrections in D-19. 2026-09-22.
 Instrument: examples/closedloop.rs (iterates the trained organism's
 measured output-response map through the frozen tag split).
 Protocol: docs/phase3/level5-r2-closedloop.md (+ D-17).
