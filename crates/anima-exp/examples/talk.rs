@@ -92,17 +92,30 @@ fn cosc(a: &[f32], b: &[f32]) -> f32 {
 fn load(run_dir: &str, net: &mut Network) -> (Vec<f32>, Vec<f32>, u64) {
     let snaps = read_snapshots(&std::path::Path::new(run_dir).join("snapshots.bin.zst")).expect("snapshots");
     let last = snaps.last().expect(">=1 snapshot");
-    let w_before: f32 = net.synapses.iter().map(|s| s.w).sum::<f32>();
-    let n_loaded = last.synapses.len();
-    for (i, s) in net.synapses.iter_mut().enumerate() {
-        if let Some(ss) = last.synapses.get(i) {
-            if let Some(w) = ss.w { s.w = w; }
-            s.consolidated = ss.consolidated;
-            if ss.track != 0 { s.track = ss.track; }
+    // FAITHFUL restore by (pre,post) KEY matching, NOT by index (the run's
+    // synapse set diverged from construction order via M3-M4 churn/prune).
+    use std::collections::HashMap;
+    let mut wmap: HashMap<(u32,u32), f32> = HashMap::new();
+    let mut cons_map: HashMap<(u32,u32), bool> = HashMap::new();
+    let mut track_map: HashMap<(u32,u32), u8> = HashMap::new();
+    for ss in &last.synapses {
+        wmap.insert((ss.pre, ss.post), ss.w.unwrap_or(0.0));
+        cons_map.insert((ss.pre, ss.post), ss.consolidated);
+        track_map.insert((ss.pre, ss.post), ss.track);
+    }
+    let (mut matched, mut pruned) = (0usize, 0usize);
+    for s in net.synapses.iter_mut() {
+        let key = (s.pre.0, s.post.0);
+        if let Some(w) = wmap.get(&key).copied() {
+            s.w = w; s.consolidated = cons_map.get(&key).copied().unwrap_or(false);
+            let t = track_map.get(&key).copied().unwrap_or(0); if t != 0 { s.track = t; }
+            matched += 1;
+        } else {
+            // trained brain pruned this synapse - tombstone it
+            s.silent_ticks = u64::MAX; pruned += 1;
         }
     }
-    let w_after: f32 = net.synapses.iter().map(|s| s.w).sum::<f32>();
-    println!("  weight check: sum before={w_before:.3} snapshotSyn={n_loaded} mySyn={} sum-after={w_after:.3}", net.synapses.len());
+    println!("  key-restore: snapshotSyn={} matched={matched} pruned(tombstoned)={pruned} netSyn={}", last.synapses.len(), net.synapses.len());
     // neuron dynamic state (v, slow depolarization, latch) - without this
     // the loaded brain is cold/at-rest and won't sustain its trained firing
     for (i, n) in net.neurons.iter_mut().enumerate() {
