@@ -49,3 +49,18 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   (shared-pool recency signature: C/Pn re-exposure lights up both
   assemblies). Test H2 (recurrent-claim capture) next via an
   afferent-only-claim gated variant; then H1 if unchanged.
+
+## D-2026-09-22-03 — blocked-ρ = expression-layer recency; checkpoint D-04
+
+- OBSERVATION: per-track totals BALANCED at drive end in blocked runs
+  (T0/T1 ≈ 8.97/9.22 for s20260912-bac E-nogain); second-block AFF mass
+  ~2x first; blocked ρ contamination = both assemblies respond to one
+  pattern (C re-exposure cosA~0.9 AND cosC~0.95) — shared
+  membrane/recurrent pool recency (G3 superposition localized to the
+  EXPRESSION layer). Budgets+addressing fix persistence/formation; the
+  read is still pool-mixed when one memory dominates.
+- DECISION: this exponential-family milestone (formation S1 6/6 × 2
+  channel pairs; alternation ρ 0.25-0.91 general) is consolidated as a
+  checkpoint; the next loop (D-04) targets blocked-order re-expression
+  via an expression-layer intervention (per-track recurrent protection
+  or a read gate), then capacity (K≥3), then closed-loop.
