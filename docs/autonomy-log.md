@@ -201,3 +201,17 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   CAN self-sustain when the split separates the responses.
 - Preserved: single-seed positive; next = a NEW registration (contrastive
   / well-conditioned output readout before the loop), needs approval.
+
+## D-19 - r2 hardened measurement CORRECTS D-18 (two claims were wrong)
+
+(a) Action surface STRONG not weak: S3 per-trial decode = 100% (10/10)
+all 3 seeds (pooled cosine understated per-trial separability). Level-5
+action ENCODING confirmed. Slice-0 "weak" retracted.
+(b) s9001 2-cycle FRAGILE (from-C per-presentation 9/20, margin 2.0) -
+pooled 423.5/406.5 was averaging ~50/50; "genuine agency" retracted.
+(c) collapse-to-A is organism structure (s20260912 robust across all tag
+splits; from-A/from-C C=0/20), not purely map artifact.
+Outcome: action encoding PASSES; closed-loop self-sustenance FALSIFIED
+per D-17; blocker is the loop readout (continuous-tag), not the action
+surface -> a contrastive/well-conditioned tag is the well-motivated next
+registration (approval required).

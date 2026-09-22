@@ -73,3 +73,42 @@ is uninformative on most seeds.
 
 STOP - falsified-as-registered; confound recorded; single-seed positive
 preserved.
+## AMENDMENT (D-19) — hardened measurement corrects two asserted claims
+
+The committed D-18 verdict carried asserted-interpretive claims. Measured
+(closedloop_hardened.rs on the same 1327Z telemetry, no new runs):
+
+(a) SLICE-0 BREAKS: the action surface is STRONG, not weak. S3 held-out
+per-trial argmax-cos decoder: acc = 1.000 (10/10) in ALL THREE seeds.
+The pooled A-vs-C output cosine (0.728/0.467/0.805) understated per-trial
+separability because A's output vectors are sparse vs C's dense. The
+trained organism produces a PERFECTLY DISCRIMINABLE A-vs-C action code.
+-> The organism CAN act episode-discriminatively (action encoding at the
+output, Level-5 action rung), a confirmed capability. Slice-0 verdict
+"weak action surface" is RETRACTED.
+
+(b) s9001 "genuine agency" 2-cycle is FRAGILE: per-presentation from-C
+vote = 9/20 (f=0.45, near coin-flip), min margin 2.0. The pooled
+423.5-vs-406.5 C->A edge was averaging ~50/50 presentations. The
+2-cycle is not settled; NO seed shows robust self-sustaining closed-loop
+alternation. D-18's "genuine single-seed agency" claim is RETRACTED.
+
+(c) collapse-to-A across seeds IS organism structure (not purely map
+artifact): s20260912 attractor {A} under ALL tag splits (4/8..8/4);
+per-presentation from-A vote C=0/20, from-C C=1/20 (clean). s424242
+mostly {A} (5/7..8/4), from-A/from-C C=0/20. Only s424242's 4/8 gives a
+2-cycle (boundary-sensitive). The two clear collapses are robust.
+
+REVISED r2 boundary (measured, not asserted):
+- CONFIRMED: action ENCODING is perfect per-trial (all seeds) - the
+  organism outputs a fully discriminable A/C code. Level-5 action
+  encoding rung GATED (passes).
+- FALSIFIED (as-registered D-17): closed-loop SELF-SUSTENANCE not
+  achieved - the fixed tag map collapses to {A} (robustly) or jitters
+  (s9001, fragile 50/50); no seed sustains settled alternation.
+- The blocker is the LOOP READOUT, not the action surface: a
+  contrastive/well-conditioned tag (WTA or difference over the
+  known-separable code) is now well-motivated and likely to change the
+  outcome. This is the difference between "organism cannot sustain
+  structure" (NOT shown) and "this frozen continuous-tag map is a bad
+  loop coupler" (SHOWN, and fixable without touching the organism).
