@@ -73,7 +73,7 @@ pub fn run_world(
     let mut tick = net.tick;
 
     while beat < spec.beats && died.is_none() {
-        let tr = io::symbol_trains(&cur, _org_seed);
+        let tr = io::symbol_trains(&cur, world_seed);
         let is_known = cur == "A" || cur == "C";
         let mut out = vec![0.0f32; 12];
         for t in 0..BEAT_MS {

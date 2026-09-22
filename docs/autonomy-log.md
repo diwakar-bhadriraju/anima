@@ -308,3 +308,23 @@ tick; benign-world OK, governor-dependency untested under harder
 regimes (in-loop frame swap = deferred fidelity upgrade).
 "Thrives" is now a measured, selected-able quantity - the precondition
 for the evolution/death-selection slice.
+
+## D-33 - evolution/death-selection verdict: SELECTION FINDS NO IMPROVEMENT (founders at local optimum)
+
+Determinism check PASSED (best-org rebuild = scored, bit-identical, all
+seeds) - pipeline valid, rankings trustworthy. 8 gens x 3 seeds, N=4,
+elitism, size band [32,56]:
+- SIZE (PRIMARY): 40.0 -> 40.0 / 41.3 / 37.3 - no consistent direction;
+  size is NOT selected in this world.
+- FITNESS (SECONDARY): mean declined in all 3 seeds (0.72->0.41,
+  0.52->0.05, 0.61->0.26); with elitism carrying the winner verbatim,
+  the decline is entirely mutated offspring: variation is destructive.
+CONCLUSION: the formed 40-neuron E-nogain brain is at a LOCAL FITNESS
+OPTIMUM - random variation degrades it. Combined with D-21 (forgetting
+cost) + Level-4 closure: the shared-pool ceiling is architecture-level,
+NOT reachable by parameter/size/growth variation from inside. The
+demonstrated core that survived everything: experience learning without
+retrain + perfect known/novel recognition + closed-loop persistence.
+Next: substrate-level registration (structured populations / inhibition
+opposing consolidation / true neurogenesis) OR accept the bound and
+document. User decision pending.

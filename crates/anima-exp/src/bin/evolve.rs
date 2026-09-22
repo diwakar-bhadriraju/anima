@@ -144,14 +144,15 @@ fn main() {
         println!("=== seed {esec} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
             Org { net: build_net(s, 40), size: 40, seed: s } }).collect();
+        let mut formed_flags: Vec<bool> = vec![false; N_POP]; // gen-0 organisms form; offspring inherit
         let mut gen_sizes: Vec<f32> = Vec::new();
         let mut gen_fits: Vec<f32> = Vec::new();
         let mut gen_best: Vec<f32> = Vec::new();
         for g in 0..GENS {
-            let mut scored: Vec<(f32, usize, usize)> = Vec::new(); // (fitness, popidx, size)
-            for (i, org) in pop.iter_mut().enumerate() {
+            let mut scored: Vec<(f32, usize, usize, u64)> = Vec::new(); // (fitness, popidx, size, orgseed)
+            for (i, (org, formed)) in pop.iter_mut().zip(formed_flags.iter_mut()).enumerate() {
                 let mut traces = Traces::new(&org.net, 20.0);
-                form_s1(&mut org.net, org.seed);
+                if !*formed { form_s1(&mut org.net, org.seed); *formed = true; }
                 let refs = capture_refs(&mut org.net, org.seed);
                 let world_seed = esec ^ (g as u64).wrapping_mul(0xABCDEF);
                 let out = survival::run_world(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces);
@@ -160,20 +161,34 @@ fn main() {
                 // fraction (multiplicative, not additive - additive let the
                 // composite exceed 1.0 and break selection ranking)
                 let f = out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac);
-                scored.push((f, i, org.size));
+                scored.push((f, i, org.size, org.seed));
             }
             scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-            let mean_sz = scored.iter().map(|(_, _, s)| *s as f32).sum::<f32>() / scored.len() as f32;
-            let mean_f = scored.iter().map(|(f, _, _)| *f).sum::<f32>() / scored.len() as f32;
+            let mean_sz = scored.iter().map(|(_, _, s, _)| *s as f32).sum::<f32>() / scored.len() as f32;
+            let mean_f = scored.iter().map(|(f, _, _, _)| *f).sum::<f32>() / scored.len() as f32;
             gen_sizes.push(mean_sz); gen_fits.push(mean_f); gen_best.push(scored[0].0);
             println!(" gen {g}: fit=[{}] mean_sz={mean_sz:.1} mean_fit={mean_f:.3} best={best:.3}",
-                scored.iter().map(|(f, _, s)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "),
+                scored.iter().map(|(f, _, s, _)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "),
                 best = scored[0].0);
             // selection: ELITISM (best organism carried verbatim - prevents
             // destructive mutation from erasing the winner) + breed 3
             // mutated offspring from the top 2
             let mut rng = Xoshiro256PlusPlus::seed_from_u64(esec ^ (g as u64) ^ 0xDEAD);
             let mut next: Vec<Org> = Vec::new();
+            // determinism check (gen 0 only): re-score organism 0 twice;
+            // identical fitness required (same world + same org seed)
+            if g == 0 && std::env::var("EVOLVE_DETERMINISM").is_ok() {
+                // rebuild THE SAME organism that scored[0] belongs to (its
+                // own seed + size), rescore under the same world, compare.
+                let (_, _, best_size, best_seed) = scored[0];
+                let mut net2 = build_net(best_seed, best_size);
+                let mut traces2 = Traces::new(&net2, 20.0);
+                form_s1(&mut net2, best_seed);
+                let refs2 = capture_refs(&mut net2, best_seed);
+                let out2 = survival::run_world(&mut net2, best_seed, esec ^ (g as u64).wrapping_mul(0xABCDEF), &refs2, &spec, &p, &mut traces2);
+                let f2 = out2.mean_viability * (0.5 + 0.5 * out2.known_recognized_frac);
+                eprintln!("DETERMINISM: best-org rebuild fit={:.6} vs scored {:.6} -> {}",
+                    f2, scored[0].0, if (f2 - scored[0].0).abs() < 1e-4 {"IDENTICAL"} else {"DIVERGES"});            }
             // ELITISM (D-32 amendment): the best organism is carried to the
             // next generation UNMUTATED (pure copy by (pre,post) inheritance,
             // seed = parent's) so destructive mutation cannot erase the
@@ -182,7 +197,7 @@ fn main() {
             let elite = &pop[elite_idx];
             next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size),
                 size: elite.size, seed: elite.seed });
-            for (_, idx, sz) in scored.iter().take(2) {
+            for (_, idx, sz, _) in scored.iter().take(2) {
                 let parent = &pop[*idx];
                 for off in 0..1 {
                     let mut sz2 = *sz as i32;
@@ -194,6 +209,7 @@ fn main() {
                     next.push(Org { net: child, size: sz2, seed: cs });
                 }
             }
+            formed_flags = vec![true; next.len()]; // offspring inherit trained weights
             pop = next;
         }
         println!(" seed {esec} RESULT: size g0={:.1} -> g7={:.1}  fit g0={:.3} -> g7={:.3}  best_g7={:.3}",
