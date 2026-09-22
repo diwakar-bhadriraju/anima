@@ -43,6 +43,9 @@ seeds."
 => NOT met (0/3, or 2/3 mismatch) => FALSIFIED as-registered.
 
 ## Confound (must be stated; do NOT overread the falsification)
+> SUPERSEDED by D-19 below: the "map-conditioning artifact" attribution
+> and "single-seed agency" are RETRACTED there (collapse-to-A is measured
+> organism structure; s9001's alternation is margin-fragile). See D-19.
 
 The two collapses are driven by a MAP-CONDITIONING artifact, not shown
 organism failure: the frozen tag split (output-id half 64-69 vs 70-75)
