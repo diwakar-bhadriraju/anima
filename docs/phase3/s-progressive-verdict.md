@@ -68,3 +68,12 @@ substrate-direction as the earlier blocked lines, now with a concrete
 measured motivation.
 
 STOP - verdict recorded; PARTIAL; no tuning; decision pending.
+
+OBSERVATION (recorded, NOT tuned): the S1D acquisition block was 30
+reps (long). Quantified here: D "scrambled" the S1 assemblies per cos-
+self (A 0.97->0.15, 0.98->0.08, 0.91->0.38; C 0.81->-0.13, 0.75->0.18,
+0.79->0.21), i.e. interference is structural (weight-space reuse), and
+may scale with acquisition reps. Whether shorter/exposure-gated D
+acquisition reduces interference is a NEW registration question, not a
+parameter tweak of this demo. Fertilizes the next mechanism slice
+(selective memory protection during acquisition).
