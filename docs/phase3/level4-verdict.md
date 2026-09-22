@@ -161,3 +161,13 @@ concordant) fully closes Level-4 temporal prediction in this substrate.
 Confirmed assets remain: L3 alternation retrieval + d_ing-protectable
 bridge. Next directions (r1/r2/r3) per the D-15 NEXT block - approval
 required; no patch/tuning of this family.
+
+CONTROL (base, 1500 ms training; 1327Z runs) same S3transfer windows:
+  s20260912: pool -0.0279 / out -0.0364
+  s9001:     pool -0.2510 / out -0.2531
+  s424242:   pool -0.0320 / out -0.0303
+Adjacent training (D-16: -0.001/-0.086/-0.086 pool) is INDISTINGUISHABLE
+from base: neither creates transfer; both ~0-to-negative in every seed.
+Airtight: no curriculum/gap value (40-1500 ms) yields positive S3
+transfer; temporal prediction remains closed at the representational
+level in this substrate.
