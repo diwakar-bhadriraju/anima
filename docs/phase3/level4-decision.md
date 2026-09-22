@@ -75,3 +75,25 @@ achievable by this route and the mechanism is rejected (no patch).
    measure Π and reject/adopt on evidence.
 
 STOP — decision + feasibility recorded; branch in progress.
+## AMENDMENT (D-08): eligibility-trace mechanism frozen in detail
+
+Justification (evidence): E18-21 measured temporal capacity < 50 ms;
+standard pairwise STDP (tau=20 ms) cannot associate events 1500 ms
+apart; the feasibility probe showed a gap state EXISTS. The minimal
+mechanism to wire the association across the gap is a SLOW per-neuron
+pre-trace used as the LTP pre-trace (the classic trace rule,
+Frémaux/Gerstner form): a neuron that fired in the preceding gap and
+again during the next event potentiates its OUTGOING synapses onto the
+next event's responders -> the X-gap state begins to drive the
+Y-assembly -> anticipation (PI > 0).
+
+Mechanism (flag d_elig, requires nothing else; additive):
+- per-neuron slow spike trace elg_i: elg_i *= exp(-dt/tau_elig) each
+  tick; += 1 per own spike; clamped to [0, e_max]. tau_elig = 1500 ms
+  (the gap; derived from the measured plateau persistence);
+  e_max = 1.0 (bounded; finite resource). One scalar per neuron.
+- stdp LTP pre-trace := elg_pre (the slow trace) in place of the 20 ms
+  trace when d_elig; LTD and everything else unchanged.
+- deterministic; identity-gated (elg stays 0 when off; flag-off path
+  untouched).
+Falsifier (unchanged): PI ~ 0 across seeds after training.
