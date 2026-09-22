@@ -77,3 +77,9 @@ may scale with acquisition reps. Whether shorter/exposure-gated D
 acquisition reduces interference is a NEW registration question, not a
 parameter tweak of this demo. Fertilizes the next mechanism slice
 (selective memory protection during acquisition).
+
+AIR-TIGHTNESS: identical S1 rates per seed across prog/control (exact
+match above) + identical seeds => identical S1 trajectories -> the S1
+reference vectors used by retent.rs are BY CONSTRUCTION the same in both
+arms. The measured S3 re-expression degradation is therefore attributable
+to the D-interposed stages (S1D acquisition), NOT to reference drift.
