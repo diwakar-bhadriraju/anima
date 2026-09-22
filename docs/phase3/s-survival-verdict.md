@@ -7,13 +7,17 @@ start; no silent stages). 3 seeds, all curriculum-complete.
 
 ## Endpoints (frozen D-22/D-30)
 
-PRIMARY (known-vs-novel differential across >= 2/3 seeds, bar > +0.05):
-  s20260912: kvs_diff = 0.133   PASS
-  s9001:     kvs_diff = 0.063   PASS
-  s424242:   kvs_diff = 0.099   PASS
-  -> 3/3 seeds. The organism responds to a NEVER-TRAINED novel probe (D)
-     with measurably different recognition/viability than to known A/C,
-     while refs stay fixed at S1-end and D stays untrained (D-24/D-26).
+PRIMARY (known-vs-novel differential across >= 2/3 seeds; bar > +0.05):
+  RECOGNITION CONTRAST (the clean falsifier number; emitted in
+  survival-outcome.json) - known_recognized_frac vs novel_recognized_frac:
+    s20260912: 1.00 (22/22) vs 0.00 (0/8)   PASS
+    s9001:     0.91 (23/23) vs 0.00 (0/7)   PASS
+    s424242:   1.00 (23/23) vs 0.00 (0/7)   PASS
+  -> 3/3 seeds: known patterns recognized ~100%, the never-trained novel
+     probe 0%, a clean 1.0-vs-0.0 contrast in EVERY seed. kvs_diff
+     (viability-mean) = 0.133 / 0.063 / 0.099 as secondary. Refs fixed
+     at S1-end, D never trained (D-24/D-26), D's presence forced by
+     p_novel=0.2 (D-30) so the metric is never null (novel_beats 7-8).
 
 SECONDARY (persistence): all 3 seeds survive the full 30-beat horizon
 (died_at=None), pool rate stays in [5,250] Hz (a=1), viability

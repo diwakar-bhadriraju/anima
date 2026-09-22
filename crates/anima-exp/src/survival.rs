@@ -17,11 +17,15 @@ pub struct SurvivalOutcome {
     pub beats: u64,
     pub died_at: Option<u64>,
     pub mean_viability: f32,
-    pub known_vs_novel_diff: f32,
+    pub known_vs_novel_diff: Option<f32>,
     pub a_actions: u64,
     pub c_actions: u64,
     pub withdraw_actions: u64,
     pub quiet_actions: u64,
+    pub known_recognized_frac: f32,
+    pub novel_recognized_frac: f32,
+    pub known_beats: u32,
+    pub novel_beats: u32,
 }
 
 /// Run the closed loop after S1: `beats` beats; each presents the current
@@ -44,6 +48,7 @@ pub fn run(
     let (mut a_act, mut c_act, mut wd_act, mut qt_act) = (0u64, 0u64, 0u64, 0u64);
     let mut known_v: Vec<f32> = Vec::new();
     let mut novel_v: Vec<f32> = Vec::new();
+    let (mut known_ok, mut known_n, mut novel_ok, mut novel_n) = (0u32, 0u32, 0u32, 0u32);
     let rw = spec.r_window.max(1) as usize;
     let mut rcog: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
     let mut ob_window: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
@@ -85,6 +90,7 @@ pub fn run(
         let recognized = is_known && act == cur;
         rcog.push_back(recognized);
         if rcog.len() > rw { rcog.pop_front(); }
+        if is_known { known_n += 1; if recognized { known_ok += 1; } } else { novel_n += 1; if recognized { novel_ok += 1; } }
         let r = rcog.iter().filter(|x| **x).count() as f32 / rcog.len().max(1) as f32;
         // activity boundedness (pool 24..64 mean rate, Hz)
         let rate = net.neurons.iter().skip(24).take(40).map(|n| n.rate_hz).sum::<f32>() / 40.0;
@@ -136,9 +142,13 @@ pub fn run(
     let mean_v = v_sum / nb as f32;
     let km = known_v.iter().sum::<f32>() / known_v.len().max(1) as f32;
     let nm = novel_v.iter().sum::<f32>() / novel_v.len().max(1) as f32;
+    let kvs = if novel_n == 0 { None } else { Some(km - nm) };
     SurvivalOutcome {
         beats: beat, died_at: died, mean_viability: mean_v,
-        known_vs_novel_diff: km - nm, a_actions: a_act, c_actions: c_act,
+        known_vs_novel_diff: kvs, a_actions: a_act, c_actions: c_act,
         withdraw_actions: wd_act, quiet_actions: qt_act,
+        known_recognized_frac: known_ok as f32 / known_n.max(1) as f32,
+        novel_recognized_frac: novel_ok as f32 / novel_n.max(1) as f32,
+        known_beats: known_n, novel_beats: novel_n,
     }
 }

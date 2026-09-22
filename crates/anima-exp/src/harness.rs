@@ -775,9 +775,11 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                 "beats": out.beats, "died_at": out.died_at, "mean_viability": out.mean_viability,
                 "known_vs_novel_diff": out.known_vs_novel_diff, "a_actions": out.a_actions,
                 "c_actions": out.c_actions, "withdraw_actions": out.withdraw_actions,
-                "quiet_actions": out.quiet_actions,
+                "quiet_actions": out.quiet_actions, "known_recognized_frac": out.known_recognized_frac,
+                "novel_recognized_frac": out.novel_recognized_frac,
+                "known_beats": out.known_beats, "novel_beats": out.novel_beats,
             }).to_string()).ok();
-        eprintln!("SURVIVAL: beats={} died_at={:?} mean_v={:.3} kvs_diff={:.3} (A={} C={} W={} Q={})",
+        eprintln!("SURVIVAL: beats={} died_at={:?} mean_v={:.3} kvs_diff={:?} (A={} C={} W={} Q={})",
             out.beats, out.died_at, out.mean_viability, out.known_vs_novel_diff,
             out.a_actions, out.c_actions, out.withdraw_actions, out.quiet_actions);
     }
