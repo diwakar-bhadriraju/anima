@@ -118,3 +118,21 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   index PI).
 - OPEN: can the gap state be SHAPED into anticipation (the transition-
   learning mechanism) - falsifier PI ~ 0 after training.
+
+## D-09 — Level-4 eligibility-trace FALSIFIED (clean rejection)
+
+- d_elig (slow-trace LTP) implemented, identity gate PASS (flag-off
+  byte-identical: FNV 9647ea8a0ca4dbd2, 105/105 snapshots), 183 tests
+  green. 3-seed alternating run completed without runaway.
+- FALSIFIER hit: PI = 0 exactly in all 3 seeds. Cause (measured): the
+  eligibility LTP eliminated the cross-gap substrate (0 late-gap spikes
+  in 37/34/33 gaps; presentations still fire, refmag ~1800-2080). The
+  mechanism meant to USE the bridge destroyed it - reproduces the
+  E4-family theme (plasticity reweighting destabilizes the firing
+  regime it depends on in this all-excitatory E-nogain substrate).
+- Verdict docs/phase3/level4-verdict.md. NO tuning (protocol 8).
+- NOTE: clla-elig runs land in runs/clla-arex-* dirs (exp_id inherited);
+  dir mapping in the verdict. d_elig configs clla-elig-s{seed}-il.
+- Next (NEW registration, not patch): passive prediction READOUT that
+  does not feed back into LTP - leave the base E-nogain gap state
+  untouched, read a per-neuron trace as anticipation. Different locus.
