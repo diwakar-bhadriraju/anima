@@ -1,97 +1,87 @@
-# Phase III Level-4 verdict — temporal prediction via eligibility-trace LTP
+# Phase III Level-4 verdict (branch 1) — inhibitory gating (d_ing)
 
-Status: FALSIFIED (reject; no patch per protocol-immutability),
-2026-09-22. Instrument: examples/predict.rs + examples/gapstate.rs.
+Status: FALSIFIED on the association endpoint; protective premise
+CONFIRMED. 2026-09-22. Instrument: predict.rs (pool/out PI + gap
+density), outspike.rs. Design: docs/phase3/level4-inhib-design.md.
 
-## Result (measured, 3 seeds × alternating il)
+## Result (measured, 3 seeds x il, d_ing on; configs clla-ing-s{seed}-il)
 
-| run dir (d_elig config) | late-gap internal spikes | mean Π |
-|---|---|---|
-| clla-arex-s20260912-il-20260922T165455Z (clla-elig-s20260912-il) | 0 / 37 gaps | +0.0000 |
-| clla-arex-s9001-il-20260922T165502Z (clla-elig-s9001-il)      | 0 / 34 gaps | +0.0000 |
-| clla-arex-s424242-il-20260922T165509Z (clla-elig-s424242-il)   | 0 / 33 gaps | +0.0000 |
+Run dirs (exp_id inherited -> runs/clla-arex-*; config WAS
+clla-ing-s{seed}-il with d_ing=true):
+  s20260912 -> runs/clla-arex-s20260912-il-20260922T175020Z
+  s9001     -> runs/clla-arex-s9001-il-20260922T175029Z
+  s424242   -> runs/clla-arex-s424242-il-20260922T175041Z
+All completed curriculum-complete (no runaway).
 
-NOTE - run dirs inherit `exp_id` from the base (clla-arex-*); the config
-passed was configs/clla-elig-s{seed}-il.toml with d_elig=true (verified
-in-file line 153). d_elig activity confirmed behaviorally: per-pattern
-rates diverge massively from the no-elig E-nogain baseline for the same
-seed (C S1 159.2 -> 59.4 Hz, A S1 50.6 -> 21.0 Hz, seed 20260912). All
-three d_elig runs completed (curriculum-complete; no runaway).
+OUTPUT prediction index (frozen PRIMARY: must exceed +0.05 in >=2/3):
+  s20260912: -0.1204   (base control +0.0153)
+  s9001:     +0.0139   (base +0 ... )   [compare earlier: base -0.0176]
+  s424242:   +0.0085   (base -0.0088)
+  => 0/3 seeds reach +0.05. POOLED output PI ~ 0. ANTICIPATION NOT LEARNED.
 
-FROZEN falsifier: "PI ~ 0 across seeds after training => reject."
-Achieved: PI = 0 exactly in all three seeds; more strongly, the LATe-GAP
-INTERNAL SUBSTRATE IS EMPTY (0 spikes in 37/34/33 late-gap windows; the
-presentation refs are non-trivial refmag 1781-2082, so the probe is
-sound - presentations fire, gaps are silent).
+POOL prediction index (secondary):
+  s20260912: -0.0046,  s9001: +0.0180,  s424242: +0.0081  (all ~ 0)
 
-## Mechanism diagnosis (why; evidence-tagged, not tuned)
+## What the mechanism DID and did NOT do (measured)
 
-The eligibility trace switched the STDP LTP pre-trace to the slow trace
-(elg, tau 1500 ms), which reweighted the recurrent pool so that the
-persistent plateau firing that sustained the E-nogain cross-gap state
-(gapstate feasibility probe: 300-1200 spikes/1500 ms in the no-elig
-baseline) no longer survives the gap. d_elig => LTP consolidation
-shifted the rate regime (C dominated 59 Hz vs A 21 Hz; imbalanced), so
-presentations fire but the gap is silent. The mechanism that was to USE
-the bridge destroyed it. This reproduces the E4/E4c-family finding: in
-this all-excitatory E-nogain regime, plasticity reweighting destabilizes
-the very firing regime the mechanism depends on. The gap bridge is a
-FRAGILE attractor of the base dynamics, not a stable substrate.
+CONFIRMED (the protective premise of the research question):
+- pool late-gap firing PRESERVED: 334.8 / 187.3 / 141.4 spikes/gap
+  (non-empty, base order of magnitude 40-239). Output gap firing 23-288
+  /gap. Unlike the falsified eligibility family (which ZEROED the gap
+  substrate, d_elig -> 0 spikes), d_ing does NOT destroy the bridge:
+  the local inhibitory gate keeps the recurrent pool off the phasic-lock
+  regime while leaving its fast STDP and persistent tail intact.
+  "Can local inhibitory gating preserve the predecessor-specific
+  cross-gap state?"  -> YES (substrate survives).
 
-## Boundary
+FALSIFIED (the association endpoint):
+- output PI ~ 0 across all 3 seeds (only s9001 mildly positive, far
+  below the +0.05 bar; s20260912 NEGATIVE). The gated additive readout
+  slow-LTP did not turn the preserved predecessor state into
+  anticipation of the next event (Y-selective late-gap output firing).
+  "while allowing the next-event association to be learned?" -> NO.
+  Adding a_ing=0.005 x gate(open in tail) x elg produced no measurable
+  re-weighting of the readout toward anticipating the successor.
 
-- Rejected: eligibility-trace-modulated LTP as the Level-4 temporal
-  association lever. No parameter tuning (protocol 8).
-- Preserved evidence: predict.rs + gapstate.rs committed; runs under
-  runs/ (disk); no-elg E-nogain gap substrate reproducible.
-- Next hypothesis (NEW registration, not a patch): make prediction a
-  PASSIVE readout that does not feed back into LTP - a per-neuron trace
-  read by the organism as anticipation of the next event, with the
-  gap state LEFT in the untouched E-nogain dynamics (where it exists)
-  and no plasticity lever. This is a different locus (readout, not
-  plasticity) and preserves the fragile bridge. Requires selecting the
-  external-response reference from the base dynamics and a new freeze.
+## Mechanism-truth observations (why; recorded, not tuned)
 
-STOP - falsified; evidence preserved; next branch is a new registration.
-## Amendment (D-10): partitioned d_elig_ro also FALSIFIED
+1. The per-cohort gate works as designed: driven cohort closes
+   (ing_gate rises, gate -> ~0.04 at saturating drive), quiet cohort
+   re-opens (gate -> ~1 after tau_g 300 ms). Unit-verified separately.
+2. Pool fast STDP is untouched (identity gate PASS, FNV unchanged),
+   and the pool bridge survives end-to-end — the design's central claim
+   about substrate protection is empirically confirmed.
+3. The association did not accumulate: pooled output PI stayed at the
+   base "memory-not-anticipation" level (the +-0.02/-0.12 scatter is the
+   same rate-asymmetry artifact seen in the untrained base, not a learned
+   signal). Either the a_ing term is too weak / too rarely active to
+   reweight the readout within S1, or the output's gap firing is not
+   tractably pulled toward Y by the pool-tail->output path. No tuning.
 
-Second registered mechanism (approved B, readout-only eligibility): the
-slow bridge applied ONLY on internal->output edges; the recurrent pool
-kept base 20 ms plasticity.
+## Falsification (frozen endpoint)
 
-WIRING FIX: the first d_elig_ro build never reached plasticity.rs (the
-patch aborted on an AssertionError and the retry only fixed network.rs);
-those runs (1703Z) were bit-identical to the base. Root cause found and
-fixed (both LTP sites gated: d_elig_ro && post-is-Output => slow trace).
-Re-run with the mechanism genuinely active (identity re-passed):
-runs/clla-arex-s{seed}-il-20260922T1706{27,34,42}Z (config
-clla-eligro-s{seed}-il.toml). d_elig_ro effect confirmed behaviorally:
-rates A 50.65->34.94, C 159.25->88.73 (seed 20260912).
+PRIMARY falsifier "output PI > +0.05 in >= 2/3 seeds" -> NOT met
+(0/3). FALSIFIED. Pool preservation (the one positive half) does not
+rescue the mechanism: the research question was whether inhibition
+preserves the state WHILE the association is learned; the state lives,
+the association does not.
 
-RESULT (measured, 3 seeds):
-- pool PI all: -0.0330 / -0.0099 / +0.0023  (approx 0)
-- output PI all: +0.0000, with output LATE-GAP FIRING = 0 in ALL THREE
-  seeds (base E-nogain output fires 162.9/gap in the gap; d_elig_ro
-  keeps output at 147-189/pres but ZEROES its gap firing).
-- pool bridge WEAKENED (5.7-81.9 gap spikes vs base 40-239), not
-  preserved.
+## Next (from this negative; no patch / no tuning)
 
-FALSIFIER (PI ~ 0 after training) hit a second time. Mechanism
-diagnosis: even confined to the readout, slow-trace LTP consolidates
-output firing toward stimulus-locked drive, eliminating the persistent
-gap component needed to carry anticipation. Output over-commits to
-"now", losing the "about-to-be".
+The substrate-protection half is now a CONFIRMED mechanism asset; the
+learning half is the persistent failure across ALL three Level-4 routes
+so far (d_elig LTP, d_elig_ro readout LTP, d_ing gated readout). The
+common cause: in this E-nogain all-excitatory environment, no
+spike-timing readout plasticity has turned the (now-preserved)
+predecessor state into next-event anticipation — the state is memory,
+not prediction. Candidates for the NEXT registration (approval required,
+not patching this one):
+- (a) measure output-anticipation against the ORGANISM's own next-event
+  response coerced from the readout (readout responses as the post may
+  be too sparse/weak; use dwell-time-consistent presentation overlap);
+- (b) a curriculum where predecessor and successor presentations
+  OVERLAP so association does not depend on bridging a silent gap;
+- (c) revisit structural-growth-targeted wiring (E4-family, gate-on
+  regression history) now that the gap bridge is protectable.
 
-TWO-MECHANISM THEME (now robust): temporal association via spike-timing
-LTP (all-edges d_elig AND readout-only d_elig_ro) is antagonistic to
-the persistent cross-gap state in this all-excitatory E-nogain substrate
-- plasticity consolidation collapses the gap component it would need to
-bridge. Ranked hypothesis for why: no inhibitory gating leaves LTP's
-consolidation unopposed, so weights pin firing to present-stimulus drive
-(recurring E4-family constraint).
-
-LEVEL-4 VIA LTP: CLOSED (2 falsifications). Next candidate families (for
-approval, not patching): (1) inhibitory gating of prediction, (2)
-structural growth, (3) a curriculum where the temporally-adjacent
-stimuli OVERLAP rather than being separated by a silent 1500 ms gap, so
-learning does not have to bridge an empty interval.
+STOP - falsified; protective premise confirmed; evidence preserved.

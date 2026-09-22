@@ -151,3 +151,20 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
 - Level-4 temporal prediction via spike-timing LTP: CLOSED (2
   falsifications, no tuning). Next families (await approval): inhibitory
   gating, structural growth, overlapping-stimulus curriculum.
+
+## D-11 - d_ing (branch 1, inhibitory gating) FALSIFIED on association; protective premise CONFIRMED
+
+- Implemented (identity PASS, FNV unchanged; 3 unit tests; 110 core /
+  183 total green). 3-seed il runs, no runaway.
+- CONFIRMED: pool gap substrate PRESERVED under inhibition (334.8/187.3/
+  141.4 pool spikes/gap; output 23-288/gap) - unlike d_elig which ZEROED
+  it. The per-cohort gate closes on drive / opens in tail as designed.
+- FALSIFIED: output PI ~ 0 across seeds (-0.1204, +0.0139, +0.0085 vs
+  base +0.0153/-0.0176/-0.0088); 0/3 reach the +0.05 PRIMARY bar.
+  The gated readout slow-LTP did not turn preserved predecessor state
+  into next-event anticipation.
+- Ladder status Level-4 temporal prediction: 3 independent mechanisms
+  falsified (d_elig, d_elig_ro, d_ing). The gap bridge is now PROTECTABLE
+  (a real mechanism asset) but NO route converts it to anticipation.
+  Next candidates recorded (overlap curriculum, readout coerced post,
+  structural-growth-targeted) - approval required, no tuning.

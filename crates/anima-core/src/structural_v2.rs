@@ -1073,6 +1073,11 @@ impl V2Plasticity {
             if !inhib || !alive {
                 continue;
             }
+            // d_ing: fixed shunting from INs (Inhibitory-class pre) is a
+            // separate structural mechanism, not M6 plastic inhibition.
+            if net.neurons[pre.idx()].class == crate::network::NeuronClass::Inhibitory {
+                continue;
+            }
             let co = self.fired[pre.idx()] && self.fired[post.idx()];
             let nw = if co {
                 (w + self.params.a_inh).min(self.params.w_inh_max)
@@ -1188,6 +1193,12 @@ fn count_live(net: &Network) -> (Vec<usize>, Vec<usize>) {
     let mut i = vec![0; n];
     for s in &net.synapses {
         if s.silent_ticks == u64::MAX {
+            continue;
+        }
+        // Phase III Level-4 `d_ing`: fixed shunting from inhibitory
+        // INs (pre = Inhibitory class) is a separate structural
+        // mechanism, NOT the plastic M6 anti-Hebbian budget. Excluded.
+        if net.neurons[s.pre.idx()].class == crate::network::NeuronClass::Inhibitory {
             continue;
         }
         if s.inhibitory {
