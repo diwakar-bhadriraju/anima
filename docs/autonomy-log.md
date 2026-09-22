@@ -136,3 +136,18 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
 - Next (NEW registration, not patch): passive prediction READOUT that
   does not feed back into LTP - leave the base E-nogain gap state
   untouched, read a per-neuron trace as anticipation. Different locus.
+
+## D-10 — d_elig_ro (partitioned B) FALSIFIED; Level-4-via-LTP CLOSED
+
+- Wiring bug found: first d_elig_ro build never consumed the flag in
+  plasticity.rs (patch AssertionError aborted it; runs were base-
+  identical). Fixed both LTP sites; identity re-passed; rerun.
+- With the mechanism genuinely active: pool PI ~0 (-0.033/-0.010/
+  +0.002), output PI = 0 with output late-gap firing ZEROED (0 in all 3
+  seeds vs base 162.9/gap). Pool bridge weakened, not preserved.
+- Two-mechanism theme: all-edges d_elig AND readout-only d_elig_ro both
+  fail - LTP consolidation collapses the persistent cross-gap state it
+  would bridge. Ranked cause: no inhibition -> consolidation unopposed.
+- Level-4 temporal prediction via spike-timing LTP: CLOSED (2
+  falsifications, no tuning). Next families (await approval): inhibitory
+  gating, structural growth, overlapping-stimulus curriculum.

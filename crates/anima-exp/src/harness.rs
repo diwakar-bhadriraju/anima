@@ -774,6 +774,7 @@ fn v2_params(cfg: &ExpConfig) -> Option<anima_core::network::V2Params> {
         d_claim: v.d_claim,
         d_sparse: v.d_sparse,
         d_elig: v.d_elig,
+        d_elig_ro: v.d_elig_ro,
         c_slots: v.c_slots,
         w_c_init: v.w_c_init,
         delta_perm: v.delta_perm,

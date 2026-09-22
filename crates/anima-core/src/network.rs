@@ -465,6 +465,13 @@ pub struct V2Params {
     /// false = exactly the committed base STDP (identity).
     #[serde(default, skip_serializing_if = "is_false")]
     pub d_elig: bool,
+    /// Phase III Level-4 partitioned (B, level4-verdict.md): the slow
+    /// eligibility bridge applies ONLY on internal->output (readout)
+    /// edges; the recurrent pool keeps its base 20 ms plasticity so its
+    /// gap bridge survives (the all-edges d_elig was FALSIFIED - it
+    /// destroyed the substrate).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_elig_ro: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -918,7 +925,7 @@ impl Network {
         // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
         // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
         let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
-        let elig_on = self.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
+        let elig_on = self.cfg.v2.as_ref().is_some_and(|v| v.d_elig || v.d_elig_ro);
         let decay_elig = if elig_on { exp_approx(-dt / elig_tau_ms()) } else { 0.0 };
         // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3;
         // SPEC CORRECTION 2026-09-20, docs/x-mechanism-review.md):

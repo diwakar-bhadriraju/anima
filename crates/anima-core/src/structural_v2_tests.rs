@@ -21,6 +21,7 @@ pub fn v2_params() -> V2Params {
         d_claim: false,
         d_sparse: false,
         d_elig: false,
+        d_elig_ro: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,
@@ -1683,7 +1684,8 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
     fn sparse_off_is_identity() {
         let cfg = NetworkConfig {
             v2: Some(V2Params { d_core: true, d_claim: true, d_sparse: false,
-        d_elig: false, ..v2_params() }),
+        d_elig: false,
+        d_elig_ro: false, ..v2_params() }),
             ..NetworkConfig::default()
         };
         let mut net = Network::new(cfg, 4, 1, 0, 23);

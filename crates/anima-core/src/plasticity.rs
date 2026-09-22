@@ -257,22 +257,25 @@ pub fn stdp_tick_multiplicative(
             // Phase III Level-4: when d_elig, the LTP pre-trace is the
             // per-neuron SLOW eligibility trace (bridges the gap), not the
             // 20 ms trace. Flag off => exact committed path.
-            let elig_on = net.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
-            let ltp_trace = if elig_on {
+            let v2 = net.cfg.v2.as_ref();
+            let use_slow = v2.is_some_and(|v| v.d_elig)
+                || (v2.is_some_and(|v| v.d_elig_ro)
+                    && net.neurons[post.idx()].class == crate::network::NeuronClass::Output);
+            let ltp_trace = if use_slow {
                 self_trace_elig(net, s.pre) // slow eligibility of the PRE
             } else {
                 pre_t
             };
-            if pre_t <= 0.0 && !elig_on {
+            if pre_t <= 0.0 && !use_slow {
                 continue;
             }
-            if elig_on && ltp_trace <= 0.0 {
+            if use_slow && ltp_trace <= 0.0 {
                 continue;
             }
             let s = &mut net.synapses[sid.idx()];
             let before = s.w;
             let room = (params.w_max - s.w).max(0.0);
-            s.w = (s.w + params.a_plus * pre_t * gate * room).min(params.w_max);
+            s.w = (s.w + params.a_plus * ltp_trace * gate * room).min(params.w_max);
             if s.w != before {
                 changes.push(WeightChange { synapse: sid, before, after: s.w });
             }
@@ -394,16 +397,19 @@ pub fn stdp_tick(
             // Phase III Level-4: when d_elig, the LTP pre-trace is the
             // per-neuron SLOW eligibility trace (bridges the gap), not the
             // 20 ms trace. Flag off => exact committed path.
-            let elig_on = net.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
-            let ltp_trace = if elig_on {
+            let v2 = net.cfg.v2.as_ref();
+            let use_slow = v2.is_some_and(|v| v.d_elig)
+                || (v2.is_some_and(|v| v.d_elig_ro)
+                    && net.neurons[post.idx()].class == crate::network::NeuronClass::Output);
+            let ltp_trace = if use_slow {
                 self_trace_elig(net, s.pre) // slow eligibility of the PRE
             } else {
                 pre_t
             };
-            if pre_t <= 0.0 && !elig_on {
+            if pre_t <= 0.0 && !use_slow {
                 continue;
             }
-            if elig_on && ltp_trace <= 0.0 {
+            if use_slow && ltp_trace <= 0.0 {
                 continue;
             }
             // E6: β scales the a⁺ increment only (input-channel afferents).

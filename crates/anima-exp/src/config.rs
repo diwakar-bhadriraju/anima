@@ -139,6 +139,9 @@ pub struct V2Section {
     /// Phase III Level-4 eligibility trace (docs/phase3/level4-decision.md).
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub d_elig: bool,
+    /// Phase III Level-4 partitioned (B): readout-only eligibility.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_elig_ro: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

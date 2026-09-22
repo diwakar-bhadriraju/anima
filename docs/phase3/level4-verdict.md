@@ -53,3 +53,45 @@ FRAGILE attractor of the base dynamics, not a stable substrate.
   external-response reference from the base dynamics and a new freeze.
 
 STOP - falsified; evidence preserved; next branch is a new registration.
+## Amendment (D-10): partitioned d_elig_ro also FALSIFIED
+
+Second registered mechanism (approved B, readout-only eligibility): the
+slow bridge applied ONLY on internal->output edges; the recurrent pool
+kept base 20 ms plasticity.
+
+WIRING FIX: the first d_elig_ro build never reached plasticity.rs (the
+patch aborted on an AssertionError and the retry only fixed network.rs);
+those runs (1703Z) were bit-identical to the base. Root cause found and
+fixed (both LTP sites gated: d_elig_ro && post-is-Output => slow trace).
+Re-run with the mechanism genuinely active (identity re-passed):
+runs/clla-arex-s{seed}-il-20260922T1706{27,34,42}Z (config
+clla-eligro-s{seed}-il.toml). d_elig_ro effect confirmed behaviorally:
+rates A 50.65->34.94, C 159.25->88.73 (seed 20260912).
+
+RESULT (measured, 3 seeds):
+- pool PI all: -0.0330 / -0.0099 / +0.0023  (approx 0)
+- output PI all: +0.0000, with output LATE-GAP FIRING = 0 in ALL THREE
+  seeds (base E-nogain output fires 162.9/gap in the gap; d_elig_ro
+  keeps output at 147-189/pres but ZEROES its gap firing).
+- pool bridge WEAKENED (5.7-81.9 gap spikes vs base 40-239), not
+  preserved.
+
+FALSIFIER (PI ~ 0 after training) hit a second time. Mechanism
+diagnosis: even confined to the readout, slow-trace LTP consolidates
+output firing toward stimulus-locked drive, eliminating the persistent
+gap component needed to carry anticipation. Output over-commits to
+"now", losing the "about-to-be".
+
+TWO-MECHANISM THEME (now robust): temporal association via spike-timing
+LTP (all-edges d_elig AND readout-only d_elig_ro) is antagonistic to
+the persistent cross-gap state in this all-excitatory E-nogain substrate
+- plasticity consolidation collapses the gap component it would need to
+bridge. Ranked hypothesis for why: no inhibitory gating leaves LTP's
+consolidation unopposed, so weights pin firing to present-stimulus drive
+(recurring E4-family constraint).
+
+LEVEL-4 VIA LTP: CLOSED (2 falsifications). Next candidate families (for
+approval, not patching): (1) inhibitory gating of prediction, (2)
+structural growth, (3) a curriculum where the temporally-adjacent
+stimuli OVERLAP rather than being separated by a silent 1500 ms gap, so
+learning does not have to bridge an empty interval.
