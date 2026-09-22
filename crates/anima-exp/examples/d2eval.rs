@@ -42,6 +42,10 @@ fn main() {
         let cohort = |pre: u32| -> usize {
             if pre < 8 { 0 } else if pre < 16 { 1 } else { 2 }
         };
+        // map a pattern name to its cohort index (measurement only)
+        let cohort_of_pat = |p: &str| -> usize {
+            if p == "A" { 0 } else if p == "C" { 1 } else { 2 }
+        };
         let name = dir.rsplit('/').next().unwrap().to_string();
         println!("H\t{name}\tfirst={first_pat}\tsecond={second_pat}");
         for snap in &snaps {
@@ -78,7 +82,7 @@ fn main() {
                     let w = syn.w.unwrap_or(0.0);
                     let cx = cohort(syn.pre);
                     if cx == 0 { mA_m += w; } else if cx == 1 { mC_m += w; }
-                    if !first_pat.is_empty() && ((first_pat == "A" && cx == 0) || (first_pat == "C" && cx == 1)) {
+                    if !first_pat.is_empty() && cohort_of_pat(&first_pat) == cx {
                         first_m += w;
                     }
                 }
@@ -90,12 +94,7 @@ fn main() {
                     let w = syn.w.unwrap_or(0.0);
                     let cx = cohort(syn.pre);
                     if cx == 0 { mA_e += w; } else if cx == 1 { mC_e += w; }
-                    if !second_pat.is_empty() && ((second_pat == "A" && cx == 0) || (second_pat == "C" && cx == 1)) {
-                        first_e += w;
-                    }
-                    if !first_pat.is_empty() && ((first_pat == "A" && cx == 0) || (first_pat == "C" && cx == 1)) {
-                        first_e += 0.0; // second-block cohort only below
-                    }
+                    (); // placeholder removed
                 }
             }
             // second-block cohort mass at drive end
@@ -104,7 +103,7 @@ fn main() {
                 if syn.consolidated && syn.pre < 24 {
                     let w = syn.w.unwrap_or(0.0);
                     let cx = cohort(syn.pre);
-                    if !second_pat.is_empty() && ((second_pat == "A" && cx == 0) || (second_pat == "C" && cx == 1)) {
+                    if !second_pat.is_empty() && cohort_of_pat(&second_pat) == cx {
                         second_e += w;
                     }
                 }

@@ -29,10 +29,18 @@ fn main() {
             }
         }
         pres.sort_by_key(|p| p.0);
-        // S1 references: last 10 presentations of each pattern in S1
+        let name = dir.rsplit('/').next().unwrap().to_string();
+        // the two distinct patterns presented in S1
+        let mut s1_pats: Vec<String> = Vec::new();
+        for p in pres.iter().filter(|p| p.2 == "S1") {
+            if !s1_pats.contains(&p.1) { s1_pats.push(p.1.clone()); }
+            if s1_pats.len() >= 2 { break; }
+        }
+        if s1_pats.len() < 2 { println!("{name}\t(note: fewer than 2 S1 patterns, probe skipped)"); continue; }
+        let (p0, p1) = (s1_pats[0].clone(), s1_pats[1].clone());
+        // references = mean over the last 10 S1 presentations of each
         let s1: Vec<(u64, String, String)> = pres.iter().filter(|p| p.2 == "S1").cloned().collect();
-        let mut refs: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
-        for pat in ["A", "C"] {
+        let ref_of = |pat: &str| -> Vec<f32> {
             let rows: Vec<&(u64, String, String)> = s1.iter().filter(|p| p.1 == pat).collect();
             let take = rows.len().min(10);
             let mut sum = vec![0.0f32; 52];
@@ -41,21 +49,22 @@ fn main() {
                 for (i, x) in v.iter().enumerate() { sum[i] += x; }
             }
             let n = take.max(1) as f32;
-            refs.insert(pat.to_string(), sum.iter().map(|x| x / n).collect());
-        }
-        // S3 blocks: stage names S3A (A) and S3C (C); report per-window
-        // rho (trajectory across the 5 re-presentations) + last-3 mean.
-        let name = dir.rsplit('/').next().unwrap().to_string();
-        for (stage, pat) in [("S3A", "A"), ("S3C", "C")] {
-            let rows: Vec<&(u64, String, String)> =
-                pres.iter().filter(|p| p.2 == stage && p.1 == pat).collect();
-            if rows.is_empty() { continue; }
+            sum.iter().map(|x| x / n).collect()
+        };
+        let ref0 = ref_of(&p0);
+        let ref1 = ref_of(&p1);
+        // probe: re-exposure stages that re-present p0 or p1
+        for pat in [&p0, &p1] {
+            let rows: Vec<&(u64, String, String)> = pres.iter()
+                .filter(|p| p.2 != "S1" && &p.1 == pat && (p.2 == "S3A" || p.2 == "S3C" || p.2 == "S3A2" || p.2 == "S3C2"))
+                .collect();
+            if rows.is_empty() { println!("{name}\t{pat}\t(no probe stage)"); continue; }
             for (wi, &r) in rows.iter().enumerate() {
                 let v = vector(r.0, &spk24);
-                let cos_a = cosine(&v, refs.get("A").unwrap());
-                let cos_c = cosine(&v, refs.get("C").unwrap());
-                let rho = if pat == "A" { cos_a - cos_c } else { cos_c - cos_a };
-                println!("{name}\t{pat}\tw{wi}\trho={rho:.3}\tcosA={cos_a:.3}\tcosC={cos_c:.3}");
+                let c0 = cosine(&v, &ref0);
+                let c1 = cosine(&v, &ref1);
+                let rho = if pat == &p0 { c0 - c1 } else { c1 - c0 };
+                println!("{name}\t{pat}\tw{wi}\trho={rho:.3}\tcos{p0}={c0:.3}\tcos{p1}={c1:.3}");
             }
         }
         println!();

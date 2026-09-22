@@ -35,3 +35,17 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
 - RESULT: PENDING.
 - OPEN: does E cross S1; does ρ>0 under either blocked order or
   alternation; do gain-regime aborts persist.
+## D-2026-09-22-02 — E-nogain milestone + generalization; blocked-ρ gap prioritized
+
+- OBSERVATION: E (with rg8c gain) forms but aborts 4 cells; E-nogain
+  9/9 complete, S1 (blocked) 6/6, alternating re-expression ρ 0.25-0.77.
+- OBSERVATION: clean-PN generalization (novel 16-23 group @ A statistics)
+  forms S1 6/6 and alternates ρ 0.36-0.91 — NOT A/C-overfit. The earlier
+  "AB" probe was confounded (config "B" = 40 Hz phase-variant over 4-11,
+  overlapping A's channels); discarded, not evidence.
+- H3 (probe re-learning) RULED OUT: blocked ρ flat across 5 re-exposure
+  windows.
+- DECISION: blocked-order re-expression is the highest-evidence gap
+  (shared-pool recency signature: C/Pn re-exposure lights up both
+  assemblies). Test H2 (recurrent-claim capture) next via an
+  afferent-only-claim gated variant; then H1 if unchanged.
