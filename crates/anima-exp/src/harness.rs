@@ -769,7 +769,7 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             let pr = net.neurons.iter().skip(24).take(40).map(|n| n.rate_hz).sum::<f32>()/40.0;
             eprintln!("DBG after ref-capture: pool rate={pr:.1}");
         }
-        let out = crate::survival::run(&mut net, cl_seed, &refs, &spec, &params, &mut traces);
+        let out = crate::survival::run_world(&mut net, cl_seed, cl_seed, &refs, &spec, &params, &mut traces);
         std::fs::write(dir.join("survival-outcome.json"),
             serde_json::json!({
                 "beats": out.beats, "died_at": out.died_at, "mean_viability": out.mean_viability,

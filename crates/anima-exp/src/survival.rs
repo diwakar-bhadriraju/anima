@@ -41,6 +41,24 @@ pub fn run(
     params: &StdpParams,
     traces: &mut Traces,
 ) -> SurvivalOutcome {
+    run_world(net, seed, seed, refs, spec, params, traces)
+}
+
+/// `world_seed` controls the forced-novelty schedule INDEPENDENTLY of the
+/// organism seed: pass the same world_seed for every organism in a
+/// generation and they all face the IDENTICAL exam (same D-beat schedule),
+/// so fitness differences reflect the brain, not different world
+/// sequences (D-32 fairness requirement).
+#[allow(clippy::too_many_arguments)]
+pub fn run_world(
+    net: &mut Network,
+    _org_seed: u64,
+    world_seed: u64,
+    refs: &[(String, Vec<f32>)],
+    spec: &crate::config::SurvivalSpec,
+    params: &StdpParams,
+    traces: &mut Traces,
+) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
     let mut died: Option<u64> = None;
@@ -55,7 +73,7 @@ pub fn run(
     let mut tick = net.tick;
 
     while beat < spec.beats && died.is_none() {
-        let tr = io::symbol_trains(&cur, seed);
+        let tr = io::symbol_trains(&cur, _org_seed);
         let is_known = cur == "A" || cur == "C";
         let mut out = vec![0.0f32; 12];
         for t in 0..BEAT_MS {
@@ -114,7 +132,7 @@ pub fn run(
         // with prob p_novel present the NEVER-TRAINED D probe (guarantees
         // the known-vs-novel falsifier is measurable); else follow the
         // organism's own action (approach known keeps it, novel->gap).
-        let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed ^ (beat as u64).wrapping_mul(0x9E3779B97F4A7C15));
+        let mut rng = Xoshiro256PlusPlus::seed_from_u64(world_seed ^ (beat as u64).wrapping_mul(0x9E3779B97F4A7C15));
         let force_novel = rng.gen::<f32>() < spec.p_novel;
         cur = if force_novel {
             "D".into() // forced-novelty probe (D-30): the ONLY source of D

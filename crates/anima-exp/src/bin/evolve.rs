@@ -153,7 +153,8 @@ fn main() {
                 let mut traces = Traces::new(&org.net, 20.0);
                 form_s1(&mut org.net, org.seed);
                 let refs = capture_refs(&mut org.net, org.seed);
-                let out = survival::run(&mut org.net, org.seed, &refs, &spec, &p, &mut traces);
+                let world_seed = esec ^ (g as u64).wrapping_mul(0xABCDEF);
+                let out = survival::run_world(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces);
                 org.size = org.net.neurons.len() - 24 - 12;
                 // fitness in [0,1]: mean viability scaled by the recognition
                 // fraction (multiplicative, not additive - additive let the
