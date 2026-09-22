@@ -113,6 +113,15 @@ byte-identical to the committed E-nogain baseline D-> pass FNV gate).
   - is itself a standard LIF neuron (finite, refractory, no plastic
     afferents; plastic-free so it cannot itself consolidate).
 - No new global signals, no external memory, no predictor.
+- RNG SAFETY (identity): the 8 INs' wiring is drawn from a SEPARATE
+  deterministic sub-stream, Xoshiro256PlusPlus::seed_from_u64(fnv1a(
+  "d_ing", run_seed)) - NEVER from the base construction stream. The IN
+  sub-network (neurons + fixed IN afferents + IN->pool/out projections)
+  is constructed IDENTICALLY regardless of the flag value, and the base
+  network draws ZERO extra RNG samples when d_ing is on. Hence flag-off
+  construction is byte-identical to the committed E-nogain baseline by
+  construction (INs present-but-silent or absent both preserve the same
+  base draws), keeping the FNV identity gate exact.
 
 ### 3.2 Local signals (item 1)
 - elg_i: existing per-neuron slow spike trace (tau 1500 ms, bounded 1.0)
@@ -132,8 +141,10 @@ byte-identical to the committed E-nogain baseline D-> pass FNV gate).
   bound the drive that would otherwise feed runaway readout-LTP.
 - The pool's FAST within-event STDP: UNTOUCHED (identity). This is the
   explicit fix vs the falsified family (no trace substitution).
-- The gate CLOSES readout slow-LTP while g is high (item 5: closes at
-  event onset, opens as g decays into the late gap).
+- The gate CLOSES readout slow-LTP while cohort c's own g_c is high
+  (item 5: closes at a cohort's own onset, opens as its drive recedes
+  through the NEXT event's onset — per-cohort, per §3.5/3.5a, NOT a
+  global "event onset / late gap" sweep).
 
 ### 3.4 What remains plastic (item 4)
 - Recurrent pool (internal->internal): BASE pairwise STDP only.
@@ -168,6 +179,21 @@ moments the association needs to fire.
 - The association cannot fire during X's own onset (X-cohort closed) nor
   at X's output drive (same reason) — only X-tail -> next-Y. This is the
   precise break of the "learning consumes its own substrate" coupling.
+
+### 3.5a Why Y-learning is NOT gated shut (robustness, explicit)
+The gate is keyed to the PRE's cohort (gate_c for synapses whose pre is
+in cohort c), never to the post/current drive. Timing arithmetic: the
+PRE (X-tail) fired >= 1500 ms before the next (Y) onset, while the gate
+low-pass tau_g ~ 300 ms. Since 1500 ms >> tau_g (3 low-pass time
+constants), g_c(X) has fully decayed to ~0 by Y onset, so gate_X is
+~1 through the ENTIRE Y presentation (X never re-fires during Y to
+re-arm its own gate). Hence the open window covers the output's full
+Y-response with wide margin — no dependence on catching a fast transient.
+The only synapses gated shut at Y onset are those whose PRE is in Y's
+own cohort (Y->Y self-association), which is exactly the term we want
+suppressed. Thus "gate closed whenever the post fires to Y" is false:
+it is closed only for Y-self pre/source cohorts. tau_g need NOT be
+tuned against the window; the 1500 ms gap dominates.
 
 ### 3.6 Stability bounds (item 6)
 - All weights in [0, w_max]; readout slow term capped by (1 - w/w_max)
@@ -214,8 +240,9 @@ PRIMARY (adopt if all hold across >= 2/3 seeds, il, training then test):
   order of magnitude) with late-gap predecessor-distinctness (cross
   cosine < within - 0.1) maintained, AND
 - formation not regressed (S1 6/6), failures = [].
-SECONDARY (mechanism truth): gate high during onset, ~0 in late gap;
-readout slow-LTP events cluster in the trough.
+SECONDARY (mechanism truth): for each cohort c, gate_c high during c's
+own onset, ~0 in c's late gap / next-onset window; readout slow-LTP
+events cluster in the pre-next-onset window of the PRE cohort.
 FALSIFY / reject (no tuning): output PI <= 0, OR pool tail destroyed, OR
 S1 regressed, OR runaway.
 
@@ -226,7 +253,10 @@ S1 regressed, OR runaway.
   9647ea8a0ca4dbd2, snapshot frames). Identity gate BEFORE the matrix.
 - Unit tests: gate(high drive)->~0 / gate(trough)->~1; readout slow term
   additive capped by w_max and by gate; pool fast STDP unchanged when
-  d_ing on; flag-off byte identity; no label/drive leak into wiring.
+  d_ing on; flag-off byte identity; no label/drive leak into wiring;
+  RNG INVARIANCE: base wiring consumes identical RNG samples with d_ing
+  on vs off (IN wiring from the fnv("d_ing", run_seed) sub-stream, so
+  flag-off construction is base-identical by construction).
 
 ## 6. Execution order
 1. This design frozen & committed. 2. Implement d_ing (identity-first).
