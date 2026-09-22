@@ -53,6 +53,10 @@ pub enum NeuronClass {
     Input,
     Internal,
     Output,
+    /// Phase III Level-4 (docs/phase3/level4-inhib-design.md): fixed
+    /// inhibitory interneurons (d_ing). Plastic-free by construction;
+    /// their fixed inhibitory projections shunt protected cohorts.
+    Inhibitory,
 }
 
 /// LIF parameters (fixed tick dt = 1 ms).
@@ -167,6 +171,56 @@ pub fn elig_tau_ms() -> f32 {
 /// per neuron).
 pub fn elig_max() -> f32 {
     1.0
+}
+
+/// Phase III Level-4 `d_ing` (docs/phase3/level4-inhib-design.md):
+/// fixed inhibitory interneuron population size and gate constants.
+pub fn ing_cohort_count() -> usize {
+    8
+}
+/// Cohort gate low-pass (event window ~300 ms; >> the 20 ms STDP tau so
+/// the gate tracks the drive envelope, not single spikes).
+pub fn ing_tau_ms() -> f32 {
+    300.0
+}
+/// Gate shape: gate = 1 / (1 + k_g * g_cohort). Chosen (placeholder
+/// "e.g. 2.0" in the frozen design) so a saturating event drive
+/// (g_cohort -> 1) closes the gate to ~0.04, i.e. near-off at onset,
+/// while the gap trough (g_cohort -> ~0) leaves it ~1. This is the
+/// required "suppress readout slow-LTP during the event's phasic lock"
+/// behavior.
+pub fn ing_kg() -> f32 {
+    24.0
+}
+/// fnv-1a hash (local copy; anima-core cannot depend on anima-exp).
+/// Derives the `d_ing` inhibitory sub-network's RNG stream so it is
+/// independent of the base construction stream (identity-safe).
+pub fn d_ing_hash_str(s: &str, seed: u64) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in s.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    // fold the run seed in (separate mixing so different seeds differ)
+    h = h.wrapping_add(seed.wrapping_mul(0x9E3779B97F4A7C15));
+    h ^= h >> 29;
+    h.wrapping_mul(0xBF58476D1CE4E5B9)
+}
+/// Fixed IN afferent weight (input channel -> IN). Strong: a few of the
+/// IN's local channels firing together must push it over threshold during
+/// its own event (so the gate closes), while absent input in the gap
+/// leaves it silent (gate opens).
+pub fn ing_w_in() -> f32 {
+    0.9
+}
+/// Gated additive readout slow-LTP coefficient (frozen; ~ a_plus so the
+/// extra term is comparable to one normal LTP step per association).
+pub fn ing_a_elig() -> f32 {
+    0.005
+}
+/// Fixed IN -> cohort shunting weight magnitude (inhibitory).
+pub fn ing_w_shunt() -> f32 {
+    0.5
 }
 
 fn v22_theta_mean() -> f32 { 2.0 }
@@ -467,11 +521,21 @@ pub struct V2Params {
     pub d_elig: bool,
     /// Phase III Level-4 partitioned (B, level4-verdict.md): the slow
     /// eligibility bridge applies ONLY on internal->output (readout)
-    /// edges; the recurrent pool keeps its base 20 ms plasticity so its
+    /// edge; the recurrent pool keeps its base 20 ms plasticity so its
     /// gap bridge survives (the all-edges d_elig was FALSIFIED - it
     /// destroyed the substrate).
     #[serde(default, skip_serializing_if = "is_false")]
     pub d_elig_ro: bool,
+    /// Phase III Level-4 (docs/phase3/level4-inhib-design.md): fixed
+    /// local inhibitory interneurons gating temporal prediction. When
+    /// true: append 8 internal-inhibitory neurons and a per-cohort gate;
+    /// readout pool->output slow-LTP is gated by the PRE-cohort's
+    /// decayed inhibition (closed at own-onset, open in the tail/next).
+    /// Pool fast STDP is byte-untouched. IN wiring derived from a
+    /// separate fnv("d_ing", run_seed) sub-stream so flag-off is
+    /// byte-identical to the E-nogain baseline by construction.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_ing: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -557,6 +621,19 @@ pub struct Network {
     pub rg_tick: Vec<f32>,
     /// D-core per-track gates (2 per neuron; zeros when off).
     pub rg_gate2: Vec<f32>,
+    /// Phase III Level-4 `d_ing`: per-cohort inhibitory gate (low-passed
+    /// IN firing), gated additive readout slow-LTP; zeros when `d_ing`
+    /// off (identity).
+    pub ing_gate: Vec<f32>,
+    /// Per-neuron cohort id (0 = none; 1..=NIN when `d_ing` on).
+    pub ing_cohort: Vec<u32>,
+    /// Per-cohort IN firing accumulator (spike flag this tick).
+    pub ing_active: Vec<bool>,
+    /// Cohort size (number of pool neurons shunted by that IN).
+    pub ing_cohort_size: Vec<u32>,
+    /// Phase III `d_ing`: cohort low-pass time constant and gate shape.
+    pub ing_tau_ms: f32,
+    pub ing_kg: f32,
     /// D-core per-track per-tick working current (2 per neuron; zeros when off).
     pub rg_tick2: Vec<f32>,
 }
@@ -686,6 +763,12 @@ impl Network {
         rg_tick: vec![0.0; n_total],
         rg_gate2: vec![0.0; n_total * dcore_tracks()],
         rg_tick2: vec![0.0; n_total * dcore_tracks()],
+        ing_gate: vec![0.0; ing_cohort_count()],
+        ing_cohort: vec![0u32; n_total],
+        ing_active: vec![false; ing_cohort_count()],
+        ing_cohort_size: vec![0u32; ing_cohort_count()],
+        ing_tau_ms: ing_tau_ms(),
+        ing_kg: ing_kg(),
     };
 
         // Wiring (frozen order, docs/anima-v2-protocol.md §2):
@@ -795,7 +878,54 @@ impl Network {
                 n.tau_het_rel = t;
             }
         }
-        net
+    // Phase III Level-4 `d_ing` (docs/phase3/level4-inhib-design.md):
+    // fixed local inhibitory interneurons gating temporal prediction.
+    // Appended AFTER all base construction draws (flag-off consumes zero
+    // extra main-stream RNG => byte-identical baseline by construction);
+    // wiring drawn from a SEPARATE fnv("d_ing", run_seed) sub-stream.
+    // Never plastic.
+    if net.cfg.v2.as_ref().is_some_and(|v| v.d_ing) {
+        let nin = ing_cohort_count();
+        let insub = d_ing_hash_str("d_ing", seed);
+        let mut irng = Xoshiro256PlusPlus::seed_from_u64(insub);
+        let n_in_prev = net.neurons.len();
+        let in_ids: Vec<NeuronId> = (0..nin).map(|k| NeuronId((n_in_prev + k) as u32)).collect();
+        for k in 0..nin {
+            let id = NeuronId(net.neurons.len() as u32);
+            net.neurons.push(Neuron {
+                id, class: NeuronClass::Inhibitory, born: Tick(0), channel: None,
+                v: net.cfg.lif.v_rest, refractory_until: Tick(0), i_syn: 0.0, i_ext: 0.0,
+                rate_hz: 0.0, i_adapt: 0.0, u_slow: 0.0, z_latch: 0, g_drive: 0.0,
+                theta_rel: 1.0, u_plateau_rel: 1.0, tau_het_rel: 1.0,
+                rg_w: 0.0, rg_p: 0.0, rg_p2: Vec::new(), rg_w2: Vec::new(),
+                ctx_protos: Vec::new(), elg: 0.0, dormant_since: None, retired: false,
+            });
+            net.incoming.push(Vec::new());
+            net.outgoing.push(Vec::new());
+            net.ing_cohort.push(0u32); // INs have no own cohort (they gate others)
+        }
+        // wire each IN to a contiguous pool cohort + local input neighborhood
+        let n_pool = n_internal; // pool ids [n_input_channels, n_input_channels+n_internal)
+        let per = n_pool / nin;
+        for (k, &inid) in in_ids.iter().enumerate() {
+            let lo = n_input_channels + k * per;
+            let hi = if k + 1 == nin { n_input_channels + n_pool } else { lo + per };
+            for pid in lo..hi {
+                let w = ing_w_shunt();
+                net.add_synapse_full(inid, NeuronId(pid as u32), w, false, true, Tick(0));
+                net.ing_cohort[pid] = (k + 1) as u32;
+                net.ing_cohort_size[k] += 1;
+            }
+            let chan_lo = k * n_input_channels / nin;
+            let chan_hi = (((k + 1) * n_input_channels) / nin).max(chan_lo + 1);
+            for ch in chan_lo..chan_hi {
+                let src = net.channels[ch].target;
+                let w = ing_w_in();
+                net.add_synapse_full(src, inid, w, false, false, Tick(0));
+            }
+        }
+    }
+    net
     }
 
     pub fn add_synapse(
@@ -925,7 +1055,7 @@ impl Network {
         // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
         // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
         let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
-        let elig_on = self.cfg.v2.as_ref().is_some_and(|v| v.d_elig || v.d_elig_ro);
+        let elig_on = self.cfg.v2.as_ref().is_some_and(|v| v.d_elig || v.d_elig_ro || v.d_ing);
         let decay_elig = if elig_on { exp_approx(-dt / elig_tau_ms()) } else { 0.0 };
         // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3;
         // SPEC CORRECTION 2026-09-20, docs/x-mechanism-review.md):
@@ -1056,6 +1186,30 @@ impl Network {
             neur.rate_hz += (target - neur.rate_hz) * alpha;
         }
 
+        // Phase III Level-4 `d_ing`: update per-cohort inhibitory gate
+        // (low-passed IN firing), BEFORE the deposit pass so shunting and
+        // readout gating use this tick's gate. Flag off => no-op.
+        let ding = self.cfg.v2.as_ref().is_some_and(|v| v.d_ing);
+        if ding {
+            let lam = exp_approx(-dt / self.ing_tau_ms);
+            let n_inf = self.neurons.len();
+            let in_base = n_inf - ing_cohort_count();
+            // detect which INs (Inhibitory class, the last cohort_count
+            // neurons) fired this tick
+            let mut fired = vec![false; ing_cohort_count()];
+            for &sp in &spikes {
+                let u = sp.0 as usize;
+                if u >= in_base && self.neurons[u].class == NeuronClass::Inhibitory {
+                    fired[u - in_base] = true;
+                }
+            }
+            for (k, &f) in fired.iter().enumerate() {
+                // drive = 1.0 when the IN fired this tick; gate low-pass
+                // decays toward the current drive level.
+                let drive = if f { 1.0 } else { 0.0 };
+                self.ing_gate[k] = self.ing_gate[k] * lam + drive * (1.0 - lam);
+            }
+        }
         // Deposit current onto postsynaptic targets of spikers.
         let spikers: Vec<NeuronId> = spikes.clone();
         // Local recruitment gain (frozen k_g = 8.0; docs/x-clla-recruitment-
@@ -1636,6 +1790,7 @@ mod tests {
         d_sparse: false,
         d_elig: false,
         d_elig_ro: false,
+        d_ing: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,

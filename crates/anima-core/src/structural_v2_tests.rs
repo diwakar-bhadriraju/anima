@@ -22,6 +22,7 @@ pub fn v2_params() -> V2Params {
         d_sparse: false,
         d_elig: false,
         d_elig_ro: false,
+        d_ing: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,
@@ -1685,7 +1686,8 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
         let cfg = NetworkConfig {
             v2: Some(V2Params { d_core: true, d_claim: true, d_sparse: false,
         d_elig: false,
-        d_elig_ro: false, ..v2_params() }),
+        d_elig_ro: false,
+        d_ing: false, ..v2_params() }),
             ..NetworkConfig::default()
         };
         let mut net = Network::new(cfg, 4, 1, 0, 23);
@@ -1701,3 +1703,63 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
         assert!((net.synapses[w1.idx()].w - 0.10).abs() > 0.001 || net.synapses[w1.idx()].w > 0.09,
             "no dropout when sparse off: {}", net.synapses[w1.idx()].w);
     }
+
+// ---------- Phase III Level-4 `d_ing` (level4-inhib-design) ----------
+
+/// T1: with d_ing the 8 inhibitory INs exist after the output block,
+/// class Inhibitory, plastic-free afferents; pool neurons get cohorts.
+#[test]
+fn ding_adds_inhibitory_neurons_and_cohorts() {
+    let mut params = v2_params();
+    params.d_ing = true;
+    let cfg = crate::network::NetworkConfig { v2: Some(params), ..crate::network::NetworkConfig::default() };
+    let mut net = crate::network::Network::new(cfg, 24, 40, 12, 7);
+    // base 24+40+12=76, plus 8 INs
+    assert_eq!(net.neurons.len(), 84);
+    let n_in = crate::network::ing_cohort_count();
+    let in_id0 = net.neurons.len() - n_in;
+    assert_eq!(net.neurons[in_id0].class, crate::network::NeuronClass::Inhibitory);
+    // pool neurons have cohort ids 1..=8
+    for pid in 24..64 {
+        let c = net.ing_cohort[pid];
+        assert!(c >= 1 && c as usize <= n_in, "pool {pid} cohort {c}");
+    }
+    // IN plastic-free: no plastic afferents on an IN
+    for sid in net.incoming[in_id0].iter() {
+        assert!(!net.synapses[sid.idx()].plastic, "IN afferent must be fixed");
+    }
+}
+
+/// T2/T3: driving an IN's input channel makes the gate low-pass rise and
+/// the cohort gate close (1/(1+kg*g) small); with the channel quiet the
+/// gate decays back toward open.
+#[test]
+fn ding_gate_closes_on_drive_and_opens_after() {
+    let mut params = v2_params();
+    params.d_ing = true;
+    let cfg = crate::network::NetworkConfig { v2: Some(params), ..crate::network::NetworkConfig::default() };
+    let mut net = crate::network::Network::new(cfg, 24, 40, 12, 7);
+    let n_in = crate::network::ing_cohort_count();
+    // gate of the DRIVEN cohort (cohort 0) only — not an average.
+    let closed_after = |net: &crate::network::Network| -> f32 {
+        let g = net.ing_gate[0];
+        1.0 / (1.0 + net.ing_kg * g)
+    };
+    // drive a channel that feeds IN cohort 0 (channels 0..3 -> IN 0)
+    let ch = crate::network::InputChannelId(0);
+    for _ in 0..400 {
+        net.step(&crate::network::InputFrame { tick: net.tick, spikes: vec![ch] });
+    }
+    assert!(net.ing_gate[0] > 0.005, "IN cohort 0 should fire under drive (gate low-pass), got {}", net.ing_gate[0]);
+    let gate_driven = closed_after(&net);
+    assert!(gate_driven < 0.5, "cohort gate should close under drive, got {gate_driven}");
+    // now quiet: gate should open back up
+    let mut quiet_for_some = false;
+    for _ in 0..4000 {
+        net.step(&crate::network::InputFrame { tick: net.tick, spikes: vec![] });
+        if net.ing_gate[0] < 1e-4 { quiet_for_some = true; }
+    }
+    let gate_rest = closed_after(&net);
+    assert!(quiet_for_some, "IN cohort 0 should stop firing when its channel goes quiet");
+    assert!(gate_rest > 0.9, "cohort gate should re-open in the tail, got {gate_rest}");
+}

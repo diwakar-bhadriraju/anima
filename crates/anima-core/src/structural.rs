@@ -272,7 +272,7 @@ impl StructuralMonitor {
         let mut retired = Vec::new();
         let now = net.tick.0;
         for i in 0..net.neurons.len() {
-            if net.neurons[i].class == NeuronClass::Input || net.neurons[i].retired {
+            if net.neurons[i].class == NeuronClass::Input || net.neurons[i].class == NeuronClass::Inhibitory || net.neurons[i].retired {
                 continue;
             }
             let n = &mut net.neurons[i];
@@ -393,7 +393,7 @@ impl StructuralMonitor {
         let mut partners: Vec<(NeuronId, f32)> = net
             .neurons
             .iter()
-            .filter(|n| n.class != NeuronClass::Input && !n.retired && n.id != id)
+            .filter(|n| n.class != NeuronClass::Input && n.class != NeuronClass::Inhibitory && !n.retired && n.id != id)
             .map(|n| (n.id, n.rate_hz))
             .collect();
         if self.wiring_avoid_coactive {
@@ -642,7 +642,7 @@ mod tests {
             n.rate_hz = 5.0;
         }
         let mut no_birth = NoBirth; let _ = mon.step(&mut net, &mut no_birth, &Signals::default());
-        assert!(net.neurons.iter().all(|n| n.dormant_since.is_none() || n.class == NeuronClass::Input));
+        assert!(net.neurons.iter().all(|n| n.dormant_since.is_none() || n.class == NeuronClass::Input || n.class == NeuronClass::Inhibitory));
     }
 
     #[test]
@@ -697,7 +697,7 @@ mod tests {
             .neurons
             .iter()
             .filter(|n| {
-                n.class != NeuronClass::Input
+                n.class != NeuronClass::Input && n.class != NeuronClass::Inhibitory
                     && !n.retired
                     && n.id != id
                     && !partners.contains(&n.id.0)
@@ -880,7 +880,7 @@ mod tests {
             .neurons
             .iter()
             .filter(|n| {
-                n.class != NeuronClass::Input
+                n.class != NeuronClass::Input && n.class != NeuronClass::Inhibitory
                     && !n.retired
                     && n.id != id
                     && !partners.contains(&n.id.0)
@@ -912,7 +912,7 @@ mod tests {
             let n_candidates = net
                 .neurons
                 .iter()
-                .filter(|n| n.class != NeuronClass::Input && !n.retired)
+                .filter(|n| n.class != NeuronClass::Input && n.class != NeuronClass::Inhibitory && !n.retired)
                 .count();
             assert!(
                 n_candidates >= fan_in,

@@ -149,7 +149,7 @@ impl V2Plasticity {
         let n = net.neurons.len();
         let mut candidates = vec![Vec::new(); n];
         for post in 0..n {
-            if net.neurons[post].class == NeuronClass::Input {
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                 continue; // D8: input neurons are pure sources
             }
             let mut pool = Vec::with_capacity(params.c_slots);
@@ -320,7 +320,7 @@ impl V2Plasticity {
         if !self.d_sparse_enabled() { return; }
         let drop = crate::network::dcore_floor_drop();
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input { continue; }
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory { continue; }
             let Some(t) = self.committed_track(net, post) else { continue };
             let incoming: Vec<SynapseId> = net.incoming[post].clone();
             for sid in incoming {
@@ -353,7 +353,7 @@ impl V2Plasticity {
         let theta = self.params.theta_prune;
         let t_e = self.params.t_e;
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input {
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                 continue;
             }
             let p_tot = self.consolidated_mass(net, NeuronId(post as u32));
@@ -453,7 +453,7 @@ impl V2Plasticity {
         let k = dcore_tracks();
         let dims = 24usize;
         for i in 0..net.neurons.len() {
-            if net.neurons[i].class == NeuronClass::Input {
+            if net.neurons[i].class == NeuronClass::Input || net.neurons[i].class == NeuronClass::Inhibitory {
                 continue;
             }
             // protocol §6.2a: no working input current delivered => no update
@@ -573,7 +573,7 @@ impl V2Plasticity {
         if !self.params.disable_m3_m4 {
             let mut candidates = std::mem::take(&mut self.candidates);
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                     continue;
                 }
                 candidates[post] = self.candidate_pass(net, post, std::mem::take(&mut candidates[post]), tick, &mut events);
@@ -918,7 +918,7 @@ impl V2Plasticity {
             } else {
                 let k = dcore_tracks();
                 for post in 0..net.neurons.len() {
-                    if net.neurons[post].class == NeuronClass::Input {
+                    if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                         continue;
                     }
                     let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -968,7 +968,7 @@ impl V2Plasticity {
         // precedence whenever assembly_protect is set.
         if self.params.assembly_protect {
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                     continue;
                 }
                 let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -998,7 +998,7 @@ impl V2Plasticity {
         }
         if n_buckets == 1 {
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                     continue;
                 }
                 let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -1025,7 +1025,7 @@ impl V2Plasticity {
         }
         // Partitioned, capacity-matched (V2.3 §2).
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input {
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
                 continue;
             }
             let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -1172,7 +1172,7 @@ fn draw_candidate(
     let post_id = NeuronId(post as u32);
     for neur in net.neurons.iter() {
         let pre = neur.id;
-        if pre == post_id || neur.class == NeuronClass::Input || connected(pre) {
+        if pre == post_id || neur.class == NeuronClass::Input || neur.class == NeuronClass::Inhibitory || connected(pre) {
             continue;
         }
         if net.rng.gen::<f32>() < params.p_cand_rec {

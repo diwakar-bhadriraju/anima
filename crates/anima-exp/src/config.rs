@@ -142,6 +142,9 @@ pub struct V2Section {
     /// Phase III Level-4 partitioned (B): readout-only eligibility.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub d_elig_ro: bool,
+    /// Phase III Level-4 `d_ing`: fixed local inhibitory gating.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_ing: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

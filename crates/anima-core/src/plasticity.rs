@@ -401,16 +401,27 @@ pub fn stdp_tick(
             let use_slow = v2.is_some_and(|v| v.d_elig)
                 || (v2.is_some_and(|v| v.d_elig_ro)
                     && net.neurons[post.idx()].class == crate::network::NeuronClass::Output);
+            // d_ing: gated additive readout term can apply even when the
+            // 20 ms pre-trace is 0 (the gap-bridge case) — don't skip.
+            let ding_elig = v2.is_some_and(|v| v.d_ing)
+                && net.neurons[s.pre.idx()].class == crate::network::NeuronClass::Internal
+                && net.neurons[post.idx()].class == crate::network::NeuronClass::Output
+                && net.ing_cohort.get(s.pre.idx()).copied().unwrap_or(0) as usize >= 1
+                && net.neurons[s.pre.idx()].elg > 0.0;
+
             let ltp_trace = if use_slow {
                 self_trace_elig(net, s.pre) // slow eligibility of the PRE
             } else {
                 pre_t
             };
-            if pre_t <= 0.0 && !use_slow {
+            if pre_t <= 0.0 && !use_slow && !ding_elig {
                 continue;
             }
             if use_slow && ltp_trace <= 0.0 {
                 continue;
+            }
+            if ding_elig && pre_t <= 0.0 && net.neurons[s.pre.idx()].elg <= 0.0 {
+                continue; // only additive could fire; elg is 0 -> nothing
             }
             // E6: β scales the a⁺ increment only (input-channel afferents).
             let beta = rate_balance.map(|rb| rb.beta(net, post, s.pre)).unwrap_or(1.0);
@@ -447,6 +458,28 @@ pub fn stdp_tick(
                 s.w = w_new;
             } else {
                 s.w = (s.w + params.a_plus * ltp_trace * gate * beta).min(params.w_max);
+            }
+            // Phase III Level-4 `d_ing` (docs/phase3/level4-inhib-design.md):
+            // gated additive readout slow-LTP. Only on INTERNAL->OUTPUT
+            // edges. gate_pre = 1 / (1 + k_g * ing_gate[pre_cohort]) is the
+            // PRE-cohort's decayed inhibition: ~0 during the pre's own event
+            // onset (no phasic-lock / no self-association), ~1 in its gap
+            // tail / next-onset window (learns X-tail -> next-Y). Additive
+            // and capped by (1 - w/w_max); pool fast STDP byte-untouched.
+            let ding = net.cfg.v2.as_ref().is_some_and(|v| v.d_ing);
+            if ding && !s.consolidated
+                && net.neurons[post.idx()].class == crate::network::NeuronClass::Output {
+                let pc = net.ing_cohort.get(s.pre.idx()).copied().unwrap_or(0) as usize;
+                if pc >= 1 && pc <= crate::network::ing_cohort_count() {
+                    let g_in = net.ing_gate[pc - 1];
+                    let gate_pre = 1.0 / (1.0 + net.ing_kg * g_in);
+                    let elg_pre = net.neurons[s.pre.idx()].elg;
+                    let dw2 = crate::network::ing_a_elig() * gate_pre * elg_pre
+                        * (1.0 - s.w / params.w_max);
+                    if dw2 > 0.0 {
+                        s.w = (s.w + dw2).min(params.w_max);
+                    }
+                }
             }
             if s.w != before {
                 // V2.3 (docs/v2_3-design.md §1): write-epoch bucket tag.
@@ -950,4 +983,50 @@ mod e6_tests {
         let on = run(true);
         let off = run(false);
         assert!(on > off, "eligibility must give MORE cross-gap LTP: on={on} off={off}");
+    }
+
+    /// T4 (Phase III `d_ing`): the gated additive readout slow-term is
+    /// present on pool->output edges when the PRE-cohort's gate is open
+    /// (elg_pre bridging X-tail -> Y), and absent (only base STDP) when
+    /// the gate is closed.
+    #[test]
+    fn ding_readout_ltp_gated_by_open_cohort() {
+        use crate::network::{NeuronId, NetworkConfig, Tick, V2Params};
+        fn run(gate_in: f32) -> (f32, f32) {
+            let mut params = crate::structural_v2_tests::v2_params();
+            params.d_ing = true;
+            let cfg = NetworkConfig { v2: Some(params), ..NetworkConfig::default() };
+            let mut net = Network::new(cfg, 24, 40, 12, 7);
+            let pre = NeuronId(30); // a pool neuron
+            let post = NeuronId(64); // an output neuron
+            assert_eq!(net.neurons[pre.idx()].class, crate::network::NeuronClass::Internal);
+            let c = net.ing_cohort[pre.idx()] as usize;
+            assert!(c >= 1);
+            let sid = net.add_synapse(pre, post, 0.05, true, Tick(0));
+            // pre "recently fired in the gap": high slow eligibility.
+            // Pin it below threshold this tick so it cannot CO-FIRE (a
+            // coincident pre/post spike is skipped in STDP -> would mask
+            // the additive term).
+            net.neurons[pre.idx()].elg = 0.9;
+            net.neurons[pre.idx()].v = -5.0;
+            net.neurons[pre.idx()].refractory_until = Tick(u64::MAX);
+            // gate: 0 => open (learn), 1 => closed
+            net.ing_gate[c - 1] = gate_in;
+            // fire the output
+            net.neurons[post.idx()].v = 100.0;
+            net.neurons[post.idx()].refractory_until = Tick(0);
+            let ev = net.step(&crate::network::InputFrame { tick: Tick(5), spikes: vec![] });
+            let mut traces = Traces::new(&net, 20.0);
+            traces.step(&net, &ev.spikes);
+            let before = net.synapses[sid.idx()].w;
+            stdp_tick(&StdpParams::default(), &mut net, &traces, &ev.spikes, 1.0, None);
+            let after = net.synapses[sid.idx()].w;
+            (before, after)
+        }
+        let (b0, open_after) = run(0.0);   // gate open
+        let (c0, closed_after) = run(1.0); // gate closed (same seed net)
+        assert_eq!(b0, c0);             // both start at identical w
+        assert!(open_after > b0, "open gate must add a positive weight: {b0}->{open_after}");
+        assert!(open_after > closed_after,
+            "gated additive readout LTP must be larger with the cohort gate open: open={open_after} closed={closed_after}");
     }
