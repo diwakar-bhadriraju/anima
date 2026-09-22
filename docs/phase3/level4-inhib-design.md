@@ -266,3 +266,40 @@ pool preservation, formation, gate timing. 7. Verdict (adopt/reject);
 autonomy-log. No post-hoc tuning; runs preserved incl. failure.
 
 STOP — frozen design. Awaiting approval to implement d_ing.
+## AMENDMENT (D-12): implementation-time deviations, frozen doc -> code lockstep
+
+Reflects exactly what was implemented and produced the verdict. No
+post-hoc tuning (all fixed before the matrix was run):
+
+A1. k_g: 2.0 (placeholder) -> 24.0. Rationale in code: with k_g=2 the
+    gate only closes to 1/(1+2*1)=0.33 at saturating drive - not the
+    "~0 at event drive" the design requires. k_g=24 closes to ~0.04.
+A2. IN afferent weights: FIXED deterministic (ing_w_in=0.9,
+    ing_w_shunt=0.5), NOT drawn from the sub-stream's U(0,1)*w form
+    (a [0,1) draw could leave a driven IN below v_th -> gate never
+    closes). Calibrated so a few driven channels reliably cross v_th.
+    The sub-stream is still instantiated/seeded (identity safety);
+    weights are constants.
+A3. Gate accumulation: g = g*lam + (fired ? 1.0 : 0.0) (per-spike
+    accumulation, NO (1-lam) scaling which capped steady-state gate at
+    ~0.05 for realistic IN rates). gate_c = 1/(1 + kg * g_c).
+A4. d_ing additive readout term restricted to NON-CONSOLIDATED synapses
+    (s.consolidated == false). Keeps the CLLA protected-mass invariant
+    exact; the gated term cannot bypass the consolidated headroom clip.
+A5. INs are APPENDED ONLY WHEN d_ing is on (the doc's "constructed
+    identically regardless of flag" is implemented as ABSENT-when-off):
+    flag-off creates zero INs and zero extra base draws -> byte-identical
+    to the E-nogain baseline (verified: FNV 9647ea8a0ca4dbd2).
+A6. M5 budget + M6 anti-Hebbian excludes IN shunting (synapses whose
+    PRE is NeuronClass::Inhibitory): IN shunts are fixed structural
+    wiring, not the plastic M6/M5 mechanism; counted out of B_i/budgets.
+A7. structural_v2/structural passes exclude Inhibitory class (INs stay
+    plastic-free; growth never wires candidates/pruning/normalize/CLLA/
+    bucket passes into them).
+A8. IDENTITY: flag-off FNV 9647ea8a0ca4dbd2 (event), 105/105 snapshot
+    frames - unchanged by the whole d_ing code path.
+
+VERDICT (D-13, docs/phase3/level4-verdict.md): substrate protection
+CONFIRMED (pool gap firing 141-335/gap preserved vs the falsified d_elig
+which zeroed it); association FALSIFIED (output PI 0/3 seeds reach the
++0.05 bar). 3 Level-4 routes now falsified (d_elig, d_elig_ro, d_ing).
