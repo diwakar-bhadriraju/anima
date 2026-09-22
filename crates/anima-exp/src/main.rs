@@ -2,6 +2,8 @@
 //! Subcommands: run | replay | report.
 
 mod config;
+mod io;
+mod survival;
 mod e19_world;
 mod env;
 mod harness;

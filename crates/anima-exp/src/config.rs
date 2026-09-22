@@ -397,7 +397,56 @@ pub struct StageSpec {
     pub iti_ms: Option<u64>,
     #[serde(default)]
     pub balance_window: Option<u64>,
+    /// Phase III sY (docs/phase3/s-survival-protocol.md D-22..D-24):
+    /// mode = "survival": run a CLOSED-LOOP stage - next stimulus chosen
+    /// by the organism's own output vote (the frozen codebook), not a
+    /// static schedule. Carries the survival loop's pre-registered
+    /// parameters. Present ONLY when loop_mode=closed (identity: absent/
+    /// default schedule path byte-unchanged).
+    #[serde(default)]
+    pub survival: Option<SurvivalSpec>,
 }
+
+/// Pre-registered survival-loop parameters (D-22..D-24).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SurvivalSpec {
+    /// Number of closed-loop beats to run.
+    pub beats: u64,
+    /// Recognition-rate window (beats).
+    #[serde(default = "default_r_window")]
+    pub r_window: u64,
+    /// Known-match cosine threshold (codebook).
+    #[serde(default = "default_th_known")]
+    pub th_known: f32,
+    /// Quiet activity floor (codebook / viability activity floor).
+    #[serde(default = "default_q_floor")]
+    pub q_floor: f32,
+    /// Activity-boundedness bounds [lo, hi] (Hz) - viability a(t).
+    #[serde(default = "default_a_bounds")]
+    pub a_bounds: [f32; 2],
+    /// Survival horizon: beats without death to count as 'persists'.
+    pub horizon: u64,
+    /// Inter-beat REST gap (ms) after each stimulus beat. MUST match the
+    /// organism's trained cadence (base off_ms=1500): a closed-loop world
+    /// with no pause drives the pool into continuous 340-400 Hz self-
+    /// saturating firing (measured, D-29) - not survival.
+    #[serde(default = "default_off_ms")]
+    pub off_ms: u64,
+    /// Forced-novelty probability (D-30): the world presents the
+    /// NEVER-TRAINED D probe with prob p_novel instead of following the
+    /// organism's action. Guarantees the known-vs-novel falsifier is
+    /// measurable (an autonomous loop otherwise locks onto one known
+    /// pattern and never meets novelty). Pre-registered; D stays
+    /// never-trained, refs fixed at S1-end.
+    #[serde(default = "default_p_novel")]
+    pub p_novel: f32,
+}
+fn default_r_window() -> u64 { 10 }
+fn default_th_known() -> f32 { 0.20 }
+fn default_q_floor() -> f32 { 1.0 }
+fn default_a_bounds() -> [f32; 2] { [5.0, 250.0] }
+fn default_off_ms() -> u64 { 1500 }
+fn default_p_novel() -> f32 { 0.2 }
 
 /// U1 default adaptation tau (ms): slow enough to integrate bursts,
 /// fast enough to recover between 500 ms presentations.

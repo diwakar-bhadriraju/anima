@@ -330,6 +330,18 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
     let mut tick_index: u64 = 0;
     // E19: previous tick's output spikes (world observation buffer).
     let mut out_prev: Vec<u32> = Vec::new();
+    // Phase III sY: survival-loop state (frame-source swap after schedule)
+    let survival_spec = cfg.stage.iter().find_map(|st| st.survival.clone());
+    let mut survival_phase = false;
+    let mut cur_sym = "A".to_string();
+    let mut surv_beat = 0u64;
+    let mut surv_dead_beat: Option<u64> = None;
+    let mut surv_v_sum = 0.0f32;
+    let mut surv_known_v: Vec<f32> = Vec::new();
+    let mut surv_novel_v: Vec<f32> = Vec::new();
+    let mut surv_rcog: std::collections::VecDeque<bool> = std::collections::VecDeque::new();
+    let mut surv_ob: std::collections::VecDeque<bool> = std::collections::VecDeque::new();
+    let (mut surv_a_act, mut surv_c_act, mut surv_w_act, mut surv_q_act) = (0u64,0u64,0u64,0u64);
     while end_reason.is_none() && recorder_error.is_none() {
         // Controls.
         if let Some(sv) = &server {
@@ -709,6 +721,65 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
             dir.join("e19-world.log"),
             format!("{}\n{}\n", w.summary(), w.trial_lines().join("\n")),
         );
+    }
+
+    // Phase III sY (docs/phase3/s-survival-protocol.md): CLOSED-LOOP
+    // survival stage, run after the static schedule (S1 formation). Only
+    // when a stage has `mode="survival"` (config gated); identity: absent
+    // => no-op, byte-identical baseline.
+    let surv = cfg.stage.iter().find_map(|st| st.survival.clone());
+    if std::env::var("DBG_SURV").is_ok() {
+        let pr = net.neurons.iter().skip(24).take(40).map(|n| n.rate_hz).sum::<f32>()/40.0;
+        eprintln!("DBG at curriculum-end: pool rate={pr:.1}");
+    }
+    if let Some(spec) = surv {
+        // capture A/C output refs from the LIVE network at S1-end (D-24:
+        // refs fixed at S1-end, per the current organism's own state).
+        let cl_seed = cfg.run.seed;
+        let nbeats = 3u64;
+        let mut refs_acc: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+        let mut refs_cnt: std::collections::BTreeMap<String, u32> = Default::default();
+        for sym in ["A", "C"] {
+            for _ in 0..nbeats {
+                let tr = crate::io::symbol_trains(sym, cl_seed);
+                let mut out = vec![0.0f32; 12];
+                for t in 0..crate::io::BEAT_MS {
+                    let frame = anima_core::network::InputFrame {
+                        tick: net.tick,
+                        spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect(),
+                    };
+                    let ev = net.step(&frame);
+                    for c in &ev.spikes {
+                        if (64..76).contains(&c.0) { out[(c.0 - 64) as usize] += 1.0; }
+                    }
+                    net.tick = anima_core::network::Tick(net.tick.0 + 1);
+                }
+                let e = refs_acc.entry(sym.to_string()).or_insert_with(|| vec![0.0f32; 12]);
+                for i in 0..12 { e[i] += out[i]; }
+                *refs_cnt.entry(sym.to_string()).or_insert(0) += 1;
+            }
+        }
+        let refs: Vec<(String, Vec<f32>)> = refs_acc.into_iter()
+            .map(|(p, v)| { let c = *refs_cnt.get(&p).unwrap_or(&1).max(&1) as f32;
+                (p, v.iter().map(|x| x / c).collect()) }).collect();
+        std::fs::write(dir.join("survival-refs.txt"),
+            format!("{:?}\n", refs.iter().map(|(p, v)| (p.clone(), v.iter().map(|x| format!("{x:.0}")).collect::<Vec<_>>())).collect::<Vec<_>>()))
+            .ok();
+        if std::env::var("DBG_SURV").is_ok() {
+            let pr = net.neurons.iter().skip(24).take(40).map(|n| n.rate_hz).sum::<f32>()/40.0;
+            eprintln!("DBG after ref-capture: pool rate={pr:.1}");
+        }
+        let out = crate::survival::run(&mut net, cl_seed, &refs, &spec, &params, &mut traces);
+        std::fs::write(dir.join("survival-outcome.json"),
+            serde_json::json!({
+                "beats": out.beats, "died_at": out.died_at, "mean_viability": out.mean_viability,
+                "known_vs_novel_diff": out.known_vs_novel_diff, "a_actions": out.a_actions,
+                "c_actions": out.c_actions, "withdraw_actions": out.withdraw_actions,
+                "quiet_actions": out.quiet_actions,
+            }).to_string()).ok();
+        eprintln!("SURVIVAL: beats={} died_at={:?} mean_v={:.3} kvs_diff={:.3} (A={} C={} W={} Q={})",
+            out.beats, out.died_at, out.mean_viability, out.known_vs_novel_diff,
+            out.a_actions, out.c_actions, out.withdraw_actions, out.quiet_actions);
     }
 
     // RunEnded + flush.

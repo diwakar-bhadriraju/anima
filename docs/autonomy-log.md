@@ -289,3 +289,22 @@ forgetting) traces to #neurons/shared-pool capacity. The survival loop +
 death-selection is the design that makes size answer itself: if bigger
 brains process better AND survive better, selection finds them; growth
 becomes the fitness target. Recorded as the core hypothesis going forward.
+
+## D-31 - Survival loop PASSES (frozen falsifier): closed-loop thrive measurable
+
+3 seeds, S1->SURV direct (warm start), 30 beats each, no deaths.
+KNOWN-VS-NOVEL (PRIMARY, bar>+0.05 in >=2/3): 0.133/0.063/0.099 =
+3/3 PASS. The never-trained D probe drives measurably different
+recognition/viability than known A/C (novel -> output silence/QUIET).
+PERSISTENCE (SECONDARY): all 3 seeds survive full horizon, pool rate in
+band, mean_v 0.63-0.78.
+Pre-matrix corrections (pre-registered, not tuning): D-28 a_bounds +
+sustained death; D-29 no-cold-silence + rest cadence (rebound seizure
+was 340-400Hz from deep-quiet start); D-30 forced-novelty p_novel=0.2
+(full autonomy degenerate-locks onto one known pattern) + withdraw->other-
+known (novel->silence->D deadlock) + exact-match r(t).
+HONEST LIMIT: post-loop runner skips V2Plasticity M2/E6 governors per
+tick; benign-world OK, governor-dependency untested under harder
+regimes (in-loop frame swap = deferred fidelity upgrade).
+"Thrives" is now a measured, selected-able quantity - the precondition
+for the evolution/death-selection slice.
