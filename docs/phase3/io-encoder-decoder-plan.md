@@ -91,3 +91,23 @@ same decoder codebook machinery and LIVE-INPUT path for its closed-loop
 env) -> reproduction/selection/growth (later registrations).
 
 STOP - frozen plan D-25; awaiting approval to implement W1-W4.
+## D-26 — ref provenance + NOVEL honesty anchors (frozen)
+
+(1) REF PROVENANCE (W2): A_ref / C_ref are NOT taken from an ad-hoc
+training run. They are computed from a FROZEN, COMMITTED source: the
+E-nogain S1 training window of the very same runs used as identity
+controls (clla-arex-s{seed}-il 1327Z), S1 presentations only, mean
+12-dim output vector per pattern, as measured by the committed probes
+(outselect/retent convention). If W3 uses a fresh live run, the refs are
+captured from ITS OWN S1 formation stage (frozen at S1-end, per D-24) -
+never mixed between runs. The decoder doc must record WHICH ref source
+was used, so the honesty claim is auditable.
+
+(2) NOVEL HONESTY (v1): the input alphabet's D is pinned as NEVER-
+TRAINED in the v1 demo (W3). D is presented only as a NOVEL probe; the
+decoder has only {A_ref, C_ref} and D must decode as NOVEL. If a later
+slice trains D in the same run (D-21 style), the growth policy (D-25
+section 2) makes the decoder GAIN a D_ref (a new registered alphabet
+symbol) - the decoder never mis-decodes a trained pattern as NOVEL-by-
+definition. W2 test (b) asserts exactly this: never-trained D -> NOVEL
+in >= 2/3 seeds, and the D_ref-gain path is a separate registration.
