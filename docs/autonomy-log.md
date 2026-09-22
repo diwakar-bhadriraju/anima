@@ -270,3 +270,22 @@ probes; no A/C exposure during S1D). 3 seeds, no runaway.
 - Next (approval required): selective memory protection during
   acquisition - pattern-gated plasticity or structured allocation; now
   concretely motivated by this measured forgetting.
+
+## D-27 - direction: survival loop first; demo paused; evolution-to-selection is the goal; network SIZE is the open research question
+
+User decision (2026-09-22): pause the I/O interactive demo (A decodes,
+C/D misdecode on the cold end-of-run brain - load fixed by key-match,
+remaining issue may be network too small). Proceed in order:
+1. SURVIVAL LOOP first (D-22..D-24) - the environment + homeostatic drive,
+   the thing evolution selects on.
+2. Then HARNESS-INTEGRATED LIVE MODE (the faithful working demo; needs
+   the live warm network, not snapshot reconstruction).
+3. Then POPULATION + DEATH-SELECTION loop: spawn variants, each dies if
+   it fails to thrive, only the fittest survives - "leave it on a loop,
+   each thing dies, one ultimate organism remains."
+KEY QUESTION (user, evidence-backed): is the 40-neuron shared pool big
+enough to process? Every prior ceiling (temporal, closed-loop, forced
+forgetting) traces to #neurons/shared-pool capacity. The survival loop +
+death-selection is the design that makes size answer itself: if bigger
+brains process better AND survive better, selection finds them; growth
+becomes the fitness target. Recorded as the core hypothesis going forward.
