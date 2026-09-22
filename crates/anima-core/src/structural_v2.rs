@@ -9,6 +9,7 @@
 //! Determinism: every random draw comes from `net.rng` in a fixed order;
 //! iteration is over Vec index order; tie-breaks by lowest SynapseId.
 
+use std::collections::HashMap;
 use crate::network::{
     dcore_alpha_p, dcore_theta_sim, dcore_tracks, NeuronClass, NeuronId, Network, SynapseId, Tick, V2Params,
 };
@@ -286,6 +287,53 @@ impl V2Plasticity {
         self.params.d_core && self.params.d_claim
     }
 
+    /// Phase III sparse-commit flag.
+    pub fn d_sparse_enabled(&self) -> bool {
+        self.params.d_core && self.params.d_claim && self.params.d_sparse
+    }
+
+    /// Committed track of a neuron under sparse-commit: Some(t) iff the
+    /// protected share R_t = P_t/(P_0+P_1) > 0.5 (majority; ties/empty =>
+    /// not committed). Pure local read of the post's incoming protection.
+    pub(crate) fn committed_track(&self, net: &Network, post: usize) -> Option<u8> {
+        let mut p = [0.0f32; 2];
+        for &sid in &net.incoming[post] {
+            let s = &net.synapses[sid.idx()];
+            if s.silent_ticks != u64::MAX && !s.inhibitory && s.consolidated {
+                let t = (s.track as usize).min(1);
+                p[t] += s.w;
+            }
+        }
+        let tot = p[0] + p[1];
+        if tot <= 0.0 { return None; }
+        if p[0] > p[1] && p[0] / tot >= crate::network::dcore_theta_commit() { Some(0) }
+        else if p[1] > p[0] && p[1] / tot >= crate::network::dcore_theta_commit() { Some(1) }
+        else { None }
+    }
+
+    /// Phase III-A sparse-commit pass: for each neuron committed to track t,
+    /// decay OTHER-track working afferents toward the churn floor
+    /// (floor_drop/window) so its effective integration becomes
+    /// track-selective -> disjoint responder sets across memories.
+    /// Ran at window end (after ctx_update, before M4). Deterministic.
+    fn sparse_commit(&mut self, net: &mut Network) {
+        if !self.d_sparse_enabled() { return; }
+        let drop = crate::network::dcore_floor_drop();
+        for post in 0..net.neurons.len() {
+            if net.neurons[post].class == NeuronClass::Input { continue; }
+            let Some(t) = self.committed_track(net, post) else { continue };
+            let incoming: Vec<SynapseId> = net.incoming[post].clone();
+            for sid in incoming {
+                let s = &net.synapses[sid.idx()];
+                if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated { continue; }
+                if s.track != t {
+                    net.synapses[sid.idx()].w =
+                        (net.synapses[sid.idx()].w * drop).clamp(net.cfg.w_min, net.cfg.w_max);
+                }
+            }
+        }
+    }
+
     /// Dormant-reserve flag (docs/x-clla-dormant-reserve.md).
     pub fn dormant_reserve_enabled(&self) -> bool {
         self.params.dormant_reserve
@@ -314,24 +362,34 @@ impl V2Plasticity {
                 continue;
             }
             let incoming: Vec<SynapseId> = net.incoming[post].clone();
+            // sparse-commit: a committed neuron's OTHER-track working
+            // afferents are de-budgeted into the floor class (single-track
+            // integration), so the dropout is not undone by the per-track
+            // upscale.
+            let ct = if self.d_sparse_enabled() { self.committed_track(net, post) } else { None };
             let mut claimed = [0.0f32; 2];
             let mut n_unc = 0usize;
             let mut unc_idxs: Vec<usize> = Vec::new();
             for &sid in &incoming {
                 let s = &net.synapses[sid.idx()];
                 if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
-                    if s.track == 2 {
+                    let t = (s.track as usize).min(1);
+                    let is_committed_track = ct.map_or(true, |c| t as u8 == c);
+                    if (ct.is_none() || is_committed_track) && s.track != 2 {
+                        claimed[t] += s.w;
+                    } else {
                         n_unc += 1;
                         unc_idxs.push(sid.idx());
-                    } else {
-                        let t = (s.track as usize).min(1);
-                        claimed[t] += s.w;
                     }
                 }
             }
             let f = if n_unc > 0 { theta.min(b / n_unc as f32) } else { 0.0 };
-            let n_cl = (if claimed[0] > 0.0 { 1usize } else { 0usize })
-                     + (if claimed[1] > 0.0 { 1usize } else { 0usize });
+            let n_cl = if ct.is_some() {
+                if claimed[ct.unwrap() as usize] > 0.0 { 1usize } else { 0usize }
+            } else {
+                (if claimed[0] > 0.0 { 1usize } else { 0usize })
+                     + (if claimed[1] > 0.0 { 1usize } else { 0usize })
+            };
             // (a) claimed tracks capacity-matched to (b - f*n_unc)/n_cl
             if n_cl > 0 {
                 let claimed_budget = (b - f * n_unc as f32).max(0.0);
@@ -495,6 +553,7 @@ impl V2Plasticity {
         // window, BEFORE any per-track budget/pass runs (protocol §6.2) ---
         if self.d_core_enabled() {
             self.ctx_update(net, tick);
+            self.sparse_commit(net);
             self.ctx_acc.fill(0.0);
             self.res_ip_t.fill(0.0);
             self.res_iw_t.fill(0.0);
@@ -548,6 +607,16 @@ impl V2Plasticity {
         if self.low_windows.len() < net.synapses.len() {
             self.low_windows.resize(net.synapses.len(), 0);
         }
+        // sparse-commit: per-post committed track so the unclaimed
+        // churn-exemption is lifted for other-track afferents of committed
+        // neurons (dropout reaches M4). None when sparse off.
+        let committed: std::collections::HashMap<usize, u8> = if self.d_sparse_enabled() {
+            (0..net.neurons.len()).filter_map(|p| {
+                self.committed_track(net, p).map(|t| (p, t))
+            }).collect()
+        } else {
+            Default::default()
+        };
         for sid in 0..net.synapses.len() {
             let s = &net.synapses[sid];
             if s.silent_ticks == u64::MAX || s.inhibitory {
@@ -559,8 +628,16 @@ impl V2Plasticity {
                 continue; // CLLA: protected from M4
             }
             if self.d_claim_enabled() && s.track == 2 {
-                self.low_windows[sid] = 0;
-                continue; // E: unclaimed substrate is churn-exempt (floor)
+                // E: unclaimed substrate is churn-exempt (floor), UNLESS a
+                // sparse-committed neuron has claimed the other track (then
+                // this unclaimed afferent is other-track -> prune-eligible).
+                let lift = self.d_sparse_enabled()
+                    && committed.get(&s.post.idx()).map_or(false,
+                        |&t| s.track != t);
+                if !lift {
+                    self.low_windows[sid] = 0;
+                    continue;
+                }
             }
             if s.w < self.params.theta_prune {
                 self.low_windows[sid] += 1;

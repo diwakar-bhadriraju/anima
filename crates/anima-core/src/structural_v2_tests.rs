@@ -19,6 +19,7 @@ pub fn v2_params() -> V2Params {
         recruit_gain: false,
         d_core: false,
         d_claim: false,
+        d_sparse: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,
@@ -1639,4 +1640,60 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
         let (net, _) = v2_net(3);
         assert!(net.live_synapses().filter(|s| !s.inhibitory).all(|s| s.track == 0),
             "d_claim false keeps track 0");
+    }
+
+    // ---------- Phase III sparse-commit (docs/phase3/sparse-commit-protocol.md) ----------
+
+    /// S-1: a neuron committed to track 0 (R_0 > 0.5 from protected
+    /// mass) drops OTHER-track working afferents toward the floor while
+    /// leaving track-0 working afferents and protected mass untouched.
+    #[test]
+    fn sparse_commit_drops_other_track_working() {
+        let cfg = NetworkConfig {
+            v2: Some(V2Params { d_core: true, d_claim: true, d_sparse: true, ..v2_params() }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 4, 1, 0, 19);
+        let post = NeuronId(4);
+        // protected track-0 afferent (drives R_0 -> 1)
+        let p0 = net.add_synapse(net.channels[0].target, post, 0.30, true, Tick(0));
+        net.synapses[p0.idx()].consolidated = true; net.synapses[p0.idx()].track = 0;
+        // working track-0 (untouched), track-1, and unclaimed afferents
+        let w0 = net.add_synapse(net.channels[1].target, post, 0.10, true, Tick(0));
+        let w1 = net.add_synapse(net.channels[2].target, post, 0.10, true, Tick(0));
+        let u1 = net.add_synapse(net.channels[3].target, post, 0.10, true, Tick(0));
+        net.synapses[w0.idx()].track = 0;
+        net.synapses[w1.idx()].track = 1;
+        net.synapses[u1.idx()].track = 2;
+        let mut p = v2_params();
+        p.d_core = true; p.d_claim = true; p.d_sparse = true;
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        v2.window(&mut net, Tick(100)); // runs sparse_commit
+        let w = |id: SynapseId| net.synapses[id.idx()].w;
+        let drop = crate::network::dcore_floor_drop();
+        assert!(w(w1) <= 0.10 * drop + 1e-9, "track-1 working dropped, got {}", w(w1));
+        assert!(w(u1) <= 0.10 + 1e-9, "unclaimed (other) working dropped, got {}", w(u1));
+        assert!((w(w0) - 0.10).abs() > 0.09 || w(w0) > 0.09, "track-0 working kept approx, got {}", w(w0));
+        assert!(net.synapses[p0.idx()].w == 0.30, "protected untouched");
+    }
+
+    /// S-2: without d_sparse (E-nogain), no dropout happens.
+    #[test]
+    fn sparse_off_is_identity() {
+        let cfg = NetworkConfig {
+            v2: Some(V2Params { d_core: true, d_claim: true, d_sparse: false, ..v2_params() }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 4, 1, 0, 23);
+        let post = NeuronId(4);
+        let p0 = net.add_synapse(net.channels[0].target, post, 0.30, true, Tick(0));
+        net.synapses[p0.idx()].consolidated = true; net.synapses[p0.idx()].track = 0;
+        let w1 = net.add_synapse(net.channels[2].target, post, 0.10, true, Tick(0));
+        net.synapses[w1.idx()].track = 1;
+        let mut p = v2_params();
+        p.d_core = true; p.d_claim = true; p.d_sparse = false;
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        v2.window(&mut net, Tick(100));
+        assert!((net.synapses[w1.idx()].w - 0.10).abs() > 0.001 || net.synapses[w1.idx()].w > 0.09,
+            "no dropout when sparse off: {}", net.synapses[w1.idx()].w);
     }

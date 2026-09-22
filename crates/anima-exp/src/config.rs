@@ -133,6 +133,9 @@ pub struct V2Section {
     /// Phase II-AR candidate E (docs/x-phase2-ar-protocol.md). Requires d_core.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub d_claim: bool,
+    /// Phase III sparse-commit (docs/phase3/sparse-commit-protocol.md).
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_sparse: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

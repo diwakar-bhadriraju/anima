@@ -84,3 +84,21 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   shaky retrieval base).
 - OPEN: does sparse-commit give Jaccard < 0.5 and blocked ρ >= 0.10
   without starving the second block (over-commit risk #1)?
+
+## D-2026-09-22-05 — sparse-commit closed: measured blocked-order tradeoff; alternation base is the platform
+
+- OBSERVATION (sparse matrix, 9 runs): responder separation PERFECT
+  (Jaccard ~0.000, rho_A 0.85-0.94, cosC=0.000) but S1 gating FAIL 9/9
+  (second block 0.0-3.4 vs first 9-15) - over-commit/first-past-the-post
+  dropout destroyed the later memory's capacity. Alternation also broke
+  (responders collapsed).
+- INTERPRETATION (measured tradeoff): single shared pool + local first-
+  contact commitment makes blocked-order ACCESS and SEPARATION
+  structurally incompatible (dense: access no separation; dropout:
+  separation no access). Alternation bypasses the asymmetry (balanced
+  simultaneous commitment).
+- DECISION: close sparse-commit as configured (S1 gate), no rescue
+  chain (patch-spiral guard), no reparameterization. E-nogain
+  alternation (formation + rho 0.25-0.91, general) is the demonstrated
+  platform. Next: probe (b) sparse-wiring topology OR advance to Level
+  4 (temporal) on the alternation base; pending the milestone record.

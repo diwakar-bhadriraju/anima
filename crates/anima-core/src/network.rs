@@ -144,6 +144,19 @@ pub fn dcore_track_cap(p_max_frac: f32, t_e: f32) -> f32 {
     p_max_frac * t_e / dcore_tracks() as f32
 }
 
+/// Phase III-A commitment threshold (R_t >= this commits the neuron to
+/// track t): 0.5 = majority, symmetric at K=2 so each memory claims
+/// ~N/2 neurons when drives balance (docs/phase3/sparse-commit §1).
+pub fn dcore_theta_commit() -> f32 {
+    0.5
+}
+/// Phase III-A other-track working-afferent decay toward the churn floor
+/// per window: 0.9/window ~= halving in ~7 windows (a few presentations),
+/// the measured churn timescale. theta_prune is the floor (reused).
+pub fn dcore_floor_drop() -> f32 {
+    0.9
+}
+
 fn v22_theta_mean() -> f32 { 2.0 }
 fn v22_plateau_mean() -> f32 { 0.9 }
 fn v22_phi_rel() -> f32 { 0.5 }
@@ -425,6 +438,11 @@ pub struct V2Params {
     /// D-core. false defaults never touched (identity).
     #[serde(default, skip_serializing_if = "is_false")]
     pub d_claim: bool,
+    /// Phase III-A (docs/phase3/sparse-commit-protocol.md): sparse-commit —
+    /// selective afferent dropout under local commitment. Requires
+    /// d_core+d_claim. false = exactly the registered E-nogain.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_sparse: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -1572,6 +1590,7 @@ mod tests {
             recruit_gain: false,
             d_core: false,
         d_claim: false,
+        d_sparse: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,
