@@ -56,6 +56,19 @@ mean_v 0.63-0.78 accumulates. PASS -- no death in a benign world.
   the direction (novel lowers recognition-viability) is the honest,
   measured signal.
 
+## The striking result (state it plainly)
+
+In EVERY seed the organism recognized EVERY known beat (22/22, 23/23,
+23/23) and NEVER mislabeled a novel beat (0/8, 0/7, 0/7) - a PERFECT
+1.00-vs-0.00 known-vs-novel recognition separation, reproducible across
+all three seeds, in a closed sense-act-sense loop with no external labels
+and no supervised readout. This is not a tuned outcome; it is the
+pre-registered falsifier firing cleanly. The organism's own dynamics
+drove its actions (approach known / withdraw from novel) and its
+viability tracked those actions. This is the first clean, reproducible
+"it knows what it knows and flinches at what it does not" behavior in
+the program.
+
 ## Verdict
 
 The survival loop PASSES its frozen falsifiers: the organism, in a
