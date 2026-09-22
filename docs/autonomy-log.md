@@ -215,3 +215,41 @@ Outcome: action encoding PASSES; closed-loop self-sustenance FALSIFIED
 per D-17; blocker is the loop readout (continuous-tag), not the action
 surface -> a contrastive/well-conditioned tag is the well-motivated next
 registration (approval required).
+
+## D-20 - MISSION CORRECTION (user directive, 2026-09-22)
+
+Goal restated by the user: this is NOT a prediction system, and Level-4
+temporal prediction was the wrong target for this organism class.
+The mission: an alternative to LLMs - a PLASTIC, SELF-BUILDING neural
+network that:
+  1. learns INCREMENTALLY/PROGRESSIVELY by experience (no re-training;
+     unlike an LLM which requires retraining);
+  2. remembers persistently and retrieves (memory, not prediction);
+  3. self-builds (constructs its own structure, like multi-cellular
+     organisms);
+  4. does ELIMINATION/SELECTION among a few possibilities under current
+     circumstances (pick the most probable tendency), NOT generative
+     prediction.
+"Predict" is replaced by "select/eliminate". Multi-cellular organisms do
+not predict; they discriminate and choose.
+
+Implications for the program:
+- Level-4 temporal prediction line stays CLOSED (D-09..D-16) but is
+  demoted from "the objective's direction" to "one attempted, failed,
+  unnecessary-for-mission capability". Corrected in
+  docs/phase3/level4-decision.md rationale going forward.
+- The confirmed assets ARE the goal's core: robust retrieval (Level-3 =
+  persistent memory), 100% per-trial action encoding (the "select among
+  alternatives" raw material), online STDP (experience learning, no
+  retrain by construction), committed M3/M4/d-core candidate-permanence-
+  prune machinery (synapse-level self-construction runs in every run).
+- The genuinely un-met capability versus this goal: demonstrations of
+  (a) progressive acquisition (+new pattern, old retained, no retrain)
+  as a clean recorded result, (b) behavioral SELECTION between
+  alternatives (contrastive-tag closed loop previously flagged), and the
+  deep open question (c) self-building NEW NEURONS (structural growth,
+  E4-family, historically regression-prone at the gate).
+- Next slice should be chosen against THIS goal, not the temporal
+  ladder: highest-value cheapest is (a) progressive acquisition demo on
+  the existing substrate (curriculum change only), then (b) selection
+  loop, then (c) structural growth when gated.
