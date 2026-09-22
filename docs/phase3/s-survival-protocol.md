@@ -97,3 +97,62 @@ registration.
    fly-statistics maturity target) are separate registrations.
 
 STOP - frozen D-22. No run until approved to implement.
+## FROZEN ACTION SET + CODEBOOK + WORLD-UPDATE RULE (explicit, D-23)
+
+Action set is exactly {approach, keep, withdraw, unsure}. The codebook
+maps the 12-neuron OUTPUT state (measured per beat) to an action via a
+pre-registered rule, and each action deterministically updates the world.
+All thresholds below are frozen registration values (set once, not tuned).
+
+References: output ref vectors A_ref, C_ref = mean 12-dim output vector
+over S1 A / S1 C training presentations (the measured 100%-separable
+code). cos = centered cosine (rate-level insensitive, matches retent.rs).
+
+                                          per-beat output state
+   CODEBOOK (12-dim output vector v, 1 beat)
+   ------------------------------------------------------------------
+    rhoA = cos(v, A_ref), rhoC = cos(v, C_ref),  amp = sum(|v|)/12
+   ------------------------------------------------------------------
+    if amp < q_floor              ->  UNSURE    (quiet: re-sample)
+    elif rhoA > th_known and rhoA > rhoC        ->  APPROACH-A   (known A)
+    elif rhoC > th_known and rhoC > rhoA        ->  APPROACH-C   (known C)
+    elif max(rhoA,rhoC) <= th_known             ->  WITHDRAW     (novel/unknown)
+    else                                          ->  UNSURE      (ambiguous)
+   ------------------------------------------------------------------
+   FROZEN constants: q_floor (quiet activity floor), th_known (known-match
+   cosine threshold); both set from the committed S1 measurement once,
+   before any survival run.
+
+   WORLD-UPDATE RULE (deterministic, per action)   current world stim S
+   ------------------------------------------------------------------
+    APPROACH-A -> next stimulus = A            (move toward known A)
+    APPROACH-C -> next stimulus = C            (move toward known C)
+    KEEP(merge) -> next stimulus = S           (stay on current, reinforce)
+    WITHDRAW    -> next stimulus = GAP (quiet) (move away from unknown)
+    UNSURE      -> next stimulus = S           (re-sample the same)
+   ------------------------------------------------------------------
+   NOTE: KEEP is merged into APPROACH-X (approaching the recognized
+   pattern equals keeping it present); the 4-action set collapses to
+   3 world-update branches (toward-A / toward-C / gap) + re-sample.
+   The organism therefore shapes its own world toward the known patterns
+   it recognizes and away from novelty - the thrivability behavior.
+
+DEATH hook (unchanged): viability v(t) < floor -> record death here too.
+
+## EXECUTION - closed-loop env mode is a NEW harness capability (D-23)
+
+The existing environment PRE-GENERATES a static schedule; a closed loop
+(next stimulus from LIVE output) cannot be expressed statically. This is
+a new harness mode:
+- New config flag, e.g. `loop_mode: "closed"` (default `"schedule"` =
+  current static path, byte-unchanged). Identity: when loop_mode
+  = schedule, the harness takes the exact existing code path (zero RNG/
+  wiring divergence; the committed baseline stays FNV-identical).
+- The closed mode runs beat-by-beat: present -> run -> decode -> world-
+  update -> next, rather than consuming a pre-generated schedule.
+- Implement as its own work item with its own unit tests; the flag-off
+  path is untouched (identity-gated).
+1. Freeze (this doc). 2. Implement closed-loop harness mode (flag-gated,
+   identity) + drive + codebook. 3. Unit tests + identity gate. 4. Run 3
+   seeds. 5. Measure known-vs-novel differential + persistence. 6. Verdict.
+STOP - frozen D-22 + D-23.
