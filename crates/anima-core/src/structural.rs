@@ -348,6 +348,7 @@ impl StructuralMonitor {
             rg_p2: Vec::new(),
             rg_w2: Vec::new(),
             ctx_protos: Vec::new(),
+            elg: 0.0,
             dormant_since: None,
             retired: false,
         });

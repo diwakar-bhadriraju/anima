@@ -136,6 +136,9 @@ pub struct V2Section {
     /// Phase III sparse-commit (docs/phase3/sparse-commit-protocol.md).
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub d_sparse: bool,
+    /// Phase III Level-4 eligibility trace (docs/phase3/level4-decision.md).
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_elig: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

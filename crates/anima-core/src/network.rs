@@ -157,6 +157,18 @@ pub fn dcore_floor_drop() -> f32 {
     0.9
 }
 
+/// Phase III Level-4 eligibility trace time constant (ms): the
+/// inter-stimulus gap (1500 ms; derived from the measured gap-state
+/// plateau persistence, docs/phase3/level4-decision.md).
+pub fn elig_tau_ms() -> f32 {
+    1500.0
+}
+/// Bounded eligibility ceiling (finite resource; one bounded scalar
+/// per neuron).
+pub fn elig_max() -> f32 {
+    1.0
+}
+
 fn v22_theta_mean() -> f32 { 2.0 }
 fn v22_plateau_mean() -> f32 { 0.9 }
 fn v22_phi_rel() -> f32 { 0.5 }
@@ -229,6 +241,10 @@ pub struct Neuron {
     /// k-means on the neuron's own delivered per-channel current.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ctx_protos: Vec<f32>,
+    /// Phase III Level-4 eligibility trace (bounded slow spike trace,
+    /// used as the STDP LTP pre-trace when d_elig). Zero always when off.
+    #[serde(default, skip_serializing_if = "is_zero_f32")]
+    pub elg: f32,
     /// Dormancy state (structural machinery).
     pub dormant_since: Option<Tick>,
     pub retired: bool,
@@ -443,6 +459,12 @@ pub struct V2Params {
     /// d_core+d_claim. false = exactly the registered E-nogain.
     #[serde(default, skip_serializing_if = "is_false")]
     pub d_sparse: bool,
+    /// Phase III Level-4 (docs/phase3/level4-decision.md): temporal
+    /// eligibility trace. Per-neuron slow spike trace used as the STDP
+    /// LTP pre-trace, bridging events across the inter-stimulus gap.
+    /// false = exactly the committed base STDP (identity).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_elig: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -573,6 +595,7 @@ impl Network {
                 rg_p2: Vec::new(),
                 rg_w2: Vec::new(),
                 ctx_protos: Vec::new(),
+                elg: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -606,6 +629,7 @@ impl Network {
                 rg_p2: Vec::new(),
                 rg_w2: Vec::new(),
                 ctx_protos: Vec::new(),
+                elg: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -634,6 +658,7 @@ impl Network {
                 rg_p2: Vec::new(),
                 rg_w2: Vec::new(),
                 ctx_protos: Vec::new(),
+                elg: 0.0,
                 dormant_since: None,
                 retired: false,
             });
@@ -893,6 +918,8 @@ impl Network {
         // V2.1: slow-state decay (exact exponential, mirror of i_adapt).
         // beta = 0 => u stays exactly 0.0 and dv adds +0.0 (V2 identity).
         let decay_slow = exp_approx(-dt / self.cfg.slow_state_tau_ms);
+        let elig_on = self.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
+        let decay_elig = if elig_on { exp_approx(-dt / elig_tau_ms()) } else { 0.0 };
         // X-series drive-gated write (docs/x-spec-drive-gated.md §2-3;
         // SPEC CORRECTION 2026-09-20, docs/x-mechanism-review.md):
         // x_i = min(I_aff/v_th, 1); I_aff = sum of amplitude*w over
@@ -941,6 +968,9 @@ impl Network {
                 decay_slow
             };
             neur.u_slow *= decay_slow_i;
+            if elig_on {
+                neur.elg *= decay_elig; // decay every tick; +1 on spike below
+            }
             // V2.2 G1: latch gate on the DECAYED u (spec §1.2 step 2).
             let u_eff = if self.cfg.latch_enable {
                 // u_reg = per-neuron regeneration equilibrium (spec §1.3):
@@ -984,6 +1014,12 @@ impl Network {
                     neur.u_slow += self.cfg.slow_state_beta * neur.g_drive;
                 } else {
                     neur.u_slow += self.cfg.slow_state_beta;
+                }
+                // Phase III Level-4: eligibility trace (bounded, flag-off
+                // stays 0 -> identity). Updated for every firing neuron
+                // (incl. input).
+                if elig_on {
+                    neur.elg = (neur.elg * decay_elig + 1.0).min(elig_max());
                 }
                 // V2.2 Y1: local per-spike subtraction eta = beta*eta_rel,
                 // floored at 0 (spec §3; 0 = off when eta_rel = 0).
@@ -1591,6 +1627,7 @@ mod tests {
             d_core: false,
         d_claim: false,
         d_sparse: false,
+        d_elig: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,
@@ -1858,4 +1895,29 @@ mod tests {
         );
         assert!(boost < raw - 1.0, "cap must bind with two afferents");
     }
+
+    // ---------- Phase III Level-4 eligibility trace (level4-decision.md) ----------
+
+    /// EL-1: the per-neuron trace rises with spikes, decays with
+    /// tau_elig, and is capped (finite resource); flag off stays 0.
+    #[test]
+    fn elig_trace_rises_decays_bounds() {
+        let cfg = NetworkConfig { v2: Some(V2Params { d_elig: true, ..v2_params_min() }), ..NetworkConfig::default() };
+        let mut net = Network::new(cfg, 1, 1, 0, 1);
+        let post = NeuronId(1);
+        // fire the internal neuron once
+        net.neurons[post.idx()].v = 2.0; // force spike next step
+        let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
+        let e = net.neurons[post.idx()].elg;
+        assert!(e > 0.0, "spike bumps eligibility, got {e}");
+        // decay over ~1.5 s
+        for _ in 0..1500u64 { let _ = net.step(&InputFrame { tick: Tick(0), spikes: vec![] }); }
+        let e2 = net.neurons[post.idx()].elg;
+        assert!(e2 < e * 0.5, "eligibility decays (tau_elig 1.5s): {e} -> {e2}");
+        // flag off -> 0
+        let cfg0 = NetworkConfig::default();
+        let mut net0 = Network::new(cfg0, 1, 1, 0, 1);
+        assert_eq!(net0.neurons[post.idx()].elg, 0.0);
+    }
+
 }

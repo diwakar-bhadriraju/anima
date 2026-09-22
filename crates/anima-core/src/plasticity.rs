@@ -254,7 +254,19 @@ pub fn stdp_tick_multiplicative(
                 continue;
             }
             let pre_t = traces.pre(sid);
-            if pre_t <= 0.0 {
+            // Phase III Level-4: when d_elig, the LTP pre-trace is the
+            // per-neuron SLOW eligibility trace (bridges the gap), not the
+            // 20 ms trace. Flag off => exact committed path.
+            let elig_on = net.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
+            let ltp_trace = if elig_on {
+                self_trace_elig(net, s.pre) // slow eligibility of the PRE
+            } else {
+                pre_t
+            };
+            if pre_t <= 0.0 && !elig_on {
+                continue;
+            }
+            if elig_on && ltp_trace <= 0.0 {
                 continue;
             }
             let s = &mut net.synapses[sid.idx()];
@@ -294,6 +306,12 @@ pub fn stdp_tick_multiplicative(
         }
     }
     changes
+}
+
+/// Phase III Level-4: the slow eligibility trace of a neuron (the LTP
+/// pre-trace when d_elig). Local read; 0 when the mechanism is off.
+fn self_trace_elig(net: &crate::network::Network, pre: crate::network::NeuronId) -> f32 {
+    net.neurons.get(pre.idx()).map_or(0.0, |n| n.elg)
 }
 
 /// Extension used by the harness: per-spike STDP given the tick's spike set.
@@ -373,7 +391,19 @@ pub fn stdp_tick(
                 continue;
             }
             let pre_t = traces.pre(sid);
-            if pre_t <= 0.0 {
+            // Phase III Level-4: when d_elig, the LTP pre-trace is the
+            // per-neuron SLOW eligibility trace (bridges the gap), not the
+            // 20 ms trace. Flag off => exact committed path.
+            let elig_on = net.cfg.v2.as_ref().is_some_and(|v| v.d_elig);
+            let ltp_trace = if elig_on {
+                self_trace_elig(net, s.pre) // slow eligibility of the PRE
+            } else {
+                pre_t
+            };
+            if pre_t <= 0.0 && !elig_on {
+                continue;
+            }
+            if elig_on && ltp_trace <= 0.0 {
                 continue;
             }
             // E6: β scales the a⁺ increment only (input-channel afferents).
@@ -397,7 +427,7 @@ pub fn stdp_tick(
                 if headroom <= 0.0 {
                     continue; // skip protected LTP when the class is full
                 }
-                let dw = params.a_plus * pre_t * gate * beta;
+                let dw = params.a_plus * ltp_trace * gate * beta;
                 let dw_eff = dw.min(headroom);
                 let w_new = (s.w + dw_eff).min(params.w_max);
                 if dcore {
@@ -410,7 +440,7 @@ pub fn stdp_tick(
                 }
                 s.w = w_new;
             } else {
-                s.w = (s.w + params.a_plus * pre_t * gate * beta).min(params.w_max);
+                s.w = (s.w + params.a_plus * ltp_trace * gate * beta).min(params.w_max);
             }
             if s.w != before {
                 // V2.3 (docs/v2_3-design.md §1): write-epoch bucket tag.
@@ -667,7 +697,8 @@ mod tests {
             force_spike(&mut net, pre);
             let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
             traces.step(&net, &ev.spikes);
-            force_spike(&mut net, post);
+            net.neurons[post.idx()].v = 100.0; // force post spike
+            net.neurons[post.idx()].refractory_until = Tick(0);
             let ev = net.step(&InputFrame { tick: Tick(1), spikes: vec![] });
             traces.step(&net, &ev.spikes);
             let changes = stdp_tick_multiplicative(&params, &mut net, &traces, &ev.spikes, 1.0);
@@ -697,7 +728,8 @@ mod tests {
             let post = net.synapses[sid.idx()].post;
             let mut traces = Traces::new(&net, 20.0);
             // post fires first (builds post trace), then pre ⇒ LTD
-            force_spike(&mut net, post);
+            net.neurons[post.idx()].v = 100.0; // force post spike
+            net.neurons[post.idx()].refractory_until = Tick(0);
             let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
             traces.step(&net, &ev.spikes);
             force_spike(&mut net, pre);
@@ -865,7 +897,8 @@ mod e6_tests {
             let w0 = net.synapses[sid.idx()].w;
             let rb = balance.then(rb_skewed);
             // Post fires at t=0, ch at t=5: LTD on the input afferent.
-            force_spike(&mut net, post);
+            net.neurons[post.idx()].v = 100.0; // force post spike
+            net.neurons[post.idx()].refractory_until = Tick(0);
             let ev = net.step(&InputFrame { tick: Tick(0), spikes: vec![] });
             traces.step(&net, &ev.spikes);
             for t in 1..5 {
@@ -882,4 +915,33 @@ mod e6_tests {
         assert!(d0 < 0.0, "LTD must depress");
         assert!((d0 - d1).abs() < 1e-7, "LTD must be identical with E6 on: {d0} vs {d1}");
     }
+
+
 }
+    /// EL-2 (Phase III Level-4): with d_elig the LTP pre-trace is the
+    /// slow per-neuron eligibility (elg); with it off it is not used.
+    #[test]
+    fn elig_ltp_uses_slow_trace_when_enabled() {
+        use crate::network::{NeuronId, NetworkConfig, Tick, V2Params};
+        fn run(elig: bool) -> f32 {
+            let mut params = crate::structural_v2_tests::v2_params();
+            params.d_elig = elig;
+            let cfg = NetworkConfig { v2: Some(params), ..NetworkConfig::default() };
+            let mut net = Network::new(cfg, 2, 2, 0, 3);
+            let pre = net.channels[0].target;
+            let post = NeuronId(2);
+            let sid = net.add_synapse(pre, post, 0.5, true, Tick(0));
+            net.neurons[pre.idx()].elg = 0.8; // pre "recently fired" in the gap
+            net.neurons[post.idx()].v = 100.0; // force post spike
+            net.neurons[post.idx()].refractory_until = Tick(0);
+            let ev = net.step(&crate::network::InputFrame { tick: Tick(5), spikes: vec![] });
+            let mut traces = Traces::new(&net, 20.0);
+            traces.step(&net, &ev.spikes);
+            let before = net.synapses[sid.idx()].w;
+            stdp_tick(&StdpParams::default(), &mut net, &traces, &ev.spikes, 1.0, None);
+            net.synapses[sid.idx()].w - before
+        }
+        let on = run(true);
+        let off = run(false);
+        assert!(on > off, "eligibility must give MORE cross-gap LTP: on={on} off={off}");
+    }
