@@ -111,7 +111,14 @@ fn capture_refs(net: &mut Network, seed: u64) -> Vec<(String, Vec<f32>)> {
 /// Inherit parent's weights by (pre,post) key into a fresh child; apply
 /// weight mutation. n_internal may differ (size mutation): shared neurons
 /// inherit, new neurons' synapses stay fresh.
+/// Pure copy of the parent brain (no mutation) - elitism.
+fn breed_no_mut(parent: &Network, seed: u64, n_internal: usize) -> Network {
+    breed_inner(parent, seed, n_internal, false)
+}
 fn breed(parent: &Network, seed: u64, n_internal: usize) -> Network {
+    breed_inner(parent, seed, n_internal, true)
+}
+fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> Network {
     let mut wmap: HashMap<(u32, u32), f32> = HashMap::new();
     for s in &parent.synapses { wmap.insert((s.pre.0, s.post.0), s.w); }
     let mut child = build_net(seed, n_internal);
@@ -121,7 +128,7 @@ fn breed(parent: &Network, seed: u64, n_internal: usize) -> Network {
         if s.pre.0 < n_shared as u32 && s.post.0 < n_shared as u32 {
             if let Some(w) = wmap.get(&(s.pre.0, s.post.0)).copied() {
                 let mut w = w;
-                if rng.gen::<f32>() < W_MUT_P { w += (rng.gen::<f32>() * 2.0 - 1.0) * W_MUT_AMP * w; }
+                if mutate && rng.gen::<f32>() < W_MUT_P { w += (rng.gen::<f32>() * 2.0 - 1.0) * W_MUT_AMP * w; }
                 s.w = w.clamp(0.0, 1.0);
             }
         }
@@ -148,7 +155,10 @@ fn main() {
                 let refs = capture_refs(&mut org.net, org.seed);
                 let out = survival::run(&mut org.net, org.seed, &refs, &spec, &p, &mut traces);
                 org.size = org.net.neurons.len() - 24 - 12;
-                let f = out.mean_viability + 0.2 * out.known_recognized_frac;
+                // fitness in [0,1]: mean viability scaled by the recognition
+                // fraction (multiplicative, not additive - additive let the
+                // composite exceed 1.0 and break selection ranking)
+                let f = out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac);
                 scored.push((f, i, org.size));
             }
             scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
@@ -158,12 +168,22 @@ fn main() {
             println!(" gen {g}: fit=[{}] mean_sz={mean_sz:.1} mean_fit={mean_f:.3} best={best:.3}",
                 scored.iter().map(|(f, _, s)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "),
                 best = scored[0].0);
-            // selection: keep top-2 by fitness, breed 2 offspring each
+            // selection: ELITISM (best organism carried verbatim - prevents
+            // destructive mutation from erasing the winner) + breed 3
+            // mutated offspring from the top 2
             let mut rng = Xoshiro256PlusPlus::seed_from_u64(esec ^ (g as u64) ^ 0xDEAD);
             let mut next: Vec<Org> = Vec::new();
+            // ELITISM (D-32 amendment): the best organism is carried to the
+            // next generation UNMUTATED (pure copy by (pre,post) inheritance,
+            // seed = parent's) so destructive mutation cannot erase the
+            // winner. Then 3 mutated offspring from the top 2.
+            let elite_idx = scored[0].1;
+            let elite = &pop[elite_idx];
+            next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size),
+                size: elite.size, seed: elite.seed });
             for (_, idx, sz) in scored.iter().take(2) {
                 let parent = &pop[*idx];
-                for off in 0..2 {
+                for off in 0..1 {
                     let mut sz2 = *sz as i32;
                     let r = rng.gen::<f32>();
                     if r < 0.35 { sz2 += SIZE_STEP; } else if r < 0.70 { sz2 -= SIZE_STEP; }
