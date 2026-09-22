@@ -102,3 +102,19 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   alternation (formation + rho 0.25-0.91, general) is the demonstrated
   platform. Next: probe (b) sparse-wiring topology OR advance to Level
   4 (temporal) on the alternation base; pending the milestone record.
+
+## D-07 — Level-4 temporal branch selected + feasibility probe POSITIVE
+
+- OBSERVATION (gapstate on E-nogain): cross-gap internal activity is
+  substantial (~300-1200 spikes per 1500ms gap, ramping to plateau) and
+  PREDECESSOR-DISTINCT in the late gap for 2/3 seeds (cross A-C cosine
+  0.625/0.759 vs within ~0.99) - a real endogenous temporal bridge that
+  the V2.1-era G6 decay regime lacked.
+- DECISION: selected Level-4 temporal/prediction over the sparse-wiring
+  fork (which only refines the well-understood blocked-order gap; the
+  mission ladder and organism objective demand temporal->prediction->
+  action). Recorded docs/phase3/level4-decision.md + frozen minimal
+  design (paired-associate prediction, eligibility trace, prediction
+  index PI).
+- OPEN: can the gap state be SHAPED into anticipation (the transition-
+  learning mechanism) - falsifier PI ~ 0 after training.
