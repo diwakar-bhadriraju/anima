@@ -40,3 +40,29 @@ Falsifier / discriminator:
 
 No post-hoc tuning; arms preserved; protocol immutable.
 STOP — protocol frozen (D-14).
+## Amendment (D-16): immediate-adjacency training -> LONG-gap transfer
+
+D-15 measured PI inside the short training gap (confounded by X-tail
+decay). The actual ladder question is TRANSFER: after adjacent STDP
+training (off_ms=0, A ends and C starts next ms, well inside tau_plus),
+does a LONE A re-exposure at the 1500 ms gap (S3A probe, unchanged)
+evoke C-assembly anticipation? If yes, adjacency training gives
+gap-crossing anticipation (a Level-4 result despite direct long-gap
+learning failing). If no, the representational limit fully closes
+temporal prediction (nothing to transfer).
+
+ARM (frozen): base E-nogain (all d_* false), 3 seeds, S1 off_ms=0
+immediate A/C alternation reps=20; S3A/S3C probes unchanged (A/C alone,
+off_ms=1500). New exp_id clla-adj0-s{seed}-il (distinct dirs).
+
+ENDPOINT (frozen): during S3A (A alone, 1500 ms spacing), late-gap-after-A
+state vs C_ref MINUS vs A_ref (same PI definition as D-15 but restricted
+to the S3A re-exposure windows):
+  PI_s3a = cos(gap_after_A, C_ref) - cos(gap_after_A, A_ref)
+Falsifier / discriminator:
+  - PI_s3a > +0.05 in >= 2/3 seeds: adjacency training transferred to
+    long-gap anticipation -> Level-4 temporal prediction ACHIEVED via
+    adjacency (bridge crossing ok, direct long-gap not needed).
+  - PI_s3a ~ 0 (or negative): no forward transition was acquired to
+    transfer -> representational limit confirmed; Level-4 closed.
+No post-hoc tuning; arms preserved.
