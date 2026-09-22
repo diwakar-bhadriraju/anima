@@ -183,3 +183,21 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   retrieval (L3), protectable gap bridge (d_ing).
 - Next (approval): (r1) substrate representation change, (r2) accept L3
   bound + move ladder to another rung, (r3) inhibition-with-gate-risk.
+
+## D-18 - r2 Slice-1 (closed-loop action) FALSIFIED as-registered, with map-conditioning confound
+
+- Slice-0 gate (base telemetry): output stimulus-selectivity cross-cos
+  0.728/0.467/0.805 - action channel EXISTS but weak.
+- Slice-1 (closedloop.rs): iterated the trained output-response map
+  through the frozen tag split. Attractors: s9001 = 2-cycle A<->C (self-
+  sustaining alternation - genuine single-seed agency); s20260912 &
+  s424242 = fixed {A} (collapse).
+- D-17 criterion (attractor bias matches C-dominance, >=2/3): NOT met
+  (2/3 mismatch) => falsified as-registered.
+- CONFOUND: the 2 collapses are a map-conditioning artifact (tag split
+  output-half 64-69 is unconditionally more active for BOTH stimuli), so
+  the falsification does NOT show organism failure - it shows the frozen
+  contiguous-tag map is uninformative on 2/3 seeds; s9001 shows the loop
+  CAN self-sustain when the split separates the responses.
+- Preserved: single-seed positive; next = a NEW registration (contrastive
+  / well-conditioned output readout before the loop), needs approval.
