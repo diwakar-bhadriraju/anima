@@ -195,3 +195,20 @@ static:
 
 No post-hoc tuning; both policies are decided here and documented in the
 falsifier's interpretation.
+
+## D-28 — registration correction (pre-matrix, smoke-tested, NOT tuning)
+
+Smoke test (clla-surv-s20260912) died at beat 0, mean_v=0 — a broken
+loop, discarded. Cause: a_bounds=[10,50] conflicted with the committed
+baseline's OWN healthy busy firing (pool 50-159 Hz during A/C
+presentations; D-22 said the activity-band comes from the committed
+rate data). The 50 Hz value is the SUSTAINED runaway threshold (over
+5000 ms) — wrong as a per-beat upper bound. Correction (from committed
+data, pre-matrix):
+  a_bounds = [5, 250]  (a_lo just above silence; a_hi above busy peak
+  159 with headroom; runaway remains guarded separately by the harness
+  50 Hz / 5000 ms detector).
+Death rule tightened while here: activity-out-of-bounds OR recognition
+collapse must hold for a full r_window (10 beats), not 1 beat, to trip
+death (a single quiet/fast beat is not death). Regression: run must
+reach the full beat horizon or a clearly attributable mid-run death.
