@@ -1,12 +1,7 @@
 //! `anima-run`: experiment harness CLI (step 9).
 //! Subcommands: run | replay | report.
 
-mod config;
-mod io;
-mod survival;
-mod e19_world;
-mod env;
-mod harness;
+use anima_exp::{config, e19_world, env, harness, io, survival};
 
 use std::path::PathBuf;
 
