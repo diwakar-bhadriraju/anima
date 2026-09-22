@@ -64,3 +64,23 @@ Distinction kept: MEASURED vs INTERPRETATION vs HYPOTHESIS vs DECISION.
   checkpoint; the next loop (D-04) targets blocked-order re-expression
   via an expression-layer intervention (per-track recurrent protection
   or a read gate), then capacity (K≥3), then closed-loop.
+
+## D-2026-09-22-04 — sparse-commit fork (Phase III-A) frozen
+
+- OBSERVATION (measured, respoverlap): blocked-order re-exposure
+  responder sets are the ENTIRE pool, Jaccard 0.98-1.00, zero
+  recurrent-only neurons -> dense p_in=0.5 pool has no structural
+  separation; A/C expressions differ only by rate modulation. The
+  alternation ρ win is rate-modulation too, not membership.
+- HYPOTHESIS: selective re-expression under recency REQUIRES disjoint
+  (sparse-committed) assemblies; budgets+addressing fix persistence/
+  formation but not expression membership.
+- DECISION: fork to sparse-commit (selective afferent dropout under a
+  local commitment threshold R_t >= theta_commit=0.5), a redesign not a
+  patch; the diagnostic uniquely demands it. Freeze
+  docs/phase3/sparse-commit-protocol.md; implement next.
+- REJECTED: further E-nogain patching for blocked-ρ (patch-spiral
+  guard); moving up the ladder before closing this Level-3 gap (a
+  shaky retrieval base).
+- OPEN: does sparse-commit give Jaccard < 0.5 and blocked ρ >= 0.10
+  without starving the second block (over-commit risk #1)?
