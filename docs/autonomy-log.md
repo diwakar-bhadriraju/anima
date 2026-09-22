@@ -328,3 +328,21 @@ retrain + perfect known/novel recognition + closed-loop persistence.
 Next: substrate-level registration (structured populations / inhibition
 opposing consolidation / true neurogenesis) OR accept the bound and
 document. User decision pending.
+
+## D-34 - CORRECTION: evolution verdict was confounded (per-gen worlds); real finding is deeper
+
+Advisory caught it: world_seed = run_seed ^ gen means each generation
+faces a DIFFERENT world; fitness declines could be harder worlds, not
+worse organisms. Frozen world across gens; rerun 3 seeds:
+- Elite HELD at founder level in 2/3 (0.695/0.749 vs 0.729/0.776).
+- s20260912 elite COLLAPSED 0.756 -> 0.091 under a FROZEN world -
+  mechanism: plasticity ON during scoring means being evaluated IS
+  living, and living degrades trained assemblies (D-21 forgetting,
+  now measured ON THE CHAMPION).
+- Size NOT selected (40->40/44/37.3): neuron count is not the variable.
+CORRECTED CONCLUSION: in this substrate, living and remembering are in
+direct tension - experience and memory share the same substrate with no
+protection. Applies to the champion. LLM-alternative implication: the
+"learn by experience without forgetting" claim needs a mechanism that
+decouples them (structured populations / acquisition protection /
+neurogenesis) - concretely motivated by champion collapse.

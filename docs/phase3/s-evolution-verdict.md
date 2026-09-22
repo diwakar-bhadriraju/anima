@@ -17,16 +17,43 @@ FITNESS (SECONDARY): mean fitness DECLINED in all 3 seeds
   With elitism carrying the winner verbatim, the decline is entirely in
   the mutated offspring: variation is DESTRUCTIVE on average.
 
-## The honest conclusion (plain language)
+## CORRECTION (D-34): the original verdict was CONFOUNDED
 
-The 40-neuron E-nogain brain, once formed on this world, is at a LOCAL
-FITNESS OPTIMUM: random variation (more neurons, fewer neurons, ±10%
-weights) degrades survival rather than improving it. Selection is
-working — it faithfully ranks organisms — but there is nothing to find:
-no explored variant thrives more than the founder. Combined with D-21
-(forgetting cost) and the Level-4 closure, this completes the picture:
-the substrate's capacity limit is real, architecture-level, and NOT
-reachable by parameter/size/growth variation from inside.
+The first run used a DIFFERENT world per generation (world_seed =
+run_seed ^ gen), so gen-over-gen fitness declines reflected HARDER
+WORLDS, not worse organisms. Corrected run (world FROZEN across all 8
+generations, D-26-style provenance):
+
+  best fitness g0 -> g7: 0.756 -> 0.091 (s20260912)   COLLAPSED
+                         0.729 -> 0.695 (s9001)       HELD
+                         0.776 -> 0.749 (s424242)     HELD
+  mean size g0 -> g7:    40.0 -> 40.0 / 44.0 / 37.3   (no consistent
+  direction; size is NOT the selected variable)
+
+## The honest conclusion (corrected, plain language)
+
+- Selection WORKS (deterministic, verified; elitism carries the winner
+  verbatim). The elite HELD at founder level in 2/3 seeds (0.695/0.749).
+- One seed's elite COLLAPSED (0.756 -> 0.091) even under a frozen world
+  - and the mechanism is measured, not guessed: PLASTICITY IS ON during
+  scoring (D-24 mandates it), so the act of being evaluated IS the act
+  of living, and living DEGRADES the trained assemblies (the D-21
+  forgetting dynamic, now seen operating ON the champion).
+- Conclusion: in this substrate, living and remembering are in direct
+  tension. The organism cannot both experience and retain. This is the
+  deepest measured statement of the shared-pool ceiling, and it applies
+  to the CHAMPION, not just losers.
+
+## What this means for the mission
+
+- "Network too small" is answered DEFINITIVELY: the problem is not
+  neuron COUNT (size was not selected, 2/3 flat/one-down). The problem
+  is that experience and memory SHARE the same substrate with no
+  mechanism to protect memory from experience-driven reorganization.
+- The next mechanism MUST decouple experience from forgetting
+  (structured/overlapping populations, protection during acquisition,
+  or true neurogenesis) - this is now concretely motivated by the
+  champion-collapse measurement, not a guess.
 
 ## What this means for the mission
 
