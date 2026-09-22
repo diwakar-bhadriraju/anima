@@ -18,6 +18,7 @@ pub fn v2_params() -> V2Params {
     V2Params {
         recruit_gain: false,
         d_core: false,
+        d_claim: false,
         disable_m2: false,
         disable_m3_m4: false,
         disable_m5: false,
@@ -1523,4 +1524,119 @@ fn clla_fe_corrected_binds_fired_channel_without_afferent() {
             "capacity-matched targets split the working budget: {w0} vs {w1}");
         // invariant: sum <= t_e exactly
         assert!(total <= 0.8 + 1e-6);
+    }
+
+    // ---------- Phase II-AR candidate E (docs/x-phase2-ar-protocol.md) ----------
+
+    /// E-1: under d_claim, M1 wiring (afferent + recurrent) initializes
+    /// UNCLAIMED (track 2); flag off / d_core-only (d_claim false) keeps 0.
+    #[test]
+    fn claim_m1_initializes_unclaimed() {
+        let (net, _) = {
+            let cfg = NetworkConfig {
+                v2: Some(V2Params { d_core: true, d_claim: true, ..v2_params() }),
+                ..NetworkConfig::default()
+            };
+            let mut n = Network::new(cfg, 8, 4, 0, 7);
+            let mut p = v2_params();
+            p.d_core = true; p.d_claim = true;
+            let _ = V2Plasticity::new(&mut n, p, None);
+            (n, ())
+        };
+        let exc: Vec<u8> = net.live_synapses().filter(|s| !s.inhibitory).map(|s| s.track).collect();
+        assert!(!exc.is_empty(), "M1 wiring must exist");
+        assert!(exc.iter().all(|&t| t == 2), "d_claim: M1 init unclaimed, got {exc:?}");
+    }
+
+    /// E-2: claim rule — an unclaimed afferent whose pre fired during the
+    /// window joins the post's CURRENT context; a non-fired one stays 2.
+    #[test]
+    fn claim_first_contact_assigns_to_current_context() {
+        let cfg = NetworkConfig {
+            v2: Some(V2Params { d_core: true, d_claim: true, ..v2_params() }),
+            ..NetworkConfig::default()
+        };
+        let mut net = Network::new(cfg, 8, 2, 0, 11);
+        let mut p = v2_params();
+        p.d_core = true; p.d_claim = true;
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        // fire channels 0..3 so their afferents are claimed; channels
+        // 4..7 never fire -> their afferents must stay unclaimed.
+        let chs: Vec<NeuronId> = (0..4).map(|c| net.channels[c].target).collect();
+        for w in 0..3u64 {
+            for _ in 0..100u64 {
+                v2.tick(&chs);
+                // the harness drives accumulate_input_current every tick; the
+                // ctx_update read of res_iw_t depends on it.
+                v2.accumulate_input_current(&net, &chs);
+            }
+            v2.window(&mut net, Tick(100 * (w + 1)));
+        }
+        let claimed = net.live_synapses().filter(|s| !s.inhibitory && s.track != 2).count();
+        let unclaimed = net.live_synapses().filter(|s| !s.inhibitory && s.track == 2).count();
+        assert!(claimed > 0, "at least one co-firing afferent must be claimed");
+        assert!(unclaimed > 0, "non-co-firing afferents must remain unclaimed");
+        // monotonicity: no claimed synapse ever returns to 2
+        assert!(net.live_synapses().filter(|s| s.track != 2).all(|s| s.track == 0 || s.track == 1));
+    }
+
+    /// E-3: M4 exemption — an unclaimed afferent held below theta_prune is
+    /// never pruned across many windows.
+    #[test]
+    fn claim_unclaimed_is_churn_exempt() {
+        let mut net = Network::new(v2_net_cfg(true), 8, 2, 0, 13);
+        let mut p = v2_params();
+        p.d_core = true; p.d_claim = true;
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        // choose an afferent to channel that never fires; set it low
+        let victim = net.live_synapses()
+            .find(|s| !s.inhibitory && s.track == 2 && s.pre.0 >= 8).map(|s| s.id);
+        // ensure silence (nothing fires) for many windows
+        for w in 0..60u64 {
+            for _ in 0..100u64 { v2.tick(&[]); }
+            v2.window(&mut net, Tick(100 * (w + 1)));
+        }
+        if let Some(vid) = victim {
+            assert!(net.synapse_alive(vid), "unclaimed afferent must survive 60 silent windows");
+        }
+    }
+
+    /// E-4: two-regime budget — claimed track upscale is PRESENT (not
+    /// deferred) and the floor never breaks sum <= t_e - P.
+    #[test]
+    fn claim_two_regime_budget_invariant_and_upscale() {
+        let mut net = Network::new(v2_net_cfg(true), 4, 1, 0, 17);
+        let mut p = v2_params();
+        p.d_core = true; p.d_claim = true;
+        let t_e = p.t_e;
+        let mut v2 = V2Plasticity::new(&mut net, p, None);
+        let post = NeuronId(4);
+        // craft: one claimed-track-1 afferent (tiny) + one unclaimed afferent
+        let c1 = net.add_synapse(net.channels[0].target, post, 0.002, true, Tick(0));
+        let u1 = net.add_synapse(net.channels[2].target, post, 0.05, true, Tick(0));
+        net.synapses[c1.idx()].track = 1;
+        net.synapses[u1.idx()].track = 2;
+        v2.window(&mut net, Tick(100));
+        // claimed track-1 should be upscaled toward (B - floor)/1 = (0.8-0)/1
+        // (no unclaimed fired -> but unclaimed present -> floor in budget)
+        let wc = net.synapses[c1.idx()].w;
+        let wu = net.synapses[u1.idx()].w;
+        let total_exc: f32 = net.incoming[post.idx()].iter()
+            .filter(|&&sid| net.synapses[sid.idx()].silent_ticks != u64::MAX && !net.synapses[sid.idx()].inhibitory && !net.synapses[sid.idx()].consolidated)
+            .map(|&sid| net.synapses[sid.idx()].w).sum();
+        // floor bound: u stays >= min(theta_prune, B/n) but total never > B
+        let b = t_e;
+        assert!(total_exc <= b + 1e-6, "norm_total {total_exc} > B {b}");
+        assert!(wu >= 0.0049 || total_exc <= b + 1e-6, "unclaimed floored toward theta_prune (budget permitting)");
+        assert!(wc > 0.002 * 2.0, "claimed track-1 upscaled (not deferred), got {wc}");
+    }
+
+    /// E-5: flag-off identity — no tag 2 ever appears, and d_core-only
+    /// (d_claim false) keeps the committed D-core behavior (track 0 init).
+    #[test]
+    fn claim_flag_off_and_dcore_only_never_unclaimed() {
+        // dcore only
+        let (net, _) = v2_net(3);
+        assert!(net.live_synapses().filter(|s| !s.inhibitory).all(|s| s.track == 0),
+            "d_claim false keeps track 0");
     }

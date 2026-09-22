@@ -420,6 +420,11 @@ pub struct V2Params {
     /// identity runs of the registration).
     #[serde(default, skip_serializing_if = "is_false")]
     pub d_core: bool,
+    /// Phase II-AR (docs/x-phase2-ar-protocol.md): candidate E —
+    /// first-contact claim. Requires d_core. false = exactly the committed
+    /// D-core. false defaults never touched (identity).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub d_claim: bool,
     // M3 — candidates
     pub c_slots: usize,
     pub w_c_init: f32,
@@ -764,9 +769,17 @@ impl Network {
         tick: Tick,
     ) -> SynapseId {
         let id = SynapseId(self.synapses.len() as u32);
+        // Phase II-AR: with d_claim, pre-existing wiring is UNCLAIMED
+        // (tag 2); M3-born synapses are overwritten to cur_ctx at the
+        // permanence site. Flag off / d_claim off: track 0 (identity).
+        let def_track: u8 = if self.cfg.v2.as_ref().is_some_and(|v| v.d_core && v.d_claim) {
+            2
+        } else {
+            0
+        };
         self.synapses.push(Synapse {
             id,
-            track: 0,
+            track: def_track,
             pre,
             post,
             w: w.clamp(self.cfg.w_min, self.cfg.w_max),
@@ -1558,6 +1571,7 @@ mod tests {
         V2Params {
             recruit_gain: false,
             d_core: false,
+        d_claim: false,
             assembly_protect: false,
             alloc_residual: false,
             dormant_reserve: false,

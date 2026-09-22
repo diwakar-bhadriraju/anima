@@ -130,6 +130,9 @@ pub struct V2Section {
     /// false = identity.
     #[serde(default, skip_serializing_if = "cfg_bool_false")]
     pub d_core: bool,
+    /// Phase II-AR candidate E (docs/x-phase2-ar-protocol.md). Requires d_core.
+    #[serde(default, skip_serializing_if = "cfg_bool_false")]
+    pub d_claim: bool,
     // M3
     pub c_slots: usize,
     pub w_c_init: f32,

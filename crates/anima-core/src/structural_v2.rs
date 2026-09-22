@@ -281,6 +281,11 @@ impl V2Plasticity {
         self.cur_ctx.get(post).copied().unwrap_or(0)
     }
 
+    /// Phase II-AR candidate-E flag.
+    pub fn d_claim_enabled(&self) -> bool {
+        self.params.d_core && self.params.d_claim
+    }
+
     /// Dormant-reserve flag (docs/x-clla-dormant-reserve.md).
     pub fn dormant_reserve_enabled(&self) -> bool {
         self.params.dormant_reserve
@@ -292,6 +297,94 @@ impl V2Plasticity {
         self.candidates[post].iter()
             .map(|c| (c.pre.0, c.w, c.reserved, c.w >= self.params.theta_permanent))
             .collect()
+    }
+
+    /// Phase II-AR two-regime normalization (protocol §1.4). See the
+    /// branch comment; deterministic, invariant-preserving.
+    fn normalize_claim(&mut self, net: &mut Network) {
+        let theta = self.params.theta_prune;
+        let t_e = self.params.t_e;
+        for post in 0..net.neurons.len() {
+            if net.neurons[post].class == NeuronClass::Input {
+                continue;
+            }
+            let p_tot = self.consolidated_mass(net, NeuronId(post as u32));
+            let b = t_e - p_tot;
+            if b <= 0.0 {
+                continue;
+            }
+            let incoming: Vec<SynapseId> = net.incoming[post].clone();
+            let mut claimed = [0.0f32; 2];
+            let mut n_unc = 0usize;
+            let mut unc_idxs: Vec<usize> = Vec::new();
+            for &sid in &incoming {
+                let s = &net.synapses[sid.idx()];
+                if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
+                    if s.track == 2 {
+                        n_unc += 1;
+                        unc_idxs.push(sid.idx());
+                    } else {
+                        let t = (s.track as usize).min(1);
+                        claimed[t] += s.w;
+                    }
+                }
+            }
+            let f = if n_unc > 0 { theta.min(b / n_unc as f32) } else { 0.0 };
+            let n_cl = (if claimed[0] > 0.0 { 1usize } else { 0usize })
+                     + (if claimed[1] > 0.0 { 1usize } else { 0usize });
+            // (a) claimed tracks capacity-matched to (b - f*n_unc)/n_cl
+            if n_cl > 0 {
+                let claimed_budget = (b - f * n_unc as f32).max(0.0);
+                let per_claim = claimed_budget / n_cl as f32;
+                for t in 0..2usize {
+                    if claimed[t] <= 0.0 {
+                        continue;
+                    }
+                    let factor = per_claim / claimed[t];
+                    for sid in incoming.iter().copied() {
+                        let s = &mut net.synapses[sid.idx()];
+                        if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated || s.track == 2 {
+                            continue;
+                        }
+                        if (s.track as usize).min(1) == t {
+                            s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                        }
+                    }
+                }
+            }
+            // (b) floor unclaimed at f
+            if f > 0.0 {
+                for &sid in &unc_idxs {
+                    let s = &mut net.synapses[sid];
+                    s.w = s.w.max(f);
+                }
+            }
+            // (c) backstop: never exceed B (absorb clamp/floor drift)
+            let total: f32 = incoming.iter().map(|&sid| {
+                let s = &net.synapses[sid.idx()];
+                if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated { s.w } else { 0.0 }
+            }).sum();
+            if total > b {
+                let mut claimed_work = 0.0f32;
+                for &sid in &incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated && s.track != 2 {
+                        claimed_work += s.w;
+                    }
+                }
+                if claimed_work > 1e-9 {
+                    let excess = total - b;
+                    let factor = ((claimed_work - excess) / claimed_work).max(0.0);
+                    for sid in incoming.iter().copied() {
+                        let s = &mut net.synapses[sid.idx()];
+                        if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated || s.track == 2 {
+                            continue;
+                        }
+                        s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                    }
+                }
+            }
+        }
     }
 
     /// Phase II-A D-core (protocol §6): per-neuron context update from the
@@ -352,6 +445,22 @@ impl V2Plasticity {
                 }
             }
             self.cur_ctx[i] = ctx;
+            // Phase II-AR claim rule (§1.3): unclaimed (track 2) incoming
+            // working synapses whose PRE fired this window join the post's
+            // current context. Deterministic; first-fire-only (once
+            // 0/1, never back to 2). Afferent + recurrent.
+            if self.d_claim_enabled() {
+                let incoming: Vec<SynapseId> = net.incoming[i].clone();
+                for sid in incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.track != 2 || s.inhibitory || s.silent_ticks == u64::MAX {
+                        continue;
+                    }
+                    if self.fired.get(s.pre.idx()).copied().unwrap_or(false) {
+                        net.synapses[sid.idx()].track = ctx;
+                    }
+                }
+            }
         }
     }
 
@@ -448,6 +557,10 @@ impl V2Plasticity {
             if s.consolidated {
                 self.low_windows[sid] = 0;
                 continue; // CLLA: protected from M4
+            }
+            if self.d_claim_enabled() && s.track == 2 {
+                self.low_windows[sid] = 0;
+                continue; // E: unclaimed substrate is churn-exempt (floor)
             }
             if s.w < self.params.theta_prune {
                 self.low_windows[sid] += 1;
@@ -715,43 +828,55 @@ impl V2Plasticity {
         // (V2.3 capacity-matched family; total <= t_e ALWAYS); consolidated
         // synapses excluded exactly as the CLLA branch below.
         if self.d_core_enabled() {
-            let k = dcore_tracks();
-            for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input {
-                    continue;
-                }
-                let incoming: Vec<SynapseId> = net.incoming[post].clone();
-                let post_id = NeuronId(post as u32);
-                let p_tot = self.consolidated_mass(net, post_id);
-                let mut w_sum = [0.0f32; 2];
-                for &sid in &incoming {
-                    let s = &net.synapses[sid.idx()];
-                    if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
-                        let t = (s.track as usize).min(k - 1);
-                        w_sum[t] += s.w;
-                    }
-                }
-                let populated: Vec<usize> = (0..k).filter(|&t| w_sum[t] > 0.0).collect();
-                if populated.is_empty() {
-                    continue;
-                }
-                let target = self.params.t_e - p_tot;
-                if target <= 0.0 {
-                    continue;
-                }
-                let per_track = target / populated.len() as f32;
-                for &t in &populated {
-                    if (w_sum[t] - per_track).abs() < 1e-9 {
+            if self.d_claim_enabled() {
+                // Phase II-AR candidate E (§1.4): TWO-REGIME normalization.
+                // Claimed working mass is capacity-matched per track to
+                // (B - floor_total)/n_claimed; unclaimed mass is floored at
+                // min(theta_prune, B/n_unc) (budget-capped churn-exempt
+                // floor), so the surviving dormant substrate is preserved
+                // WITHOUT allowing the floor to break the invariant
+                // sum_working <= B. A post-normalize backstop rescales the
+                // claimed set to absorb any clamp drift. Deterministic.
+                self.normalize_claim(net);
+            } else {
+                let k = dcore_tracks();
+                for post in 0..net.neurons.len() {
+                    if net.neurons[post].class == NeuronClass::Input {
                         continue;
                     }
-                    let factor = per_track / w_sum[t];
-                    for sid in incoming.iter().copied() {
-                        let s = &mut net.synapses[sid.idx()];
-                        if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated {
+                    let incoming: Vec<SynapseId> = net.incoming[post].clone();
+                    let post_id = NeuronId(post as u32);
+                    let p_tot = self.consolidated_mass(net, post_id);
+                    let mut w_sum = [0.0f32; 2];
+                    for &sid in &incoming {
+                        let s = &net.synapses[sid.idx()];
+                        if s.silent_ticks != u64::MAX && !s.inhibitory && !s.consolidated {
+                            let t = (s.track as usize).min(k - 1);
+                            w_sum[t] += s.w;
+                        }
+                    }
+                    let populated: Vec<usize> = (0..k).filter(|&t| w_sum[t] > 0.0).collect();
+                    if populated.is_empty() {
+                        continue;
+                    }
+                    let target = self.params.t_e - p_tot;
+                    if target <= 0.0 {
+                        continue;
+                    }
+                    let per_track = target / populated.len() as f32;
+                    for &t in &populated {
+                        if (w_sum[t] - per_track).abs() < 1e-9 {
                             continue;
                         }
-                        if (s.track as usize).min(k - 1) == t {
-                            s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                        let factor = per_track / w_sum[t];
+                        for sid in incoming.iter().copied() {
+                            let s = &mut net.synapses[sid.idx()];
+                            if s.silent_ticks == u64::MAX || s.inhibitory || s.consolidated {
+                                continue;
+                            }
+                            if (s.track as usize).min(k - 1) == t {
+                                s.w = (s.w * factor).clamp(net.cfg.w_min, net.cfg.w_max);
+                            }
                         }
                     }
                 }

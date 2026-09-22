@@ -14,7 +14,12 @@ into learned context tracks, with churn-exempt dormancy for the
 unclaimed class — restore sequential blocked-order formation (S1) AND,
 where S1 passes, give selective re-expression (S3 ρ probe)?
 
-## 1. Mechanism delta over committed D-core (all behind `d_core`)
+## 1. Mechanism delta over committed D-core (behind `d_core` + `d_claim`)
+
+Sub-flag: `d_claim` (V2Params, default false; requires d_core). Arm-1
+configs set d_core=true, d_claim=true, recruit_gain=true. `d_claim=false`
+(d_core alone) is EXACTLY the committed D-core (tag-0 init, per-track
+single-regime M2, no claim, no floor) — registration-separable.
 
 1.1 M1 INITIALIZATION: at construction, when d_core is ON, every M1
 synapse (afferent AND recurrent) initializes track = 2 (UNCLAIMED),
