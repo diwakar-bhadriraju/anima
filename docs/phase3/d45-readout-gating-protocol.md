@@ -188,3 +188,35 @@ question: whether the ~229 wall is real under the CURRENT config (only
 424242 got to 202, close but not past the old 229 threshold in D-46b).
 CLOSED pending that replication.
 STOP.
+
+## D-46 FINAL VERDICT (amended, controlled) - output inhibition: per-seed rescue, NOT selectable mechanism
+
+DETERMINISTIC CONTROL (same seed+world, only oi differs - NO RNG drift,
+the clean A/B the GA comparisons couldn't give):
+  20260912  oi=0.0 die 127 fit .349 | oi=0.1 die 14 fit .102  HURT
+  9001      oi=0.0 die 109 fit .592 | oi=0.1 die 35 fit .323  HURT
+  424242    oi=0.0 die 22  fit .403 | oi=0.1 die 108 fit .762 HELPED
+=> oi=0.1 rescues ONLY 424242; actively harms the other two seeds.
+
+GENE-8 x FITNESS pairing (verbose 424242): no monotone relationship.
+oi=0.05 -> fit {0.000..0.729}; oi=0.016 -> {0.000..0.667}. Fitness
+variance WITHIN each oi dwarfs any oi effect. Selection does not
+consistently reward any inhibition value.
+
+VERDICT: output-band lateral inhibition is a PER-SEED-SPECIFIC rescue
+(breaks 424242's degenerate-output collapse in isolation) but is
+NET-NEGATIVE across the seed ensemble and confers NO selectable GA
+advantage (best_g7 = 0.703 both with inert gene and with reachable gene
+exercised at 0.19). The D-45/D-46 readout-segregation axis is CLOSED,
+on clean evidence: the mechanism is real for one seed but selection
+cannot exploit it without per-seed hand-tuning (forbidden).
+
+HONEST re-scope of the ~229 wall (advisory-corrected): the prior wall
+evidence (424242 all-zero at ~229) came from the D-43-era config. Under
+current config, D-46b reached ~202 mean (424242 hit exactly 202) but NO
+organism crossed 229, so "wall real" vs "wall gone" is UNTESTED above
+~205 under current machinery - the D-46b non-collapse at 202 is
+expected under either hypothesis. The wall question needs a deliberate
+size-push run (more gens or relaxed budget) to cross 229 - NOT settled
+by this verdict.
+STOP.
