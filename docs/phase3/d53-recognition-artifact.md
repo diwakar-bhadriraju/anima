@@ -61,3 +61,30 @@ what it decodes-to. The closed-loop survival metric is invalid for
 discrimination claims until this is fixed.
 STOP - headline recognition claim corrected; the tonic-seizure
 degeneracy is the real, structural limit.
+
+## D-53b: NOVELTY DETECTION NEVER MEASURED HONESTLY - and the honest metric says it FAILS
+
+The novel metric was a TAUTOLOGY: novel_recognized_frac = 0.00 BY
+CONSTRUCTION (recognized requires is_known, which is false for D).
+'Novel 0.00 (0/8)' proved nothing about detection.
+
+The D-53-contamination probe (D-52's instrument, now fixed) measured the
+HONEST number: 204 contamination notes in one 8-gen baseline run - D
+CONSISTENTLY decodes to a KNOWN symbol (mostly 'C'). The organism has
+NEVER demonstrated novelty detection: it labels every D-beat as a known
+symbol (A/C/E).
+
+CORRECTED FOUNDATION:
+- 'Known-vs-novel separation' (the strongest claim in the project) was
+  NEVER honestly measured, and the honest measurement says it FAILS:
+  D is not detected as novel; it is misattributed to known symbols.
+- What DID survive this audit: 2/3 seeds separate 2-3 KNOWN symbols
+  post-survival (sep >= 0.7 in 67% of org-gens at 3 symbols, mean 0.81).
+- What was never true: novelty DETECTION (as opposed to novelty not-
+  being-recognized).
+
+HOUSE RULE (extends D-53): novelty detection must be measured as
+'fraction of novel beats decoding to NOVEL/UNSURE', never as
+'novel_recognized_frac' (tautological), and checked against the
+contamination rate (novel decoding to known).
+STOP - novelty detection: never honestly measured; honest metric says FAIL.
