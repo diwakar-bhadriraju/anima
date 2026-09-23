@@ -250,9 +250,20 @@ evolve: `evolve 424242 16` (isolated seed, 16 generations).
   9-15 244.0 0.000   (irrecoverable)
 
 RESULT: 424242 grows stably to ~215, then the moment it crosses into
-~229-244 ALL four organisms die in the SAME generation (gen 8). The
-wall is SHARP and REPLICATED under the current (argv-fixed, gene-8
-reachable) config - NOT a D-43-era config artifact.
+~229-244 ALL four organisms' RECOGNITION COLLAPSES in the SAME
+generation (gen 8, fit->0.000 while mean_sz holds 244). The wall is
+SHARP and REPLICATED under the current (argv-fixed, gene-8 reachable)
+config - NOT a D-43-era config artifact.
+
+PRECISION ON MECHANISM (advisory-corrected): gen-8 fit=0 is RECOGNITION
+COLLAPSE, not necessarily monitored death. evolve does not surface
+died_at/fail_kind (0 'failed=' in log), and prior birthprobe evidence
+(D-45 telemetry) shows this collapse occurs with activity IN-BAND
+(a=1, rate ~88 Hz) and recognition r->0 - i.e. organisms ALIVE but
+UNRECOGNIZING, not runaway (the 280 Hz monitor did not fire) and not
+silent-death. So the claim is: growth past ~229 collapses RECOGNITION
+while the organism stays active - the bounded resource is recognition,
+not neurogenesis (bodies keep growing to 244).
 
 MECHANISM (per D-45 telemetry): past ~229 neurons, growth-driven
 reciprocal excitation collapses the readout into the degenerate-output
