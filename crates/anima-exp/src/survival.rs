@@ -27,6 +27,14 @@ pub struct SurvivalOutcome {
     pub quiet_actions: u64,
     pub known_recognized_frac: f32,
     pub novel_recognized_frac: f32,
+    /// D-53b: fraction of NOVEL beats the organism DETECTED as novel
+    /// (act = NOVEL/UNSURE, below th_known). The honest novelty metric -
+    /// novel_recognized_frac was a tautology (always 0) and proved
+    /// nothing about detection.
+    pub novel_detected_frac: f32,
+    /// D-53b: count of novel beats that decoded to a KNOWN symbol
+    /// (contamination - org misattributed the novel pattern).
+    pub novel_contaminated: u32,
     pub known_beats: u32,
     pub novel_beats: u32,
     /// In-loop resource failure (runaway-activity / resource-exhaustion),
@@ -117,6 +125,7 @@ pub fn run_world_full(
     let mut known_v: Vec<f32> = Vec::new();
     let mut novel_v: Vec<f32> = Vec::new();
     let (mut known_ok, mut known_n, mut novel_ok, mut novel_n) = (0u32, 0u32, 0u32, 0u32);
+    let mut novel_detected: u32 = 0; // D-53b: honest novelty-DETECTION count
     let rw = spec.r_window.max(1) as usize;
     let mut rcog: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
     let mut ob_window: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
@@ -209,15 +218,14 @@ pub fn run_world_full(
         if rcog.len() > rw { rcog.pop_front(); }
         if is_known { known_n += 1; if recognized { known_ok += 1; } } else {
             novel_n += 1;
-            // D-53b FIX: the old metric (novel_ok += recognized) was a
-            // TAUTOLOGY - recognized is false for every novel beat by
-            // construction (is_known=false -> recognized=false), so
-            // novel_recognized_frac was 0.00 ALWAYS, whether the org
-            // correctly DETECTED novelty or confidently mislabeled D as
-            // a known symbol. The honest detection metric: a novel beat
-            // is correctly handled iff act is NOVEL/UNSURE (below
-            // th_known), NOT a known symbol. Track BOTH.
-            if act == "NOVEL" || act == "UNSURE" { novel_ok += 1; }
+            // Legacy semantics UNCHANGED (D-53b): novel_ok += recognized
+            // stays tautologically 0 (is_known=false -> recognized=false)
+            // so historical novel_recognized_frac JSONs stay interpretable.
+            if recognized { novel_ok += 1; }
+            // D-53b honest detection: a novel beat is correctly HANDLED
+            // iff act is NOVEL/UNSURE (below th_known) - i.e. the org
+            // DETECTED it is not any known symbol. Track separately.
+            if act == "NOVEL" || act == "UNSURE" { novel_detected += 1; }
         }
         let r = rcog.iter().filter(|x| **x).count() as f32 / rcog.len().max(1) as f32;
         // activity boundedness (pool 24..64 mean rate, Hz)
@@ -284,6 +292,8 @@ pub fn run_world_full(
         withdraw_actions: wd_act, quiet_actions: qt_act,
         known_recognized_frac: known_ok as f32 / known_n.max(1) as f32,
         novel_recognized_frac: novel_ok as f32 / novel_n.max(1) as f32,
+        novel_detected_frac: novel_detected as f32 / novel_n.max(1) as f32,
+        novel_contaminated: novel_n - novel_detected,
         known_beats: known_n, novel_beats: novel_n,
     }
 }

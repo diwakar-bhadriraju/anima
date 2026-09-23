@@ -464,6 +464,8 @@ fn main() {
                     }
                 }
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                    eprintln!("  org {i} NOVEL: detected={} contaminated={} (loop-side, gap-separated)",
+                        out.novel_detected_frac, out.novel_contaminated);
                     let mut coses = String::new();
                     for ri in 0..refs.len() {
                         for rj in (ri+1)..refs.len() {

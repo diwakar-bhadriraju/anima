@@ -189,18 +189,28 @@ D-55 (stale-refs reconciliation), and the corrected uncapped baseline:
 WHAT IS REAL (measured, deterministic):
 1. GROWTH: heritable neurogenesis is real and uncapped at this scale
    (55 -> 244+ neurons in 8 gens with size-scaled cap; D-49's ~8x).
-2. 2-SYMBOL KNOWN-vs-KNOWN DISCRIMINATION: real post-survival in ~67%
-   of org-gens (sep >= 0.7 at 3 symbols, mean 0.81), but carried by
-   FRAGILE magnitude-argmax over near-identical refs (cos 0.96-1.00) -
-   the 12-dim output codebook provides razor-thin margins.
-3. Novelty-not-recognized: D beats rarely decode as KNOWN-MATCH (act ==
-   cur requires cur=D which never happens in the closed loop).
+2a. TWO-SYMBOL known-vs-known discrimination: real post-survival.
+2b. THREE-SYMBOL separation: >= 0.7 in ~67% of org-gens (mean 0.81),
+    but carried by FRAGILE magnitude-argmax over near-identical refs
+    (cos 0.96-1.00) - the 12-dim output codebook provides razor-thin
+    margins. (The 67% figure was a 3-symbol measurement; 2-symbol is
+    the cleaner/stronger sub-case.)
+3. (REMOVED - was a leftover tautology framing that contradicted the
+   contamination finding below. The honest novelty statement is item
+   'NOT REAL' #1: novelty detection = 0.)
 
 WHAT IS NOT REAL (falsified by honest measurement):
-- NOVELTY DETECTION: ZERO. D CONSISTENTLY decodes to a known symbol
-  (204 contamination events / 8-gen run) - the organism has never
-  demonstrated detection of a new pattern. The survival verdict's
-  'novel 0.00' was a tautology (recognized requires is_known).
+- NOVELTY DETECTION: WEAK-TO-ZERO, DEGRADING WITH GROWTH. The honest
+  loop-side metric (gap-separated D-beats, the registered metric's
+  source): detected_frac 0.14-0.43 in gen 0, collapsing to 0.00 by
+  gen 1 (all D-beats decode to KNOWN symbols). The survival verdict's
+  'novel 0.00' was a tautology (recognized requires is_known -> always
+  false for D) and proved nothing. The 204-contamination number from
+  the earlier probe INCLUDED back-to-back probe-D presentations (no
+  gap, aftereffects-biased) - the loop-side number is the honest one
+  and it is weak-then-zero, not exactly-zero-at-baseline.
+  => the organism does NOT robustly detect novelty, and the capability
+  DEGRADES as the organism grows (a growth-cost, not a fixed limit).
 - ROBUST multi-symbol separation: the codebook's margin structure is
   too thin to support more than 2-3 symbols reliably; 3-symbol strain
   (33% of org-gens below 0.7) is real.

@@ -776,7 +776,9 @@ pub fn run(cfg: ExpConfig, cfg_path: &Path, live: bool) -> std::io::Result<RunOu
                 "known_vs_novel_diff": out.known_vs_novel_diff, "a_actions": out.a_actions,
                 "c_actions": out.c_actions, "withdraw_actions": out.withdraw_actions,
                 "quiet_actions": out.quiet_actions, "known_recognized_frac": out.known_recognized_frac,
-                "novel_recognized_frac": out.novel_recognized_frac,
+                                "novel_recognized_frac": out.novel_recognized_frac,
+                "novel_detected_frac": out.novel_detected_frac, // D-53b honest detection
+                "novel_contaminated": out.novel_contaminated, // D-53b
                 "known_beats": out.known_beats, "novel_beats": out.novel_beats,
             }).to_string()).ok();
         eprintln!("SURVIVAL: beats={} died_at={:?} mean_v={:.3} kvs_diff={:?} (A={} C={} W={} Q={})",
