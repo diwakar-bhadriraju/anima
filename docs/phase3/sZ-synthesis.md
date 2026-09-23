@@ -128,3 +128,15 @@ fork is OBSOLETE; replaced by three evidence-live questions)
    the nearest binding constraint at large sizes. Understand the
    runaway trigger's behavior above 400 neurons.
 STOP.
+
+## Cleanup note (2026-09-23): disk + evidence hygiene
+- Reclaimed ~13.4G: removed target/debug (12G build cache) + 628 uncited
+  runs/ dirs + emptied .trash-jsonl. Repo 16G -> 2.6G.
+- Rescued cited telemetry: e1, e2a, e2b-082426Z telemetry .zst files were
+  ONLY in .trash-jsonl (their runs/ dirs had metrics/report/snapshots but
+  no telemetry). Restored each into its runs/ dir - cited runs now
+  complete. This is the correct pattern: telemetry is evidence, always
+  lives with the run.
+- DANGLING CITATION: runs/e2b-20260913T082332Z is cited in docs but
+  missing on disk (no dir anywhere, pre-existing). Do not chase it.
+- All 57 doc-cited run dirs preserved; 186 tests green; tree clean.
