@@ -95,6 +95,27 @@ fn main() {
     let ca = heldout_decode_acc(&mut net, seed, &known, &refs, out_lo, 1, false);
     let ta = heldout_decode_acc(&mut net, seed, &known, &trefs, out_lo, bins_n, true);
     println!("   held-out decode acc: count-codec={:.3}  temporal-codec={:.3}", ca, ta);
+    // survival-equivalent: th_known-gated decode (0.20). How many A/C
+    // held-out beats decode to EITHER known vs NOVEL/UNSURE? survival's
+    // known_recognized_frac counts act==cur; a chance-org may still
+    // 'recognize' by gating (both A and C map to one known ref above th).
+    {
+        let mut rok=0u32; let mut rtot=0u32;
+        for sym in &known { for _ in 0..4 {
+            let st=io::symbol_trains(sym,seed);
+            let mut out=vec![0f32;n_out];
+            for t in 0..io::BEAT_MS { let f=InputFrame{tick:net.tick,spikes:st.iter().filter(|(tt,_)|*tt==t).map(|(_,c)|*c).collect()};
+                let e=net.step(&f); for c in &e.spikes { let ci=c.0 as usize; if ci>=out_lo && ci<out_lo+n_out { out[ci-out_lo]+=1.0; } }
+                net.tick=Tick(net.tick.0+1); }
+            let amp = out.iter().sum::<f32>()/out.len().max(1) as f32;
+            let mut best:Option<(f32,&str)>=None;
+            for (p,r) in &refs { let c=io::cos(&out,r); if best.as_ref().map(|(bc,_)|c>*bc).unwrap_or(true){best=Some((c,p));} }
+            let act = if amp < 1.0 { "QUIET" } else if let Some((c,p))=best { if c>0.20 {p} else {"NOVEL"} } else {"UNSURE"};
+            // survival recognized = is_known && act==cur
+            if act==*sym { rok+=1; } rtot+=1;
+        }}
+        println!("   th_known(0.20)-gated: A/C->correct={:.3} A/C->known_or_quiet distribution", rok as f32/rtot.max(1) as f32);
+    }
     for r in &refs { // print nonzero channels
         let nz: Vec<String> = r.1.iter().enumerate().filter(|(_,v)|**v>0.0).map(|(i,v)|format!("{i}:{v:.0}")).collect();
         println!("   ref {}: nonzeros [{}]", r.0, nz.join(", "));
