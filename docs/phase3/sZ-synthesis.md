@@ -49,7 +49,9 @@ collapses.
 - Perfect known-vs-novel recognition (1.00/0.91/1.00 vs 0.00).
 - Closed-loop survival (own output vote -> next stimulus, viability v=a*r*s).
 - Heritable neurogenesis: 55 -> 434 neurons over selection, recognition
-  never fully collapses, ~8x growth.
+  never fully collapses in LIVING organisms, ~8x growth (seed 424242,
+  k=200 run - single-seed/lineage qualifier applies; cap selectively
+  culled high-synapse-demand genomes).
 - Deterministic per (seed, config); 186 tests green.
 
 ## Honest open problems (for future registrations)
