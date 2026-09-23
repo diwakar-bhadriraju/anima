@@ -77,11 +77,16 @@ partially true:
   the hard death at every cap. The 'structural wall' narrative based on
   the incidental 20k constant was wrong - the hard bound is the budget.
   SOFT SLOPE = REAL (P2 partial CONFIRMED, as a slope not a hard wall):
-  above ~320-350 neurons, recognition DEGRADES with cap headroom
-  remaining and NO monitor firing: at n=354, dead=None fail=None fits
-  0.29/0.36/0.37/0.65; at n=383, 0.35/0.47. A soft recognition decline
-  begins ~320 neurons and is measurable - but it is NOT a hard
-  recognition collapse; the hard collapse at gen 13 is exhaustion.
+  at population sizes >= ~320 neurons, SOME organisms show fit < 0.4
+  while ALIVE and UNMONITORED (dead=None fail=None) - e.g. at n=354
+  fits 0.29/0.36/0.37/0.65, at n=383 fits 0.35/0.47. This is
+  POPULATION-LEVEL degradation (spread across organisms and
+  generations), NOT a per-organism monotonic recognition decline - the
+  n=354 and n=383 fits come from different organisms. Caveat: the
+  '0.70 at 289' is the population BEST. So: measurable degradation
+  appears above ~320 neurons, but stated as population spread, not a
+  hard per-organism recognition collapse; the hard collapse at gen 13
+  is exhaustion.
 
 So: hard wall = budget value (free parameter, should be size-scaled to
 sit above the degradation zone); soft degradation = real, quantifiable
