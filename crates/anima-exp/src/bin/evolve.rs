@@ -377,6 +377,11 @@ fn main() {
                     let sep = if d50_mode() == "d50" || d50_mode() == "d50-2" {
                         let (acc, pairs) = capture_separation(&mut org.net, org.seed, &refs, &spec);
                         if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                            let mut coses = String::new();
+                            for ri in 0..refs.len(){ for rj in ri+1..refs.len(){
+                                coses.push_str(&format!("cos({}-{})={:.3} ", refs[ri].0, refs[rj].0, io::cos(&refs[ri].1,&refs[rj].1)));
+                            }}
+                            eprintln!("  org {i} refs: {}", coses);
                             eprintln!("  org {i} D50-sep: {:?} mean={acc:.3}", pairs);
                         }
                         acc
