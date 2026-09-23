@@ -10,13 +10,29 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 pub const BEAT_MS: u64 = 500;
 pub const OUTPUT_LO: u32 = 64;
 pub const OUTPUT_HI: u32 = 76;
-/// Input alphabet (symbol -> exclusive channel subset). A/C are the
-/// committed trained patterns; D is the never-trained NOVEL probe (v1).
-pub const ALPHABET: [(&str, &[u32]); 3] = [
-    ("A", &[0, 1, 2, 3, 4, 5, 6, 7]),
-    ("C", &[8, 9, 10, 11, 12, 13, 14, 15]),
-    ("D", &[16, 17, 18, 19, 20, 21, 22, 23]),
-];
+/// Input alphabet (symbol -> exclusive channel subset), MODE-DRIVEN.
+/// Legacy mode (D-50 default): A/C 8-channel trained, D 8-channel NOVEL.
+/// D50 mode: 3 trained (A/C/E) + D NOVEL, 6 channels each (24 total),
+/// the ONLY change being symbol count at matched size.
+pub fn alphabet(mode: &str) -> Vec<(&'static str, &'static [u32])> {
+    match mode {
+        "d50" => vec![
+            ("A", &[0, 1, 2, 3, 4, 5]),
+            ("C", &[6, 7, 8, 9, 10, 11]),
+            ("E", &[12, 13, 14, 15, 16, 17]),
+            ("D", &[18, 19, 20, 21, 22, 23]), // never-trained NOVEL probe
+        ],
+        _ => vec![
+            ("A", &[0, 1, 2, 3, 4, 5, 6, 7]),
+            ("C", &[8, 9, 10, 11, 12, 13, 14, 15]),
+            ("D", &[16, 17, 18, 19, 20, 21, 22, 23]), // never-trained NOVEL
+        ],
+    }
+}
+/// Trained (non-novel) symbols for the active mode.
+pub fn known_syms(mode: &str) -> Vec<&'static str> {
+    alphabet(mode).iter().filter(|(s, _)| *s != "D").map(|(s, _)| *s).collect()
+}
 pub const RATE_HZ: f32 = 20.0;
 
 fn hash_str(s: &str) -> u64 {
@@ -33,7 +49,12 @@ fn derive_seed64(master: u64, a: u64, b: u64) -> u64 {
 /// Deterministic Poisson trains for one symbol beat (same convention as
 /// env.rs; verified in talk.rs). Empty for unknown/QUIET.
 pub fn symbol_trains(sym: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
-    let Some(chans) = ALPHABET.iter().find(|(s, _)| *s == sym).map(|(_, c)| c.to_vec()) else { return vec![] };
+    symbol_trains_mode(sym, "", seed)
+}
+/// mode-aware trains (D-50: mode selects channel layout). Empty mode =
+/// legacy.
+pub fn symbol_trains_mode(sym: &str, mode: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
+    let Some(chans) = alphabet(mode).iter().find(|(s, _)| *s == sym).map(|(_, c)| c.to_vec()) else { return vec![] };
     let lambda = RATE_HZ / 1000.0;
     let mut out = Vec::new();
     for &ch in &chans {

@@ -61,11 +61,16 @@ fn survival_spec() -> SurvivalSpec {
         a_bounds: [5.0, 250.0], horizon: 30, off_ms: 1500, p_novel: 0.2 }
 }
 
+fn d50_mode() -> &'static str {
+    if std::env::var("D50_MODE").is_ok() { "d50" } else { "" }
+}
+
 fn form_s1(net: &mut Network, seed: u64) {
     let p = params();
     let mut traces = Traces::new(net, 20.0);
+    let known: Vec<&'static str> = io::known_syms(d50_mode());
     for _rep in 0..20usize {
-        for sym in ["A", "C"] {
+        for sym in &known {
             let tr = io::symbol_trains(sym, seed);
             for t in 0..io::BEAT_MS {
                 let frame = anima_core::network::InputFrame {
@@ -90,7 +95,7 @@ fn form_s1(net: &mut Network, seed: u64) {
 fn capture_refs(net: &mut Network, seed: u64) -> Vec<(String, Vec<f32>)> {
     let mut acc: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
     let mut cnt: std::collections::BTreeMap<String, u32> = Default::default();
-    for sym in ["A", "C"] {
+    for sym in io::known_syms(d50_mode()) {
         for _ in 0..3u64 {
             let tr = io::symbol_trains(sym, seed);
             let mut out = vec![0.0f32; 12];

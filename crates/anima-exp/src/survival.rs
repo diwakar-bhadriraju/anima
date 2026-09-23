@@ -122,7 +122,9 @@ pub fn run_world_full(
 
     while beat < spec.beats && died.is_none() {
         let tr = io::symbol_trains(&cur, world_seed);
-        let is_known = cur == "A" || cur == "C";
+        // D-50: known-set derived from refs (mode-agnostic: [A,C] or
+        // [A,C,E]). A symbol is 'known' iff it has a captured ref.
+        let is_known = refs.iter().any(|(p, _)| *p == cur);
         let mut out = vec![0.0f32; 12];
         for t in 0..BEAT_MS {
             let frame = InputFrame {
@@ -166,7 +168,7 @@ pub fn run_world_full(
             // the organism's own signals (prediction error = unrecognized
             // or novel beats). D-37 gate probe.
             if let Some((monitor, trigger)) = structural.as_mut() {
-                let pe = if cur != "A" && cur != "C" { 1.0 } else { 0.2 }; // birth pressure from novel/unrecognized beats
+                let pe = if !is_known { 1.0 } else { 0.2 }; // birth pressure from novel/unrecognized beats
                 if let Some((m, s)) = pe_state.as_mut() {
                     *m += (pe - *m) * 0.05;
                     *s = (*s + (pe - *m).abs()) * 0.5;
@@ -175,7 +177,7 @@ pub fn run_world_full(
                     prediction_error: pe,
                     pe_mean: pe_state.map(|x| x.0).unwrap_or(0.0),
                     pe_std: pe_state.map(|x| x.1).unwrap_or(0.0),
-                    novelty: if cur != "A" && cur != "C" { 1.0 } else { 0.0 },
+                    novelty: if !is_known { 1.0 } else { 0.0 },
                 };
                 let n_before = net.neurons.len();
                 let ev = monitor.step(net, trigger.as_mut(), &sig);
@@ -237,13 +239,15 @@ pub fn run_world_full(
         cur = if force_novel {
             "D".into() // forced-novelty probe (D-30): the ONLY source of D
         } else {
-            match act.as_str() {
-                "A" => "A".into(), // approach known keeps it
-                "C" => "C".into(),
-                _ => if cur == "A" { "C".into() } else { "A".into() },
-                // withdraw/QUIET/novel -> GAP then move AWAY to the OTHER
-                // known pattern (D-23), never re-present D from the
-                // organism's own state (that deadlocks: novel->silence->D).
+            // approach-known: the decoded known symbol is re-presented;
+            // withdraw/novel/QUIET -> move AWAY to a DIFFERENT known ref
+            // (D-23 semantics, generalized to N known via refs).
+            if refs.iter().any(|(p, _)| *p == act.as_str()) {
+                act.clone()
+            } else {
+                let knowns: Vec<&str> = refs.iter().map(|(p, _)| p.as_str()).collect();
+                let some_known = knowns.iter().find(|&&k| k != cur).copied().unwrap_or("A");
+                some_known.to_string()
             }
         };
         // D-29: inter-beat REST gap (off_ms) - preserves the trained
