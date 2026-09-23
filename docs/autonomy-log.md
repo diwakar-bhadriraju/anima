@@ -346,3 +346,17 @@ protection. Applies to the champion. LLM-alternative implication: the
 "learn by experience without forgetting" claim needs a mechanism that
 decouples them (structured populations / acquisition protection /
 neurogenesis) - concretely motivated by champion collapse.
+
+## D-35 - MECHANISTIC REFUTATION: size-mutant copy is structurally invalid; D-34 wrong
+
+EVOLVE_VERBOSE exposed it: same-size elite copy is PERFECT (1703=1703,
+leftover 0); size-mutants balloon to 2300-3000 live synapses (over-add
+916-1396) because a differently-sized child has different topology and
+(pre,post) weight-inheritance patches WRONG synapses. So 20260912's
+fitness collapse was the size-mutation copy artifact, NOT organic
+plasticity damage. D-34's 'living degrades the champion' is REFUTED.
+Consequence: the evolution run does NOT answer 'is bigger better' -
+size inheritance needs structural correspondence (NEAT-style gene
+alignment), a separate capability/registration. Evolution pipeline IS
+deterministic + same-size elite-faithful. Size question: still open,
+needs proper structural inheritance.

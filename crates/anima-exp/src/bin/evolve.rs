@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use anima_core::network::{Network, NetworkConfig, Tick, V2Params};
+use anima_core::network::{NeuronId, Network, NetworkConfig, Tick, V2Params};
 use anima_core::plasticity::{stdp_tick, StdpParams, Traces};
 
 use anima_exp::config::SurvivalSpec;
@@ -120,18 +120,49 @@ fn breed(parent: &Network, seed: u64, n_internal: usize) -> Network {
 }
 fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> Network {
     let mut wmap: HashMap<(u32, u32), f32> = HashMap::new();
-    for s in &parent.synapses { wmap.insert((s.pre.0, s.post.0), s.w); }
+    // build weight map from LIVE parent synapses only (skip tombstones)
+    for s in &parent.synapses {
+        if s.silent_ticks == u64::MAX { continue; }
+        wmap.insert((s.pre.0, s.post.0), s.w);
+    }
     let mut child = build_net(seed, n_internal);
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
     let n_shared = parent.neurons.len().min(child.neurons.len());
+    let mut consumed: Vec<(u32, u32)> = Vec::new();
     for s in child.synapses.iter_mut() {
-        if s.pre.0 < n_shared as u32 && s.post.0 < n_shared as u32 {
-            if let Some(w) = wmap.get(&(s.pre.0, s.post.0)).copied() {
+        let key = (s.pre.0, s.post.0);
+        if s.silent_ticks != u64::MAX && s.pre.0 < n_shared as u32 && s.post.0 < n_shared as u32 {
+            if let Some(w) = wmap.get(&key).copied() {
                 let mut w = w;
-                if mutate && rng.gen::<f32>() < W_MUT_P { w += (rng.gen::<f32>() * 2.0 - 1.0) * W_MUT_AMP * w; }
+                if mutate && rng.gen::<f32>() < W_MUT_P {
+                    w += (rng.gen::<f32>() * 2.0 - 1.0) * W_MUT_AMP * w;
+                }
                 s.w = w.clamp(0.0, 1.0);
+                consumed.push(key); // drain matched so we don't re-add below
             }
         }
+    }
+    for k in consumed { wmap.remove(&k); }
+    // Parent-born synapses (created during the parent's life) that the fresh
+    // child truly lacks are ADDED - only when BOTH endpoints exist in the
+    // child's neuron range AND the child doesn't already carry the key.
+    // (matched/drained keys never reach here; size-mutation keys outside
+    //  the child's range must be dropped, not added - a smaller child
+    //  cannot host a synapse to a neuron it does not have.)
+    let n_child = child.neurons.len() as u32;
+    let mut born = 0usize;
+    let have: std::collections::HashSet<(u32, u32)> = child.synapses.iter()
+        .filter(|s| s.silent_ticks != u64::MAX)
+        .map(|s| (s.pre.0, s.post.0)).collect();
+    for ((pre, post), w) in &wmap {
+        if *pre < n_child && *post < n_child && !have.contains(&(*pre, *post)) {
+            child.add_synapse_full(NeuronId(*pre), NeuronId(*post), *w, true, false, Tick(0));
+            born += 1;
+        }
+    }
+    if std::env::var("EVOLVE_VERBOSE").is_ok() {
+        eprintln!("breed: leftover(would-add)={born}; child live={} parent live={} (expect live<=parent-live if no unintended add)",
+            child.live_synapses().count(), parent.live_synapses().count());
     }
     child
 }
@@ -197,9 +228,10 @@ fn main() {
             let elite = &pop[elite_idx];
             next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size),
                 size: elite.size, seed: elite.seed });
-            for (_, idx, sz, _) in scored.iter().take(2) {
+            for (pi, (_, idx, sz, _)) in scored.iter().take(2).enumerate() {
                 let parent = &pop[*idx];
-                for off in 0..1 {
+                let n_off: u32 = if pi == 0 { 2 } else { 1 };
+                for off in 0..n_off {
                     let mut sz2 = *sz as i32;
                     let r = rng.gen::<f32>();
                     if r < 0.35 { sz2 += SIZE_STEP; } else if r < 0.70 { sz2 -= SIZE_STEP; }

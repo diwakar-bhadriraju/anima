@@ -73,3 +73,28 @@ generations, D-26-style provenance):
 STOP - D-32 verdict recorded; deterministic pipeline; evolution finds
 no improvement from this substrate's local optimum; decision pending on
 substrate-level next step.
+
+## D-35 — MECHANISTIC REFUTATION of D-34 (honest, measured)
+
+The D-34 'plasticity degrades the champion' interpretation was WRONG.
+Breeding debug (EVOLVE_VERBOSE) shows:
+  - SAME-SIZE elite copy: leftover=0, child live=1703 = parent live (PERFECT
+    faithful inheritance every time - the elite holds because it's copied
+    correctly).
+  - SIZE-MUTANT offspring (44/36): leftover 916->1396, child live balloons
+    to 2300-3000 vs parent 1703 - the differently-sized child has a
+    DIFFERENT topology, so patching parent weights by (pre,post) key puts
+    them on WRONG synapses and corrupts the brain.
+  - => The fitness collapse of 20260912's lineage was the SIZE-MUTATION
+    copy-artifact, NOT organic plasticity damage. Elitism's same-size copy
+    is faithful; size inheritance is structurally invalid.
+  - => The size question (is bigger better) is NOT answerable by this
+    (pre,post) key-inheritance across size change. It requires structural
+    correspondence (NEAT-style gene alignment), a separate capability.
+
+CORRECTED standing: the evolution pipeline is deterministic and elite-
+faithful (same-size inheritance works perfectly); but size-variation
+inheritance is invalid, so the evolution run does NOT answer the size
+question. D-34's 'living degrades the champion' is refuted. The genuine,
+un-answered size question needs NEAT-style structural inheritance - a
+new registration, not a patch.
