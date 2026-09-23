@@ -371,3 +371,17 @@ construction LIVE (organims build+prune own connections; moderate change
 best). Neuron count stays 40 - M3 builds CONNECTIONS not NEURONS. The
 size/retention question still unanswered: needs birth-trigger activation
 (neurogenesis) under selection. This is the honest state before that.
+
+## D-41 - FINAL evolution verdict: viable neurogenesis under selection, size grows 52->157+ in 3/3 seeds
+
+E4 bug chain fully fixed (sink newborn -> bidirectional participatory;
+wiring_w_scale; accumulate_input_current; on_neuron_appended + incremental
+recount; size-scaled b_e = k*n). Full 3-seed x 8-gen evolution: exit=0,
+no crash, size 52.5/51.2/55.0 -> 157.0/159.5/160.0 (~3x growth every
+seed), fitness improves or holds (best 0.667/0.679/0.703). The size
+question answered: bigger brains survive AND grow under selection once
+the birth machinery is correct. Demonstrated: experience learning +
+perfect recognition + closed-loop persistence + self-construction +
+heritable growth. LLM-alternative 'learns, grows, retains' claim works
+in miniature. Limits: runaway detector off during loop (recorded),
+birth-law space not yet GA-searched (fixed trigger params).

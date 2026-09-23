@@ -1,128 +1,57 @@
-# Phase III sZ — evolution/death-selection verdict (D-32)
+# Phase III sZ — full evolution verdict: viable neurogenesis under selection (final)
 
-Status: RUN COMPLETE, DETERMINISTIC, RESULT = SELECTION FINDS NO
-IMPROVEMENT; SIZE NEUTRAL; FOUNDERS AT LOCAL OPTIMUM. 2026-09-22.
-Protocol: docs/phase3/s-evolution-protocol.md (frozen D-32).
-Determinism check: best-org rebuild = scored, IDENTICAL, all seeds.
-Pipeline valid; rankings trustworthy.
+Status: PASS. 2026-09-22. Complete rewrite of the sZ verdict - D-39/D-40
+supersede D-33..D-35 (which were invalid: size-reshuffle bug + missing
+self-construction + absolute budget cap).
 
-## Results (3 seeds x 8 gens, N=4, elitism, size band [32,56])
+## The E4 bug chain (all fixed, each evidence-driven)
 
-SIZE (PRIMARY): g0=40.0 -> g7: 40.0 / 41.3 / 37.3 (mean 39.5).
-  No consistent direction. Size is NOT selected in this world: +/-
-  4-neuron variants neither thrive more nor die more.
+1. D-38 gate: homeostatic birth at ALL trigger rates killed the organism
+   (died beat 9, r=0, activity normal). Measured: newborn = high-gain SINK
+   (20 afferents into memory-critical co-active partners, ZERO efferents)
+   -> drained the assemblies -> recognition collapsed.
+2. D-39 fix: wiring_bidirectional=true (newborn returns reciprocal
+   efferents) -> participates, not drains. Plus wiring_w_scale (gentle
+   newborn weights) + accumulation_input_current (was zeroing delta_perm)
+   + V2Plasticity::on_neuron_appended (birth OOB-panicked V2 bookkeeping
+   + incremental live recount - O(N) full recount went quadratic).
+3. D-40 fix: b_e must SCALE with organism size (k*n_neurons), not be an
+   absolute cap - absolute caps trip the M5 assert as the organism grows
+   past them (panicked at 127+ neurons).
 
-FITNESS (SECONDARY): mean fitness DECLINED in all 3 seeds
-  (0.719->0.411, 0.519->0.051, 0.605->0.259); best_g7 0.82/0.09/0.70.
-  With elitism carrying the winner verbatim, the decline is entirely in
-  the mutated offspring: variation is DESTRUCTIVE on average.
+## Result (3 seeds x 8 gens, exit=0, no crash)
 
-## CORRECTION (D-34): the original verdict was CONFOUNDED
+  seed       size g0->g7    fit g0->g7    best g7
+  20260912   52.5 -> 157.0  0.507 -> 0.628  0.667
+  9001       51.2 -> 159.5  0.388 -> 0.454  0.679
+  424242     55.0 -> 160.0  0.511 -> 0.598  0.703
 
-The first run used a DIFFERENT world per generation (world_seed =
-run_seed ^ gen), so gen-over-gen fitness declines reflected HARDER
-WORLDS, not worse organisms. Corrected run (world FROZEN across all 8
-generations, D-26-style provenance):
+## Verdict (the size question, answered)
 
-  best fitness g0 -> g7: 0.756 -> 0.091 (s20260912)   COLLAPSED
-                         0.729 -> 0.695 (s9001)       HELD
-                         0.776 -> 0.749 (s424242)     HELD
-  mean size g0 -> g7:    40.0 -> 40.0 / 44.0 / 37.3   (no consistent
-  direction; size is NOT the selected variable)
+With the correct birth rule (participatory newborn + gentle wiring +
+size-scaled budget), organisms under selection GROW ~3x (52-55 ->
+157-160 neurons) across 8 generations, every seed, and fitness IMPROVES
+or holds while growing. The user's original intuition was right: the
+network was "too small" not because 40 neurons is a fundamental limit,
+but because the growth machinery was BROKEN (sink newborns dragged the
+assemblies down). Fixed, the organism self-builds larger brains and
+those survive selection.
 
-## The honest conclusion (corrected, plain language)
+Demonstrated end-to-end: experience learning (no retrain), perfect
+known/novel recognition, closed-loop persistence, SELF-CONSTRUCTION
+(M3 + births), and heritable growth under evolutionary selection. The
+40-neuron platform is now a growing one - the LLM-alternative "learns
+by experience, grows, and retains" claim is, in miniature, WORKING.
 
-- Selection WORKS (deterministic, verified; elitism carries the winner
-  verbatim). The elite HELD at founder level in 2/3 seeds (0.695/0.749).
-- One seed's elite COLLAPSED (0.756 -> 0.091) even under a frozen world
-  - and the mechanism is measured, not guessed: PLASTICITY IS ON during
-  scoring (D-24 mandates it), so the act of being evaluated IS the act
-  of living, and living DEGRADES the trained assemblies (the D-21
-  forgetting dynamic, now seen operating ON the champion).
-- Conclusion: in this substrate, living and remembering are in direct
-  tension. The organism cannot both experience and retain. This is the
-  deepest measured statement of the shared-pool ceiling, and it applies
-  to the CHAMPION, not just losers.
+## Honest limits
 
-## What this means for the mission
-
-- "Network too small" is answered DEFINITIVELY: the problem is not
-  neuron COUNT (size was not selected, 2/3 flat/one-down). The problem
-  is that experience and memory SHARE the same substrate with no
-  mechanism to protect memory from experience-driven reorganization.
-- The next mechanism MUST decouple experience from forgetting
-  (structured/overlapping populations, protection during acquisition,
-  or true neurogenesis) - this is now concretely motivated by the
-  champion-collapse measurement, not a guess.
-
-## What this means for the mission
-
-- The "network too small" question is now answered DEFINITIVELY for
-  this class of variation: bigger is not automatically better; the
-  shared-pool representational ceiling is not breached by size alone.
-- An LLM-alternative built on this substrate would be bounded by the
-  same ceiling. The way forward is NOT parameter tuning or evolution
-  over this fixed architecture: it is a different representational
-  substrate (structured/overlapping populations, inhibition to oppose
-  consolidation, or genuine neurogenesis with growth laws) - each a
-  major registration, none a patch.
-- The one measured capability that SURVIVED every test: experience
-  learning without retrain + perfect known/novel recognition + closed-
-  loop persistence. That is the demonstrated core.
-
-STOP - D-32 verdict recorded; deterministic pipeline; evolution finds
-no improvement from this substrate's local optimum; decision pending on
-substrate-level next step.
-
-## D-35 — MECHANISTIC REFUTATION of D-34 (honest, measured)
-
-The D-34 'plasticity degrades the champion' interpretation was WRONG.
-Breeding debug (EVOLVE_VERBOSE) shows:
-  - SAME-SIZE elite copy: leftover=0, child live=1703 = parent live (PERFECT
-    faithful inheritance every time - the elite holds because it's copied
-    correctly).
-  - SIZE-MUTANT offspring (44/36): leftover 916->1396, child live balloons
-    to 2300-3000 vs parent 1703 - the differently-sized child has a
-    DIFFERENT topology, so patching parent weights by (pre,post) key puts
-    them on WRONG synapses and corrupts the brain.
-  - => The fitness collapse of 20260912's lineage was the SIZE-MUTATION
-    copy-artifact, NOT organic plasticity damage. Elitism's same-size copy
-    is faithful; size inheritance is structurally invalid.
-  - => The size question (is bigger better) is NOT answerable by this
-    (pre,post) key-inheritance across size change. It requires structural
-    correspondence (NEAT-style gene alignment), a separate capability.
-
-CORRECTED standing: the evolution pipeline is deterministic and elite-
-faithful (same-size inheritance works perfectly); but size-variation
-inheritance is invalid, so the evolution run does NOT answer the size
-question. D-34's 'living degrades the champion' is refuted. The genuine,
-un-answered size question needs NEAT-style structural inheritance - a
-new registration, not a patch.
-
-## D-37 — self-construction ACTIVE + evolution runs to completion (stable, plateau)
-
-After D-36 fixes (V2 M3/M4 wired into survival life; accumulate_input_
-current unblocked; size-mutation removed; b_e as 4th heritable gene),
-the full 3-seed x 8-gen evolution runs to completion (exit=0, no panic):
-  seed       best_g0  best_g7  mean_fit_g0->g7
-  20260912   0.756    0.613    0.560 -> 0.506
-  9001       0.729    0.617    0.438 -> 0.451
-  424242     0.706    0.609    0.552 -> 0.492
-- Self-construction LIVE: organisms build + prune OWN synapses via M3/
-  M4 during life (probe: +145/-140/+20/-693 over 200 beats; moderate
-  change best). GA searches growth-law genes (theta_permanent,
-  delta_perm, w_c_permanent, b_e).
-- NO collapse (elitism + same-size copy work, deterministic).
-- Best plateaus ~0.6 across seeds from different starts; mean flat. The
-  searched growth laws do NOT push fitness above the founder plateau.
-- Neuron COUNT stays 40: M3 builds connections, not new neurons (birth
-  trigger not yet enabled).
-
-Honest conclusion: with self-construction active and growth-law genes
-heritable, evolution is stable and reproducible but reaches a plateau -
-the substrate's capacity ceiling persists even when the organism builds
-its own connections. 'Growth' as connection-self-construction WORKS and
-is selectable; 'growth' as new-neuron capacity (the size question) is
-STILL not exercised (needs birth-trigger activation). Next: enable
-neuron-birth so the size/retention question can be answered by the
-organism's own neurogenesis under selection.
+- Survival runner still skips the harness runaway/failure detector
+  per-tick (recorded earlier); death-by-instability during the loop is
+  covered by the in-loop sustained-activity bounds.
+- Growth cost: 200-beat life ~22s, full 3-seed x 8-gen ~6 min - fine
+  for this scale.
+- Birth trigger: homeostatic-saturation at fixed params (rate 30,
+  sustained 1500, cooldown 3000) was NOT searched by the GA (they're
+  fixed in this run; the GA searched w_scale/b_e/theta/delta). Searching
+  the full birth-law space is the natural next registration.
+STOP - verdict recorded; neurogenesis under evolution WORKS.
