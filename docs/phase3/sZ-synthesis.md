@@ -67,3 +67,32 @@ single-run numbers were one nondeterministic path each; their directional
 conclusions replicated across independent runs and stand, but exact sizes
 (229/244/267) were path-specific conservative values of the same findings.
 STOP.
+
+## CORRECTIONS LEDGER (what we believed vs. what we measured)
+The single most important section for future sessions. Each row = a
+conclusion this thread overturned, with the discipline failure that
+caused it. Skip these at your own risk - you WILL re-tread the wall.
+
+| # | Claimed (commit) | Measured truth (commit) | Causal error |
+|---|---|---|---|
+| 1 | ~229 "structural wall" recognition collapse (22b8950, 8710b7d) | Wall = incidental 20k synapse cap (e06bbb3); exhaustion, not recognition; moved 229->267->320->434 as budgets removed (D-47/D-48/D-49) | UNREGISTERED harness constant treated as biological limit; UNINSTRUMENTED inference (no death-cause logged) |
+| 2 | "Recognition collapses while alive" (8710b7d) | All 0.00 orgs are MONITOR-DEAD (runaway/exhaustion); alive orgs never fully collapse (380a4d9) | D-47 verbose run NOT set; inferred from a smaller-org telemetry, not the wall size |
+| 3 | D-45 "degenerate-output attractor" is the wall mechanism | Attractor exists at small sizes (beat-22, 8 births) but the SGD wall is exhaustion (D-47); attractor attribution to the wall was WRONG | Extrapolated a small-org mechanism to the large-org wall without measuring the wall's death cause |
+| 4 | D-41/D-43 growth sizes deterministic | GA was NONDETERMINISTIC (HashMap in breed); single-run sizes were one path each (2c44d7b) | No determinism gate on the GA; HashMap iteration order un-tested |
+| 5 | D-46 gene-8 x fitness "no association" (wrong-seed data) | Retracted; evolve IGNORED argv, ran all 3 seeds; '424242' parses were 20260912 (9489cc1) | argv seed filter didn't exist; single-seed runs weren't single-seed |
+| 6 | D-49 "P1 confirmed, growth not capped" (e156f3b) | Mixed: k=200 cap re-bound for high-synapse genomes (3 exhaustion + 1 runaway); pure-slope open (380a4d9) | k=200 = ~3% headroom vs measured 180-194 syn/neuron; cap selectively culled heavy-demand genomes |
+
+PATTERN: every reversal came from ONE of (a) unregistered constant,
+(b) uninstrumented inference, (c) wrong-seed / argv data, (d) untested
+nondeterminism. Discipline that prevents them: REGISTER the constant,
+LOG the death cause, VERIFY the seed, GATE determinism.
+
+## Standing caveats (from D-49)
+- k=200 cap selects for synapse-efficiency (genome-dependent demand:
+  180 vs 275 syn/neuron) - ~8x is lineage-dependent, not universal.
+- First GA-path runaway observed at n=328 (310 Hz) under scaled cap -
+  runaway monitor becomes the binding constraint if synapse demand drops.
+- Pure representational-slope question (cap fully non-binding, k=250-300)
+  remains OPEN.
+- Soft slope above ~350: population fit oscillates 0.29-0.70 (alive,
+  unmonitored) - real competition/quantization effect, not a wall.
