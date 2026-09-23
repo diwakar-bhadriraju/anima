@@ -1,41 +1,36 @@
-# D-44 PRE-REGISTRATION: survival-duration fitness floor
+# D-44 PRE-REGISTRATION + VERDICT: survival-duration fitness floor
 
-Date: 2026-09-23. FORWARD amendment to D-38's death-gate. Applies only
-to runs started AFTER this record (all seeds measured fresh, not as
-continuations of c94f507).
+Date: 2026-09-23. Forward amendment to D-38's death-gate. Applies only
+to runs started AFTER this record (all seeds measured fresh).
 
-## Problem (evidence)
-c94f507 GA: seed 424242 grew to 229 neurons, then ALL 4 organisms died
-at gen 7 (fit 0.000) - genuine lineage collapse past the metabolic
-envelope (advisory-confirmed honest data, not bug). Under D-38's flat
-"death -> fitness 0.0":
-- A dead-gen produces NO selection gradient. With elitism, the elite is
-  carried verbatim EVEN IF IT DIED, and offspring are bred from dead
-  genes -> the lineage locks onto the cliff edge: it cannot tell
-  "died beat 5" from "died beat 195" (both 0.0), so it cannot evolve
-  around the collapse point. Missing information, not a tuning choice.
+## Registration (constant)
+Dead/failed fitness = base * (beats/spec.beats) * FLOOR; FLOOR=0.25.
+base = the living-fitness formula. Fully-surviving organisms keep base.
 
-## Amendment (registered constant)
-Fitness for a dead/failed organism = base * (beats/spec.beats) * FLOOR
-where base = mean_viability * (0.5 + 0.5*known_recognized_frac) [the
-living-fitness formula], and FLOOR = 0.25 (registered constant).
+## VERDICT: PARTIALLY FALSIFIED (informative)
+Treatment: 3-seed x 8-gen GA started fresh under D-44.
 
-Fully-surviving organism keeps base (FLOOR never applies). A
-near-completion lineage (195/200 beats) gets base * 0.975 * 0.25 ~
-0.24x - enough to rank above an instant-death (5/200 -> ~0.006x) and
-give selection a survival-duration gradient, but ALWAYS below any
-survivor. Justification for 0.25: runaway-causing lineages reach long
-near-miss survival; without a cap below 1.0 they could outrank weak
-but viable survivors. 0.25 cleanly separates "died but nearly made it"
-from "survived" while keeping gradient.
+  seed      D-43 (flat 0) g7        D-44 (floor) g7      effect
+  20260912  230, fit 0.621          230, fit 0.548        ~same trajectory
+  9001      230, fit 0.537          160, fit 0.513        ~same
+  424242    229, ALL 0.000          229, ALL 0.000        NO effect
 
-## Prediction (falsifiable)
-Under D-44, seed 424242's collapse becomes GRADED collapse: gen 7 shows
-non-zero near-miss fitness (not all 0.000), and selection has a
-gradient to evolve the birth law back under the envelope -> the lineage
-either recovers OR degrades gracefully instead of cliff-locking.
+CONFIRMED: the floor registers late activity-deaths (20260912 g4
+137:0.07, g5 158:0.11; 9001 g6 139:0.00) - graded near-miss fitness
+appears where death follows in-band viability.
 
-## Failure mode (honest)
-If FLOOR is too high, near-runaway genes propagate and re-collapse each
-gen (oscillation). 0.25 chosen below the living base to avoid this.
+FALSIFIED (prediction): 424242's gen-7 collapse was expected to become
+graded. It did NOT - all four organisms still score exactly 0.000.
+MECHANISM: 424242 dies by RECOGNITION collapse (r=0 -> viability
+v=a*r*s = 0 -> base = 0), and the floor multiplies base: 0 * frac * 0.25
+= 0. The floor ONLY grades activity-deaths (out-of-band, base stays
+positive); recognition-collapse death is a hard zero through any
+multiplicative floor because the viability signal itself is zero.
+
+CONCLUSION: D-44 does not rescue recognition-collapse lineages (424242
+at ~229 neurons) - those are hard deaths by construction of v(t). The
+hypothesis that a survival-duration floor restores gradient across
+424242's collapse is FALSIFIED. The floor is a minor refinement for
+activity-deaths only; the recognition-collapse wall is a structural
+(representational) limit, not a fitness-loss-gradient artifact.
 STOP.
