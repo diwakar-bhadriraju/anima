@@ -64,3 +64,23 @@ with known-recog, selection is implicitly selecting for memory.
 
 STOP - frozen D-32. Implementation: anima-exp example evolve.rs
 reusing io + survival machinery; 3 runs x 8 gens; verdict D-33.
+## Amendment D-36: replace size-reshuffle with TOPOLOGY-PRESERVING GROWTH
+
+D-35 measured that resize-by-n_internal is structurally invalid (child
+topology differs -> weights land on wrong synapses; over-add 916-1396).
+Ammended variation:
+- OFFSPRING = EXACT copy of parent brain (same size; verified 1703=1703
+  faithful every generation) + GROWTH-APPEND mutation, applied optionally
+  (p_grow, pre-registered).
+- GROWTH-APPEND: append K (pre-registered, K in 0..=2) NEW internal
+  neurons AFTER the intact parent, with fresh seeded random afferents
+  (input + recurrent) + efferents, ALL plastic. Existing pool untouched -
+  this is genuinely new capacity on top, structurally valid inheritance.
+- SIZE TREND now measured as neuron count growth, not n_internal of a
+  reshuffled build.
+- "Snapshot the winner" = elitism (exact copy), already verified byte-faithful.
+
+ENDPOINT (unchanged PRIMARY): does population neuron count grow (bigger
+retains/survives better), stay flat (size irrelevant), per seed, >=2/3
+agreement. SECRET (unchanged): fitness improves under elitism.
+STOP - D-36 frozen; rebuild breeding as copy+append, not resize.
