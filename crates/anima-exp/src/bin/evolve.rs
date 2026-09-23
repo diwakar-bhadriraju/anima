@@ -241,25 +241,19 @@ fn main() {
                 // resource failure (runaway-activity / exhaustion) is the
                 // hard failure mode the monitor exists to catch - flat zero
                 // fitness so selection aggressively prunes it (D-38).
-                // survival-duration floor (D-44, PRE-REGISTERED amendment):
-                // under the survival objective, surviving beats is fitness.
-                // A flat 0.0 death score gives a dead-gen NO selection
-                // gradient (elite carries dead genes verbatim, offspring
-                // breed from them - cliff lockout). Floor = base *
-                // (fraction-of-horizon survived) ^ 1 * NEAR_MISS_FLOOR cap.
-                // NEAR_MISS_FLOOR = 0.25 (registered constant): a dead/
-                // failed organism's fitness is capped at 0.25x its base,
-                // so a FULLY-surviving organism always outranks it. Justified:
-                // keeps runaway-causing lineages (which reach long near-miss
-                // survival) from ever dominating a viable survivor.
-                let base = out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac);
-                let dead = out.failed.is_some() || out.died_at.is_some();
-                const NEAR_MISS_FLOOR: f32 = 0.25;
-                let f = if dead {
-                    let frac = (out.beats as f32 / spec.beats as f32).min(1.0);
-                    base * frac * NEAR_MISS_FLOOR
+                // D-38 death-gate (RESTORED after D-44 falsified): death
+                // or resource failure -> fitness 0.0, unconditionally.
+                // D-44's survival-duration floor was FALSIFIED (174477e):
+                // (a) it did NOT rescue recognition-collapse deaths (base
+                // = a*r*s = 0 at r=0, floor multiplies 0 -> stays 0); (b)
+                // it let mid-fitness dying organisms breed into the pool,
+                // REGRESSING seed 9001 by 30% (230->160). Flat 0 is the
+                // registered baseline; keep it.
+                let f = if out.failed.is_some() || out.died_at.is_some() {
+                    let _ = out.failed; // keep field referenced
+                    0.0
                 } else {
-                    base
+                    out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac)
                 };
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     eprintln!("  org {i}: gp={:?} syn_growth={syn_growth:+} fit={f:.3}",
