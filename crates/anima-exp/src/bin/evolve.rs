@@ -174,7 +174,13 @@ struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 9] }
 fn main() {
     let spec = survival_spec();
     let p = params();
+    // optional argv[1] seed filter: run only the requested seed (e.g.
+    // `evolve 424242`). Empty/absent = all SEEDS. (D-46 fix: evolution
+    // previously IGNORED argv and always ran all 3 seeds, which
+    // invalidated "single-seed" verbose parses - they were another seed.)
+    let want: Option<u64> = std::env::args().nth(1).and_then(|a| a.parse().ok());
     for &esec in &SEEDS {
+        if let Some(w) = want { if w != esec { continue; } }
         println!("=== seed {esec} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
             Org { net: build_net(s, 40, 0.0), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0, 0.1, 30.0, 1500.0, 3000.0, 0.0] } }).collect();

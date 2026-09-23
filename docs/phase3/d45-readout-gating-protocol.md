@@ -209,14 +209,15 @@ dynamics did not (selection on the 20260912/9001 lineages correctly
 purges oi>0; the 424242 0.19-retention is lineage-specific drift, not a
 demonstrated selectable advantage).
 
-GENE-8 x FITNESS pairing (VERIFIED offline from verbose log file,
-424242): no positive association. high-fit(>=0.6) orgs mean_oi=0.062,
-all-orgs mean_oi=0.058 - statistically identical. oi=0 cluster (n=21)
-reaches fit 0.73; oi=0.055 (n=11) reaches 0.69; oi=0.19 (n=7) reaches
-0.67. High-fitness organisms do NOT carry higher inhibition. (Note:
-an earlier inline-awk pairing claiming otherwise was a WRONG extraction -
-it grabbed gp element 0, not the last element (gene 8).) Selection does
-not reward oi>0 on 424242 either.
+GENE-8 x FITNESS pairing: RETRACTED. All verbose 'evolve 424242' runs
+were actually 20260912 data - evolution IGNORED argv and always ran all
+3 seeds (=== seed 20260912 === header). The correct-per-seed parse
+requires the argv seed-filter fix (added D-46). This is why the claim
+kept failing to reproduce. DO NOT use any prior GA-level gene-8 pairing.
+The D-46 verdict rests SOLELY on the deterministic 3x2 control table
+(birthprobe, which correctly parses a seed arg - unaffected by this bug)
++ the GA null (0.703 inert vs 0.703 exercised, both full-3-seed runs -
+also valid).
 
 VERDICT (amended): output-band lateral inhibition is a seed-conditionally
 beneficial / net-harmful per-lineage trait - it breaks 424242's
