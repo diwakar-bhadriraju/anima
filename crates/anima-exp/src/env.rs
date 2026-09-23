@@ -432,9 +432,9 @@ mod tests {
                 PatternSpec { id: "D".into(), channels: vec!["A".into(), "B".into()], channel_ids: None, phases: None, phase_variants: None, variant_block: 1, rate_hz: 20.0, duration_ms: 100, jitter_ms: 2.0 },
             ],
             stage: vec![
-                StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200), mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
-                StageSpec { id: "S1".into(), present: vec!["A".into()], reps: 3, order: "interleaved".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
-                StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None },
+                StageSpec { id: "S0".into(), present: vec![], reps: 0, order: "interleaved".into(), off_ms: 0, silence_ms: Some(200), mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None, survival: None },
+                StageSpec { id: "S1".into(), present: vec!["A".into()], reps: 3, order: "interleaved".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None, survival: None },
+                StageSpec { id: "S2".into(), present: vec!["D".into()], reps: 1, order: "blocked".into(), off_ms: 100, silence_ms: None, mode: None, trials: None, antecedents: None, probe: None, gap_ms: None, iti_ms: None, balance_window: None, survival: None },
             ],
             v2: None,
             e6: None,
