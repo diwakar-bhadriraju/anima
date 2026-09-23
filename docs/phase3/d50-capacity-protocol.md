@@ -149,3 +149,22 @@ grows' first needs an output codec that can represent more distinct
 symbols at all.
 STOP - codebook degeneracy is the primary blocker, upstream of both
 capacity and pool-organization questions.
+
+## D-50 MECHANISM COMPLETE (2026-09-23): tonic-neuron seizure is SAME-per-symbol; codebook always degenerate
+
+Full legacy 8ch refs (seed 424242, 4 orgs):
+  org0 cos .988: A,C BOTH seize channels {0,8}; differ only ch4 254v137
+  org1 cos .993: both seize {0,1,2,9}; differ ch10 497v500, ch11 134v0
+  org2 cos .956: both seize {7,10}; differ ch8 391v469, ch9 0v249
+  org3 cos 1.000: A,C IDENTICAL on {5,9,11} (497v500 clips same)
+REFUTES the '8ch worked because tonic neuron differed per symbol'
+hypothesis: the SAME tonic neurons seize for both A and C; separation
+was ONLY the magnitude of 1-2 SHARED channels (254 vs 137). At org3 the
+difference vanishes entirely (cos 1.000).
+CONCLUSION (unchanged, now airtight): the 12-neuron output codebook
+encodes distinct inputs as near-identical templates (cos 0.96-1.00)
+even in the working 2-symbol case. 6ch just removes the last magnitude
+margin. Codebook degeneracy = primary blocker, upstream of capacity,
+pool organization, and decode. 2-symbol 'separation' was magnitude-
+argmax over a razor-thin margin, never robust structure.
+STOP - mechanism closed; output codec is the next registered lever.
