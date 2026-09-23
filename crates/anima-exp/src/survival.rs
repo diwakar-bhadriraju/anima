@@ -11,6 +11,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::io;
 use anima_core::structural_v2::V2Plasticity;
+use anima_core::structural::{make_trigger, BirthTrigger, Signals, StructuralMonitor};
 
 const BEAT_MS: u64 = 500;
 
@@ -78,6 +79,25 @@ pub fn run_world_v2(
     mut v2: Option<&mut V2Plasticity>,
     window_ticks: u64,
 ) -> SurvivalOutcome {
+    run_world_full(net, _org_seed, world_seed, refs, spec, params, traces,
+        v2, window_ticks, None, None, false)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn run_world_full(
+    net: &mut Network,
+    _org_seed: u64,
+    world_seed: u64,
+    refs: &[(String, Vec<f32>)],
+    spec: &crate::config::SurvivalSpec,
+    params: &StdpParams,
+    traces: &mut Traces,
+    mut v2: Option<&mut V2Plasticity>,
+    window_ticks: u64,
+    mut structural: Option<(StructuralMonitor, Box<dyn BirthTrigger>)>,
+    mut pe_state: Option<(f32, f32)>, // (pe_mean, pe_std) for persistent error
+    _birth_probe: bool,
+) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
     let mut died: Option<u64> = None;
@@ -122,6 +142,30 @@ pub fn run_world_v2(
             // STDP live (plasticity ON in-loop, D-24)
             let changes = stdp_tick(params, net, traces, &ev.spikes, 1.0, None);
             let _ = changes.len();
+            // birth trigger (optional): organism self-builds NEW neurons via
+            // the organism's own signals (prediction error = unrecognized
+            // or novel beats). D-37 gate probe.
+            if let Some((monitor, trigger)) = structural.as_mut() {
+                let pe = if cur != "A" && cur != "C" { 1.0 } else { 0.2 }; // birth pressure from novel/unrecognized beats
+                if let Some((m, s)) = pe_state.as_mut() {
+                    *m += (pe - *m) * 0.05;
+                    *s = (*s + (pe - *m).abs()) * 0.5;
+                }
+                let sig = Signals {
+                    prediction_error: pe,
+                    pe_mean: pe_state.map(|x| x.0).unwrap_or(0.0),
+                    pe_std: pe_state.map(|x| x.1).unwrap_or(0.0),
+                    novelty: if cur != "A" && cur != "C" { 1.0 } else { 0.0 },
+                };
+                let n_before = net.neurons.len();
+                let ev = monitor.step(net, trigger.as_mut(), &sig);
+                if !ev.births.is_empty() {
+                    if let Some(v2ref) = v2.as_deref_mut() {
+                        // keep V2Plasticity bookkeeping in sync with the born neuron
+                        v2ref.on_neuron_appended(net);
+                    }
+                }
+            }
             tick = Tick(tick.0 + 1);
         }
         // decode action via frozen codebook (plain-cos argmax + amp floor)

@@ -449,6 +449,28 @@ impl V2Plasticity {
     /// JUST-FINISHED window's per-channel delivered-current vectors.
     /// Deterministic; consumes NO RNG. Skipped entirely when d_core is
     /// off (identity).
+    /// Called after a NEW neuron is appended to `net` (structural birth,
+    /// E4-family): grow the internal bookkeeping arrays so subsequent
+    /// per-tick/window accesses stay in bounds. Without this, a birth
+    /// desyncs V2Plasticity's vecs from net.neurons (index OOB at window).
+    pub fn on_neuron_appended(&mut self, net: &Network) {
+        let n = net.neurons.len();
+        let k = dcore_tracks();
+        self.fired.push(false);
+        self.res_ip.push(0.0);
+        self.res_iw.push(0.0);
+        self.res_ip_t.extend(std::iter::repeat(0.0).take(k));
+        self.res_iw_t.extend(std::iter::repeat(0.0).take(k));
+        self.ctx_acc.extend(std::iter::repeat(0.0).take(24));
+        self.cur_ctx.push(0);
+        self.res_gate.push(1.0);
+        self.fired_channels.push(Default::default());
+        self.candidates.push(Vec::new());
+        self.live_e.push(0);
+        self.live_i.push(0);
+        let _ = n;
+    }
+
     fn ctx_update(&mut self, net: &mut Network, _tick: Tick) {
         let k = dcore_tracks();
         let dims = 24usize;
