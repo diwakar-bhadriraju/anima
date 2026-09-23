@@ -16,6 +16,11 @@ pub const OUTPUT_HI: u32 = 76;
 /// the ONLY change being symbol count at matched size.
 pub fn alphabet(mode: &str) -> Vec<(&'static str, &'static [u32])> {
     match mode {
+        "d50-2" => vec![
+            ("A", &[0, 1, 2, 3, 4, 5]),
+            ("C", &[6, 7, 8, 9, 10, 11]),
+            ("D", &[12, 13, 14, 15, 16, 17]), // never-trained NOVEL
+        ],
         "d50" => vec![
             ("A", &[0, 1, 2, 3, 4, 5]),
             ("C", &[6, 7, 8, 9, 10, 11]),
