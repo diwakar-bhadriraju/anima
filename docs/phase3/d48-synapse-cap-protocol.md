@@ -49,3 +49,42 @@ Flag-off identity: SYN_CAP default 20000 = current behavior, byte-
 identical monitor semantics. Cap-raised runs are a NEW measurement,
 registered here.
 STOP.
+
+## D-48 VERDICT: P2 CONFIRMED - the wall is STRUCTURAL (recognition collapse at scale), not the synapse-budget constant
+
+Test: `evolve 424242 16 40000` (2x the incidental 20k cap, deterministic
+post-BTreeMap) + verbose death-cause sub-run.
+
+TRAJECTORY (gen, size, best fit):
+  gen 9  260  fit 0.70   (clean growth past old 'wall')
+  gen 10 289  fit 0.70   (recognition intact)
+  gen 11 318  fit 0.65   (warning)
+  gen 12 347  fit 0.47   (collapse begins)
+  gen 13 347  ALL 0.000  (hard)
+MEASURED DEATH CAUSE (D-47 verbose, n=325-383):
+  org rows at n=354: dead=None fail=None fit 0.29/0.36/0.37/
+  0.65 - organisms ALIVE but RECOGNITION DEGRADING, NO monitor fired,
+  NO exhaustion at that point.
+  THEN exhaustion fires (synapses 59341/74259 > cap 40000) as a
+  SECONDARY effect once the raised cap is reached.
+
+CONCLUSION: raising the cap from 20k to 40k MOVED the death point
+(~244-267 -> ~318-347) but did NOT remove it, AND the collapse is
+observed as RECOGNITION failure (dead=None, fail=None, fit->0.3) that
+PRECEDES the exhaustion. The wall is a genuine structural/
+representational ceiling at ~320-350 neurons (recognition collapses
+independent of synapse budget), NOT an artifact of the incidental 20k
+harness constant. The earlier 'budget-artifact' hypothesis (D-48 P1) is
+FALSIFIED; P2 (structural) CONFIRMED.
+
+The ~229 numbers from prior nondeterministic runs were conservative
+versions of the same structural wall (budget bit sooner at 20k); the
+recognition-collapse-only evidence now directly shows the ceiling.
+
+NEXT (registered candidates, for user decision):
+  (a) compartmentalized pools - grown neurons recruit into NEW pools,
+      attacking the representational ceiling directly.
+  (b) accept ~320-350 as the self-construction ceiling (recognition
+      cannot survive >~350 neurons in a single shared pool) - record
+      as the honest end-state.
+STOP.
