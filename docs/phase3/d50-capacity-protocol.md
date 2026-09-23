@@ -58,3 +58,33 @@ FAIL -> shared pool caps at ~2; COMPARTMENTALIZED POOLS becomes the
   mandatory next structural step for the memory goal. Either way the
   'store more as it grows' question is answered on evidence.
 STOP.
+
+## D-50 VERDICT: FAIL - shared pool caps at 2 known; 3rd symbol breaks pairwise separation irreversibly
+
+Measurement (decode-against-refs falsifier, corrected per advisory):
+present each known symbol FRESH, decode via frozen io codebook vs refs.
+Isolation control first (confound removed):
+  legacy  8ch A/C   sep 1.0     (baseline)
+  d50-2   6ch A/C   fit = baseline (.511/.532)  <- channel squeeze ZERO effect
+  d50-3   6ch A/C/E sep 0.0-0.33               <- 3rd symbol E breaks A-C
+So the collapse is CAUSED by the 3rd symbol, not the 6-channel layout.
+
+Full 3-seed x 8-gen D50-3 (deterministic, D50_MODE=1):
+  sep distribution (83 orgs): 64 at 0.333 (chance!), 10 at 0.667, 5 at
+  0.000, 1 at 0.75, 1 at 0.50, 1 at 0.25, 1 at 0.083. NO organism ever
+  reaches the 0.7 PASS bar.
+  fitness collapses: best 0.205/0.219/0.123 across the 3 seeds - selection
+  CANNOT restore separation over 8 generations.
+  sizes still grow (223/241/189) - growth works (D-49), but recognition
+  of 3 knowns stays at chance.
+
+CONCLUSION: FAIL branch confirmed in 2/3+ seeds (actually 3/3).
+The single shared pool CANNOT cleanly hold 3 known patterns - adding E
+irreversibly mixes A and C (pairwise separation -> chance), and
+evolution cannot recover it. This is a REPRESENTATIONAL CONTENT limit
+(not a capacity/size limit - sizes grew fine). The 'store more as it
+grows' goal requires COMPARTMENTALIZED POOLS: grown neurons recruit
+into SEPARATE pools per pattern so A/C/E don't mix. That structural
+step is now the evidenced, mandatory next investment for the memory
+goal.
+STOP - capacity caps at 2 in a shared pool; compartmentalize next.
