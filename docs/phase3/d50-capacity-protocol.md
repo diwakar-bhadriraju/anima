@@ -88,3 +88,25 @@ into SEPARATE pools per pattern so A/C/E don't mix. That structural
 step is now the evidenced, mandatory next investment for the memory
 goal.
 STOP - capacity caps at 2 in a shared pool; compartmentalize next.
+
+## RETRACTION (2026-09-23): prior D-50 verdict 863bd71 INVALIDATED by wiring bug
+
+The 863bd71 FAIL verdict was built on BROKEN trains: every train call in
+the d50 path used the legacy `io::symbol_trains()` wrapper (hardcoded
+mode=""), so `E` resolved to EMPTY input (not in the legacy alphabet)
+and A/C were presented with LEGACY 8-CHANNEL trains - the 6-channel d50
+layout and the 3rd symbol were NEVER actually exercised. The run tested
+the legacy 2-symbol organism with a phantom silence-E. All separation
+numbers in 863bd71 are confounded.
+FIX (committed): threaded mode through form_s1/capture_refs/
+capture_separation (symbol_trains_mode(sym, d50_mode(), seed)) and
+survival's world presentations; legacy mode="" verified byte-identical
+(gen0 .511/.642, gen1 .532/.663 unchanged).
+CORRECTED PRELIMINARY (trains now real): d50-2 (6ch A/C) A-C sep ~0.5
+(chance) AND D probes decode as known (contamination) - so the 6-CHANNEL
+SQUEEZE alone breaks separation for 2 symbols, and the novel probe is
+compromised. The earlier 'squeeze has zero effect' (fit-match) claim was
+measured with wrong trains and is ALSO retracted. The capacity question
+is NOT yet answered - d50-3 (6ch A/C/E) must be re-run with correct
+trains. Status: D-50 reopened, verdict pending corrected measurement.
+STOP - verdict retracted; re-running with correct trains.

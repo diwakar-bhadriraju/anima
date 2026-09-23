@@ -75,7 +75,7 @@ fn form_s1(net: &mut Network, seed: u64) {
     let known: Vec<&'static str> = io::known_syms(d50_mode());
     for _rep in 0..20usize {
         for sym in &known {
-            let tr = io::symbol_trains(sym, seed);
+            let tr = io::symbol_trains_mode(sym, d50_mode(), seed);
             for t in 0..io::BEAT_MS {
                 let frame = anima_core::network::InputFrame {
                     tick: net.tick,
@@ -101,7 +101,7 @@ fn capture_refs(net: &mut Network, seed: u64) -> Vec<(String, Vec<f32>)> {
     let mut cnt: std::collections::BTreeMap<String, u32> = Default::default();
     for sym in io::known_syms(d50_mode()) {
         for _ in 0..3u64 {
-            let tr = io::symbol_trains(sym, seed);
+            let tr = io::symbol_trains_mode(sym, d50_mode(), seed);
             let mut out = vec![0.0f32; 12];
             for t in 0..io::BEAT_MS {
                 let frame = anima_core::network::InputFrame {
@@ -139,7 +139,7 @@ fn capture_separation(net: &mut Network, seed: u64, refs: &[(String, Vec<f32>)],
     for sym in &knowns {
         let mut correct = 0u32; let mut presented = 0u32;
         for _ in 0..4u64 { // 4 fresh held-out presentations
-            let tr = io::symbol_trains(sym, seed);
+            let tr = io::symbol_trains_mode(sym, d50_mode(), seed);
             let mut out = vec![0.0f32; 12];
             for t in 0..io::BEAT_MS {
                 let frame = anima_core::network::InputFrame {
@@ -161,6 +161,28 @@ fn capture_separation(net: &mut Network, seed: u64, refs: &[(String, Vec<f32>)],
     // not retained per presentation; approximate per-pair via presence
     // in the correct-decode accounting). Report per-symbol acc as the
     // pairs' components.
+    // novel-probe integrity (D): D must NOT decode to any known symbol.
+    // Count any D presentation that decodes to a known ref as a
+    // contamination. (Guards the known-vs-novel falsifier.)
+    for _ in 0..4u64 {
+        let tr = io::symbol_trains_mode("D", d50_mode(), seed);
+        let mut out = vec![0.0f32; 12];
+        for t in 0..io::BEAT_MS {
+            let frame = anima_core::network::InputFrame {
+                tick: net.tick,
+                spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect(),
+            };
+            let ev = net.step(&frame);
+            for c in &ev.spikes { if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) { out[(c.0 - io::OUTPUT_LO) as usize] += 1.0; } }
+            net.tick = Tick(net.tick.0 + 1);
+        }
+        let act = io::decode(&out, refs, spec.q_floor, spec.th_known);
+        if knowns.iter().any(|k| *k == act.as_str()) {
+            if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                eprintln!("  NOTE: D probed decode -> known symbol '{act}' (contamination)");
+            }
+        }
+    }
     let mut pairs: Vec<(String, f32)> = Vec::new();
     let mut total_acc = 0.0f32; let mut npair = 0;
     for i in 0..knowns.len() {
@@ -328,7 +350,7 @@ fn main() {
                 // the monitor is the BACKUP for genuine runaway beyond it.
                 rcfg.runaway_rate_hz = spec.a_bounds[1] + 30.0;
                 let rmon = Some(anima_core::resources::ResourceMonitor::new(rcfg));
-                let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true, rmon);
+                let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true, rmon, d50_mode());
                 let syn_growth = org.net.live_synapses().count() as isize - syn_before as isize;
                 org.size = org.net.neurons.len() - 24 - 12;
                 // fitness in [0,1]: mean viability scaled by the recognition
@@ -352,7 +374,7 @@ fn main() {
                     // D-50: in d50 mode, multiply by the pairwise separation
                     // falsifier so selection must HOLD separation across all
                     // N(N-1)/2 pairs, not just survive. Legacy mode: no change.
-                    let sep = if d50_mode() == "d50" {
+                    let sep = if d50_mode() == "d50" || d50_mode() == "d50-2" {
                         let (acc, pairs) = capture_separation(&mut org.net, org.seed, &refs, &spec);
                         if std::env::var("EVOLVE_VERBOSE").is_ok() {
                             eprintln!("  org {i} D50-sep: {:?} mean={acc:.3}", pairs);

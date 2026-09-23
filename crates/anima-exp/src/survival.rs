@@ -86,7 +86,7 @@ pub fn run_world_v2(
     window_ticks: u64,
 ) -> SurvivalOutcome {
     run_world_full(net, _org_seed, world_seed, refs, spec, params, traces,
-        v2, window_ticks, None, None, false, None)
+        v2, window_ticks, None, None, false, None, "")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -105,6 +105,8 @@ pub fn run_world_full(
     _birth_probe: bool,
     // in-loop resource monitor (runaway + caps); None = no detection
     mut mon: Option<ResourceMonitor>,
+    // D-50: i/o alphabet mode ("" = legacy 8ch A/C/D; d50 = 6ch A/C/E/D)
+    mode: &str,
 ) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
@@ -121,7 +123,7 @@ pub fn run_world_full(
     let mut tick = net.tick;
 
     while beat < spec.beats && died.is_none() {
-        let tr = io::symbol_trains(&cur, world_seed);
+        let tr = io::symbol_trains_mode(&cur, mode, world_seed);
         // D-50: known-set derived from refs (mode-agnostic: [A,C] or
         // [A,C,E]). A symbol is 'known' iff it has a captured ref.
         let is_known = refs.iter().any(|(p, _)| *p == cur);

@@ -53,7 +53,7 @@ fn main() {
     let out = survival::run_world_full(
         &mut net, seed, seed, &refs, &spec, &p, &mut traces,
         Some(&mut v2), 100,
-        Some((mon, trigger)), None, true, mon_opt,
+        Some((mon, trigger)), None, true, mon_opt, "",
     );
     let born = net.neurons.len() - n_before;
     let syn_growth = net.live_synapses().count() as isize - syn_before as isize;
