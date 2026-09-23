@@ -24,7 +24,7 @@ fn main(){
       // after S1+S2 (~40 interleaved + gap). Approx by rep>0 of a lone pattern
       // present after the alternation. We approximate "held-out" = block of 5
       // of a single pattern (S3A/S3C are blocked A/C reps).
-      if pending_block(p, &pres, t){ test.push((p.clone(),v)); } else { let e=refs.entry(p.clone()).or_insert_with(||vec![0.0f32;12]);for i in 0..12{e[i]+=v[i]};*cnt.entry(p.clone()).or_insert(0)+=1; }
+      if pending_block(p, &pres, *t){ test.push((p.clone(),v)); } else { let e=refs.entry(p.clone()).or_insert_with(||vec![0.0f32;12]);for i in 0..12{e[i]+=v[i]};*cnt.entry(p.clone()).or_insert(0)+=1; }
     }
     for(p,v)in refs.iter_mut(){let c=cnt[p]as f32;for x in v.iter_mut(){*x/=c}}
     let name=dir.rsplit('/').next().unwrap().to_string();
@@ -42,7 +42,7 @@ fn pending_block(p:&str,pres:&[(u64,String)],t:u64)->bool{
   // run of >=2 consecutive same-pattern presentations with long gaps
   // (the S3 blocked style, 1500ms), i.e. near the end of the run.
   // Heuristic: the last 5 of each lone pattern.
-  let n=pres.len(); let mut back=0; for j in 0..n{ let(tj,pj)=pres[n-1-j]; if tj>t {continue} }
+  let n=pres.len(); let mut back=0; for j in 0..n{ let(tj,pj)=&pres[n-1-j]; if *tj>t {continue} }
   // simpler: S3A/S3C are the tail blocks; approximate held-out = last 10
   // presentations of the run
   let n=pres.len();
