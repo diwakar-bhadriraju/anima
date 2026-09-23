@@ -118,3 +118,42 @@ separately): output-channel homeostatic competition at the organism
 level, or inhibitory gating on the output band (not the identity-gated
 d_ing, which failed; plain pool-level inhibition on output projection).
 STOP - do not implement gated decoder; re-scope to degenerate-output.
+
+## D-46: output-band lateral inhibition (REGISTERED 2026-09-23)
+
+CONTEXT: D-45 telemetry (beat 0-22, seed 424242) showed the collapse is
+a DEGENERATE-OUTPUT ATTRACTOR, not readout dilution: the internal pool
+collapses onto driving 2 output neurons (channels 1,5) to 250-cap while
+10 go silent -> out=[0,250,0,0,0,250,0,0,0,0,0,0] IDENTICAL for A/C/D,
+r decays 1.00->0.00. This organism is ALL-EXCITATORY (no inhibitory
+synapses - E4d). The output band has no element opposing 2 neurons
+capturing all drive.
+
+MECHANISM (charter-allowed: plasticity law at I/O boundary): each firing
+OUTPUT-class neuron deposits inhibitory current onto every OTHER
+same-tick OUTPUT neuron (output_inhibition_gain, default 0 = identity).
+Distinct from inhibition_gain (E3b = ALL non-input, worsened separation)
+and d_ing (identity-gated). Readout-band only - does not touch pool
+plasticity or growth.
+
+PROBE (seed 424242, the collapsing case, 120 beats):
+  oi=0.0  die beat 22 (degenerate attractor) fit 0.403
+  oi=0.05 die beat 15 (too weak) fit 0.361
+  oi=0.1  36 born +996 syn survive to beat 108 fit 0.762 (real runaway
+           at 283 Hz only) | out[] NOT degenerate (recognition true)
+  oi=0.2  38 born +1203 syn survive beat 112 fit 0.760
+BREAKTHROUGH: oi>=0.1 breaks the degenerate-output attractor on the
+collapsing seed - it grows instead of seizing.
+
+CAVEAT (why GA-search): fixed oi=0.1 REGRESSES healthy seeds
+(20260912 fit 0.10, 9001 fit 0.32 vs baseline 0.42-0.68). Per-lineage
+optimum. => output_inhibition_gain wired as GA gene 9 (init 0.0, mutate
+in 0..9 loop). Selection must discover each lineage's gain.
+
+PREDICTION: with gene 9, seed 424242 does NOT collapse to all-zero (its
+lineage finds oi>0); 20260912/9001 find low oi (>= baseline fitness);
+mean_fitness across 3 seeds >= the c94f507 no-inhibition baseline.
+FALSIFIER: if 424242 still all-zero at g7 AND gene 9 stays 0 (selection
+never reaches oi>0), output inhibition is unreachable by this GA and
+the segregation axis is closed too.
+STOP.

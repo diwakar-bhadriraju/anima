@@ -11,7 +11,8 @@ use anima_exp::survival;
 fn main() {
     let seed: u64 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(20260912);
     let beats: u64 = std::env::args().nth(2).and_then(|a| a.parse().ok()).unwrap_or(100);
-    let mut net = build(seed, 40);
+    let out_inh: f32 = std::env::args().nth(11).and_then(|a| a.parse().ok()).unwrap_or(0.0); // D-46 output inhibition
+    let mut net = build(seed, 40, out_inh);
     let p = params();
     form(&mut net, seed);
     let refs = refs_of(&mut net, seed);
@@ -75,13 +76,14 @@ fn v2_params() -> V2Params {
         disable_m5: false, disable_m6: false,
     }
 }
-fn build(seed: u64, n_internal: usize) -> Network {
+fn build(seed: u64, n_internal: usize, out_inh: f32) -> Network {
     let cfg = NetworkConfig {
         connectivity: 0.038, w_init: 0.2, amplitude: 52.0, adaptation_tau_ms: 200.0,
         adaptation_gain: 0.05, inhibition_gain: 0.0, slow_state_beta: 0.0046875,
         slow_state_tau_ms: 5000.0, slow_state_beta_drive: false, latch_enable: true,
         theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: 0.0,
         tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2_params()),
+        output_inhibition_gain: out_inh, // D-46: 0 = identity
         ..NetworkConfig::default()
     };
     Network::new(cfg, 24, n_internal, 12, seed)

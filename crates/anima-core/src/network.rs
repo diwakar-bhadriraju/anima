@@ -401,6 +401,15 @@ pub struct NetworkConfig {
     /// U1-inhibition (E3b): inhibitory current each non-input spiker
     /// deposits onto every OTHER same-tick non-input spiker (0 = E3).
     pub inhibition_gain: f32,
+    /// D-46 (docs/phase3/d45-readout-gating-protocol.md): OUTPUT-band
+    /// lateral inhibition - each firing OUTPUT-class neuron deposits an
+    /// inhibitory current onto every OTHER same-tick OUTPUT neuron.
+    /// Opposes the measured collapse where 2 output neurons capture all
+    /// pool drive (out=[..,250,..,250,..] identical for A/C/D). 0 =
+    /// identity (bit-identical baseline). Distinct from inhibition_gain
+    /// (E3b, ALL non-input) and d_ing (identity-gated): here readout-only.
+    #[serde(default)]
+    pub output_inhibition_gain: f32,
     /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
     /// slow_state_beta = per-spike increment; slow_state_tau_ms = decay.
     /// beta = 0 (default) => bit-identical V2.
@@ -578,6 +587,8 @@ impl Default for NetworkConfig {
             adaptation_gain: 0.0,
             // U1-inhibition default OFF: gain 0 must reproduce E3 exactly.
             inhibition_gain: 0.0,
+            // D-46 output-band inhibition default OFF: 0 = identity.
+            output_inhibition_gain: 0.0,
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
@@ -1350,6 +1361,21 @@ impl Network {
                     if a != b {
                         self.neurons[b.idx()].i_syn -= g;
                     }
+                }
+            }
+        }
+
+        // D-46: output-band lateral inhibition - only OUTPUT-class
+        // co-spikers inhibit each other. 0 = identity.
+        if self.cfg.output_inhibition_gain != 0.0 {
+            let og = self.cfg.output_inhibition_gain;
+            let out_sp: Vec<NeuronId> = spikers
+                .iter().copied()
+                .filter(|&id| self.neurons[id.idx()].class == NeuronClass::Output)
+                .collect();
+            for &a in &out_sp {
+                for &b in &out_sp {
+                    if a != b { self.neurons[b.idx()].i_syn -= og; }
                 }
             }
         }

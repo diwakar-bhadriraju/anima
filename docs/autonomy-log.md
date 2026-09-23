@@ -385,3 +385,17 @@ perfect recognition + closed-loop persistence + self-construction +
 heritable growth. LLM-alternative 'learns, grows, retains' claim works
 in miniature. Limits: runaway detector off during loop (recorded),
 birth-law space not yet GA-searched (fixed trigger params).
+
+## D-46 - output-band lateral inhibition registered; breaks the 424242 degenerate-output collapse (probe evidence)
+
+D-45 readout-gating DE-REGISTERED at step 1: telemetry showed the ~229
+collapse = degenerate-output attractor (pool dumps all drive on 2 output
+neurons, out identical 250-250 for A/C/D), NOT readout dilution - gated
+decoder powerless (no signal to decode). New mechanism (charter-legal
+I/O-boundary plasticity law): output_inhibition_gain - each firing
+output neuron inhibits fellow outputs. Probe seed 424242 (the collapse
+case): oi=0 die beat 22 fit 0.403 -> oi=0.1 36 born +996 syn survive to
+beat 108, fit 0.762, no degenerate out[]. CAVEAT: fixed oi=0.1 regresses
+healthy seeds (per-lineage optimum) => wired as GA gene 9 (init 0,
+mutate). Running 3-seed GA to test if selection discovers per-lineage
+gain. Falsifier: 424242 all-zero + gene stays 0 => segregation axis closed.

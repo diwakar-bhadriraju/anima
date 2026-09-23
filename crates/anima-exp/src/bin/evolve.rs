@@ -39,14 +39,15 @@ fn v2_params() -> V2Params {
         disable_m5: false, disable_m6: false,
     }
 }
-fn build_net(seed: u64, n_internal: usize) -> Network {
+fn build_net(seed: u64, n_internal: usize, out_inh: f32) -> Network {
     let cfg = NetworkConfig {
         connectivity: 0.038, w_init: 0.2, amplitude: 52.0,
         adaptation_tau_ms: 200.0, adaptation_gain: 0.05, inhibition_gain: 0.0,
         slow_state_beta: 0.0046875, slow_state_tau_ms: 5000.0, slow_state_beta_drive: false,
         latch_enable: true, theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0,
         u_plateau_rel_sd: 0.0, tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0,
-        v2: Some(v2_params()), ..NetworkConfig::default()
+        v2: Some(v2_params()), output_inhibition_gain: out_inh, // D-46
+        ..NetworkConfig::default()
     };
     Network::new(cfg, 24, n_internal, 12, seed)
 }
@@ -114,20 +115,20 @@ fn capture_refs(net: &mut Network, seed: u64) -> Vec<(String, Vec<f32>)> {
 /// weight mutation. n_internal may differ (size mutation): shared neurons
 /// inherit, new neurons' synapses stay fresh.
 /// Pure copy of the parent brain (no mutation) - elitism.
-fn breed_no_mut(parent: &Network, seed: u64, n_internal: usize) -> Network {
-    breed_inner(parent, seed, n_internal, false)
+fn breed_no_mut(parent: &Network, seed: u64, n_internal: usize, out_inh: f32) -> Network {
+    breed_inner(parent, seed, n_internal, false, out_inh)
 }
-fn breed(parent: &Network, seed: u64, n_internal: usize) -> Network {
-    breed_inner(parent, seed, n_internal, true)
+fn breed(parent: &Network, seed: u64, n_internal: usize, out_inh: f32) -> Network {
+    breed_inner(parent, seed, n_internal, true, out_inh)
 }
-fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> Network {
+fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool, out_inh: f32) -> Network {
     let mut wmap: HashMap<(u32, u32), f32> = HashMap::new();
     // build weight map from LIVE parent synapses only (skip tombstones)
     for s in &parent.synapses {
         if s.silent_ticks == u64::MAX { continue; }
         wmap.insert((s.pre.0, s.post.0), s.w);
     }
-    let mut child = build_net(seed, n_internal);
+    let mut child = build_net(seed, n_internal, out_inh);
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
     let n_shared = parent.neurons.len().min(child.neurons.len());
     let mut consumed: Vec<(u32, u32)> = Vec::new();
@@ -169,14 +170,14 @@ fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> 
     child
 }
 
-struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 8] }
+struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 9] }
 fn main() {
     let spec = survival_spec();
     let p = params();
     for &esec in &SEEDS {
         println!("=== seed {esec} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
-            Org { net: build_net(s, 40), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0, 0.1, 30.0, 1500.0, 3000.0] } }).collect();
+            Org { net: build_net(s, 40, 0.0), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0, 0.1, 30.0, 1500.0, 3000.0, 0.0] } }).collect();
         let mut formed_flags: Vec<bool> = vec![false; N_POP]; // gen-0 organisms form; offspring inherit
         let mut gen_sizes: Vec<f32> = Vec::new();
         let mut gen_fits: Vec<f32> = Vec::new();
@@ -279,7 +280,7 @@ fn main() {
                 // rebuild THE SAME organism that scored[0] belongs to (its
                 // own seed + size), rescore under the same world, compare.
                 let (_, _, best_size, best_seed) = scored[0];
-                let mut net2 = build_net(best_seed, best_size);
+                let mut net2 = build_net(best_seed, best_size, pop[scored[0].1].growth_params[8]);
                 let mut traces2 = Traces::new(&net2, 20.0);
                 form_s1(&mut net2, best_seed);
                 let refs2 = capture_refs(&mut net2, best_seed);
@@ -297,7 +298,7 @@ fn main() {
             // heavier (0.3) - selection acts on the SELF-CONSTRUCTION RULE.
             let mut egp = elite.growth_params;
             if rng.gen::<f32>() < 0.2 { egp[0] = (egp[0] * (0.5 + rng.gen::<f32>())).clamp(0.01, 0.2); }
-            next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size),
+            next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size, egp[8]),
                 size: elite.size, seed: elite.seed, growth_params: egp });
             for (pi, (_, idx, sz, _)) in scored.iter().take(2).enumerate() {
                 let parent = &pop[*idx];
@@ -306,13 +307,13 @@ fn main() {
                     let sz2 = *sz; // NO size mutation: growth is self-emergent
                     // via M3 during life, never hand-resized (D-36).
                     let cs = esec ^ (g as u64) << 8 ^ (off as u64 * 104729);
-                    let child = breed(&parent.net, cs, sz2);
                     let mut cgp = parent.growth_params;
-                    for pi in 0..8 {
+                    for pi in 0..9 {
                         if rng.gen::<f32>() < 0.3 {
                             cgp[pi] = (cgp[pi] * (0.5 + rng.gen::<f32>())).clamp(0.005, 300.0);
                         }
                     }
+                    let child = breed(&parent.net, cs, sz2, cgp[8]);
                     next.push(Org { net: child, size: sz2, seed: cs, growth_params: cgp });
                 }
             }
