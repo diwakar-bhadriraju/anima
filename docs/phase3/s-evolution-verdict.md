@@ -98,3 +98,31 @@ inheritance is invalid, so the evolution run does NOT answer the size
 question. D-34's 'living degrades the champion' is refuted. The genuine,
 un-answered size question needs NEAT-style structural inheritance - a
 new registration, not a patch.
+
+## D-37 — self-construction ACTIVE + evolution runs to completion (stable, plateau)
+
+After D-36 fixes (V2 M3/M4 wired into survival life; accumulate_input_
+current unblocked; size-mutation removed; b_e as 4th heritable gene),
+the full 3-seed x 8-gen evolution runs to completion (exit=0, no panic):
+  seed       best_g0  best_g7  mean_fit_g0->g7
+  20260912   0.756    0.613    0.560 -> 0.506
+  9001       0.729    0.617    0.438 -> 0.451
+  424242     0.706    0.609    0.552 -> 0.492
+- Self-construction LIVE: organisms build + prune OWN synapses via M3/
+  M4 during life (probe: +145/-140/+20/-693 over 200 beats; moderate
+  change best). GA searches growth-law genes (theta_permanent,
+  delta_perm, w_c_permanent, b_e).
+- NO collapse (elitism + same-size copy work, deterministic).
+- Best plateaus ~0.6 across seeds from different starts; mean flat. The
+  searched growth laws do NOT push fitness above the founder plateau.
+- Neuron COUNT stays 40: M3 builds connections, not new neurons (birth
+  trigger not yet enabled).
+
+Honest conclusion: with self-construction active and growth-law genes
+heritable, evolution is stable and reproducible but reaches a plateau -
+the substrate's capacity ceiling persists even when the organism builds
+its own connections. 'Growth' as connection-self-construction WORKS and
+is selectable; 'growth' as new-neuron capacity (the size question) is
+STILL not exercised (needs birth-trigger activation). Next: enable
+neuron-birth so the size/retention question can be answered by the
+organism's own neurogenesis under selection.

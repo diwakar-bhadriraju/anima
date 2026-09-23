@@ -360,3 +360,14 @@ size inheritance needs structural correspondence (NEAT-style gene
 alignment), a separate capability/registration. Evolution pipeline IS
 deterministic + same-size elite-faithful. Size question: still open,
 needs proper structural inheritance.
+
+## D-37 - evolution WITH self-construction: runs to completion, stable plateau (no improvement, no collapse)
+
+wired V2 M3/M4 into survival life (tick + accumulate_input_current +
+window); removed size-mutation (structurally invalid); b_e 4th heritable
+gene. Full 3-seed x 8-gen runs exit=0: best g7 0.61/0.62/0.61 plateau,
+mean flat 0.45-0.56; no collapse (deterministic, elitist). M3 self-
+construction LIVE (organims build+prune own connections; moderate change
+best). Neuron count stays 40 - M3 builds CONNECTIONS not NEURONS. The
+size/retention question still unanswered: needs birth-trigger activation
+(neurogenesis) under selection. This is the honest state before that.
