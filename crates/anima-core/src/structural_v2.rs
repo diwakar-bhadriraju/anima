@@ -469,18 +469,19 @@ impl V2Plasticity {
         // recompute the newborn's OWN live counts (it may already carry
         // afferents from birth wiring); V2's live_e/live_i must be exact
         // for the M5 budget assert.
-        let (mut ne, mut ni) = (0usize, 0usize);
-        for sid in &net.incoming[n - 1] {
+        // count ONLY neurons touched by this birth: the newborn itself and
+        // its afferent targets (partners). Full recount is O(N*synapses)
+        // PER BIRTH and goes quadratic as the organism grows - the 800-beat
+        // slowdown. Incremental: the newborn only adds afferents to itself
+        // and to its selected partners.
+        let mut affected: Vec<usize> = vec![n - 1];
+        for sid in &net.outgoing[n - 1] {
             let s2 = &net.synapses[sid.idx()];
-            if s2.silent_ticks != u64::MAX {
-                if s2.inhibitory { ni += 1; } else { ne += 1; }
-            }
+            if s2.silent_ticks != u64::MAX { affected.push(s2.post.idx()); }
         }
-        self.live_e.push(ne);
-        self.live_i.push(ni);
-        // the newborn's afferents also count toward POST (its targets) - must
-        // recount the 20 partners it wired into, since they gained afferents.
-        for i in 0..self.live_e.len() {
+        // grow per-neuron arrays to cover the newborn
+        self.live_e.push(0); self.live_i.push(0);
+        for i in affected {
             let mut e = 0usize; let mut ii = 0usize;
             for sid in &net.incoming[i] {
                 let s2 = &net.synapses[sid.idx()];
