@@ -132,6 +132,42 @@ fn capture_refs(net: &mut Network, seed: u64) -> Vec<(String, Vec<f32>)> {
 /// confusion matrix falling out of misassignments. (Earlier version
 /// wrongly compared held-out responses against EACH OTHER - cos(x,x)=1.0
 /// trivial - fixed to decode-against-refs per advisory.)
+/// D-52 timing probe: dump per-output-neuron spike TIMES for one beat of
+/// each known symbol (verbose). Answers H-52a: does output-band TIMING
+/// differ between symbols, or is it timing-constant (one tonic neuron
+/// every tick)? The fork-test before building a binned codec.
+fn probe_output_timing(net: &mut Network, seed: u64, sym: &str, mode: &str) {
+    let tr = io::symbol_trains_mode(sym, mode, seed);
+    let mut times: Vec<(u64, u32)> = Vec::new();
+    for t in 0..io::BEAT_MS {
+        let frame = anima_core::network::InputFrame {
+            tick: net.tick,
+            spikes: tr.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect(),
+        };
+        let ev = net.step(&frame);
+        for c in &ev.spikes {
+            if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) {
+                times.push((t, c.0 - io::OUTPUT_LO));
+            }
+        }
+        net.tick = Tick(net.tick.0 + 1);
+    }
+    if std::env::var("EVOLVE_VERBOSE").is_ok() {
+        eprintln!("  TIMING[{sym}]: {} output spikes; first-20 (t,outch): {:?}", times.len(), &times[..times.len().min(20)]);
+        // summary: per-output-channel spike-time histogram (mean time, count)
+        let mut per: Vec<(u32, usize, f64)> = Vec::new();
+        for oc in 0..(io::OUTPUT_HI - io::OUTPUT_LO) as u32 {
+            let occ: Vec<u64> = times.iter().filter(|(_, o)| *o == oc).map(|(t, _)| *t).collect();
+            if !occ.is_empty() {
+                let mean = occ.iter().map(|t| *t as f64).sum::<f64>() / occ.len() as f64;
+                let spread = occ.iter().map(|t| (*t as f64 - mean).abs()).sum::<f64>() / occ.len() as f64;
+                per.push((oc, occ.len(), spread));
+            }
+        }
+        eprintln!("  TIMING[{sym}] per-outch (outch,n_spikes,mean|spread): {:?}", per);
+    }
+}
+
 fn capture_separation(net: &mut Network, seed: u64, refs: &[(String, Vec<f32>)], spec: &SurvivalSpec) -> (f32, Vec<(String, f32)>) {
     let knowns = io::known_syms(d50_mode());
     // per-symbol held-out decode accuracy (fresh presentations vs refs)
@@ -392,6 +428,12 @@ fn main() {
                 // fail kind into the scoring line so the wall mechanism
                 // (recognition-collapse-while-alive vs runaway) is
                 // recorded - it determines the next intervention.
+                if std::env::var("D52_TIMING").is_ok() {
+                    let mt = d50_mode();
+                    for s2 in &io::known_syms(mt) {
+                        probe_output_timing(&mut org.net, org.seed, s2, mt);
+                    }
+                }
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     let mut coses = String::new();
                     for ri in 0..refs.len() {
