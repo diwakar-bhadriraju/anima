@@ -192,20 +192,32 @@ STOP.
 ## D-46 FINAL VERDICT (amended, controlled) - output inhibition: per-seed rescue, NOT selectable mechanism
 
 DETERMINISTIC CONTROL (same seed+world, only oi differs - NO RNG drift,
-the clean A/B the GA comparisons couldn't give):
-  20260912  oi=0.0 die 127 fit .349 | oi=0.1 die 14 fit .102  HURT
-  9001      oi=0.0 die 109 fit .592 | oi=0.1 die 35 fit .323  HURT
-  424242    oi=0.0 die 22  fit .403 | oi=0.1 die 108 fit .762 HELPED
-=> oi=0.1 rescues ONLY 424242; actively harms the other two seeds.
+the clean A/B the GA comparisons couldn't give). THE closing table:
+
+  seed      oi=0.0                  oi=0.1                   delta fit
+  20260912  die 127  fit 0.349      die 14   fit 0.102      -0.247  HURT
+  9001      die 109  fit 0.592      die 35   fit 0.323      -0.269  HURT
+  424242    die 22   fit 0.403      die 108  fit 0.762      +0.359  HELP
+  MEAN      -        0.448           -        0.396          -0.052 NET NEG
+
+=> oi=0.1 rescues ONLY the seizure-prone seed (424242); actively harms
+the other two. Net across the ensemble: mean fit 0.448 -> 0.396 (NEG).
+The mechanism is SEED-CONDITIONALLY beneficial and NET-HARMFUL - a
+per-lineage trait (like a heritable allele) that a GA gene COULD in
+principle express via lineage-specific retention, but the present search
+dynamics did not (selection on the 20260912/9001 lineages correctly
+purges oi>0; the 424242 0.19-retention is lineage-specific drift, not a
+demonstrated selectable advantage).
 
 GENE-8 x FITNESS pairing (verbose 424242): no monotone relationship.
 oi=0.05 -> fit {0.000..0.729}; oi=0.016 -> {0.000..0.667}. Fitness
 variance WITHIN each oi dwarfs any oi effect. Selection does not
 consistently reward any inhibition value.
 
-VERDICT: output-band lateral inhibition is a PER-SEED-SPECIFIC rescue
-(breaks 424242's degenerate-output collapse in isolation) but is
-NET-NEGATIVE across the seed ensemble and confers NO selectable GA
+VERDICT (amended): output-band lateral inhibition is a seed-conditionally
+beneficial / net-harmful per-lineage trait - it breaks 424242's
+degenerate-output collapse in isolation but is NET-NEGATIVE across the
+seed ensemble (mean fit 0.448 -> 0.396) and confers NO selectable GA
 advantage (best_g7 = 0.703 both with inert gene and with reachable gene
 exercised at 0.19). The D-45/D-46 readout-segregation axis is CLOSED,
 on clean evidence: the mechanism is real for one seed but selection
