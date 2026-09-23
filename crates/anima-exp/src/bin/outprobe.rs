@@ -47,6 +47,54 @@ fn main() {
     for i in 0..refs.len(){ for j in i+1..refs.len(){
         println!("   cos({}-{})={:.4}", refs[i].0, refs[j].0, io::cos(&refs[i].1,&refs[j].1));
     }}
+
+    // === D-52 lever (a) temporal-codec comparison on identical nets ===
+    // count-codec cosine already printed above. Build 5-bin temporal refs
+    // and re-measure A/C cosine + decode acc.
+    let bins_n = 5usize;
+    let bin_ms = (io::BEAT_MS as usize) / bins_n;
+    // temporal refs: out_temporal[dim= n_out*bins]
+    let mut tacc: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+    let mut tcnt: std::collections::BTreeMap<String, u32> = Default::default();
+    for sym in known { for _ in 0..3 {
+        let st=io::symbol_trains(sym,seed);
+        let mut tt=vec![0f32; n_out*bins_n];
+        for bind_t in 0..io::BEAT_MS { let f=InputFrame{tick:net.tick,spikes:st.iter().filter(|(tt0,_)|*tt0==bind_t).map(|(_,c)|*c).collect()};
+            let e=net.step(&f);
+            let bin=(bind_t as usize/bin_ms).min(bins_n-1);
+            for c in &e.spikes { let ci=c.0 as usize; if ci>=out_lo && ci<out_lo+n_out { tt[(ci-out_lo)*bins_n + bin]+=1.0; } }
+            net.tick=Tick(net.tick.0+1); }
+        let en=tacc.entry(sym.to_string()).or_insert_with(||vec![0f32;n_out*bins_n]); for i in 0..n_out*bins_n{en[i]+=tt[i];}
+        *tcnt.entry(sym.to_string()).or_insert(0)+=1;
+    }}
+    let trefs: Vec<(String,Vec<f32>)> = tacc.into_iter().map(|(p,v)|{let c=*tcnt.get(&p).unwrap() as f32;(p,v.iter().map(|x|x/c).collect())}).collect();
+    for i in 0..trefs.len(){ for j in i+1..trefs.len(){
+        println!("   TEMPORAL({}bin) cos({}-{})={:.4}", bins_n, trefs[i].0, trefs[j].0, io::cos(&trefs[i].1,&trefs[j].1));
+    }}
+    // held-out decode acc: count vs temporal, per symbol (present fresh)
+    fn heldout_decode_acc(net:&mut Network, seed:u64, known:&[&str;2], refs:&[(String,Vec<f32>)], lo:usize, bins:usize, use_bins:bool)->f32 {
+        let mut ok=0u32; let mut tot=0u32;
+        for sym in known { for _ in 0..4 {
+            let st=io::symbol_trains(sym,seed);
+            let mut v=if use_bins { vec![0f32; (12*std::cmp::max(1,refs.len()))*0+refs[0].1.len()] } else { vec![0f32; refs[0].1.len()] };
+            let bin_ms=(500usize)/(usize::max(1,bins));
+            for t in 0..io::BEAT_MS { let f=InputFrame{tick:net.tick,spikes:st.iter().filter(|(tt,_)|*tt==t).map(|(_,c)|*c).collect()};
+                let e=net.step(&f);
+                let bin=(t as usize/bin_ms).min(bins-1);
+                for c in &e.spikes { let ci=c.0 as usize; if ci>=lo { 
+                    if use_bins { let idx=(ci-lo)*bins+bin; if idx<v.len(){v[idx]+=1.0;} } else { let idx=ci-lo; if idx<v.len(){v[idx]+=1.0;} }
+                } }
+                net.tick=Tick(net.tick.0+1); }
+            // argmax cos
+            let mut best: Option<(f32,&str)>=None;
+            for (p,r) in refs { let c=io::cos(&v,r); if best.as_ref().map(|(bc,_)|c>*bc).unwrap_or(true){best=Some((c,p));} }
+            if let Some((_,p))=best { if p==*sym{ok+=1;} tot+=1; }
+        }}
+        ok as f32 / tot.max(1) as f32
+    }
+    let ca = heldout_decode_acc(&mut net, seed, &known, &refs, out_lo, 1, false);
+    let ta = heldout_decode_acc(&mut net, seed, &known, &trefs, out_lo, bins_n, true);
+    println!("   held-out decode acc: count-codec={:.3}  temporal-codec={:.3}", ca, ta);
     for r in &refs { // print nonzero channels
         let nz: Vec<String> = r.1.iter().enumerate().filter(|(_,v)|**v>0.0).map(|(i,v)|format!("{i}:{v:.0}")).collect();
         println!("   ref {}: nonzeros [{}]", r.0, nz.join(", "));

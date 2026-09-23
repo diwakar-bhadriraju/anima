@@ -165,6 +165,18 @@ fn probe_output_timing(net: &mut Network, seed: u64, sym: &str, mode: &str) {
             }
         }
         eprintln!("  TIMING[{sym}] per-outch (outch,n_spikes,mean|spread): {:?}", per);
+        // D-52 fork decisor: per-channel 5-bin temporal histogram
+        // (5x100ms over the 500ms beat). If A vs C differ in PROFILE
+        // SHAPE (not just magnitude), the binned codec has signal.
+        let bins = 5usize;
+        let bin_ms = (io::BEAT_MS as usize) / bins;
+        for oc in 0..(io::OUTPUT_HI - io::OUTPUT_LO) as u32 {
+            let occ: Vec<u64> = times.iter().filter(|(_, o)| *o == oc).map(|(t, _)| *t).collect();
+            if occ.len() < 5 { continue; } // only channels with enough spikes
+            let mut hist = vec![0usize; bins];
+            for t in &occ { let b = ((*t as usize) / bin_ms).min(bins-1); hist[b] += 1; }
+            eprintln!("  TIMING[{sym}] ch{oc} HIST(5x100ms): {:?}", hist);
+        }
     }
 }
 

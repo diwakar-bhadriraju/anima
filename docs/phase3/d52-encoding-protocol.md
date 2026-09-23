@@ -116,3 +116,32 @@ selecting. The 2-symbol 'separation' that worked was fragile magnitude-
 argmax over an inherently degenerate output. Codec and width are both
 dead ends; the organism's output dynamics are the blocker.
 STOP - output tonic seizure is the mechanism; organism-side fix needed.
+
+## D-52 LEVER (a) FINAL VERDICT (measured with the ACTUAL binned codec, not inference)
+
+Built the 5-bin temporal codec in outprobe (per-output-channel 5x100ms
+binned counts; refs + held-out decode identical mechanics). Same nets,
+count vs temporal, 3 seeds:
+
+  seed       count-cos  temporal-cos  count-acc  temporal-acc
+  20260912   1.000      1.000         0.500      0.500   (chance!)
+  9001       1.000      1.000         0.500      0.500   (chance!)
+  424242     0.988      0.981         1.000      1.000   (magnitude-argmax)
+
+Temporal binning adds ZERO signal: cos ~unchanged, decode acc unchanged.
+Seeds 20260912/9001 are at CHANCE (0.5) - their tonic seizure makes A/C
+refs cos=1.000 (identical), indistinguishable in count AND time. Seed
+424242 already decodes 1.0 via the fragile magnitude margin; temporal
+doesn't improve it.
+CONCLUSION: lever (a) FALSIFIED by direct measurement (the codec BUILT,
+not inferred). The organism's output is degenerate in count AND time -
+no coding scheme recovers per-symbol structure because none exists at
+the output. The tonic-seizure mechanism (D-52 core finding) is fully
+confirmed: the all-excitatory shared pool locks output neurons to
+constant firing for any input, identically across symbols, in most
+organs (2/3 seeds at chance decode).
+org-dependent: seed 424242 keeps a fragile magnitude margin; the tonic
+seizure isn't universal but is dominant. Both D-52 levers closed;
+output tonic-seizure (organism-side dynamics) is the definitive blocker.
+STOP - D-52 complete: neither codec lever helps; organism output
+dynamics are the mechanism.
