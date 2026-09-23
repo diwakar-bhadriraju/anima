@@ -140,3 +140,13 @@ STOP.
 - DANGLING CITATION: runs/e2b-20260913T082332Z is cited in docs but
   missing on disk (no dir anywhere, pre-existing). Do not chase it.
 - All 57 doc-cited run dirs preserved; 186 tests green; tree clean.
+
+## RULES FOR FUTURE DISK CLEANUP (from 2026-09-23 pass)
+- BEFORE deleting .trash-jsonl/ (or any archive dir): check it for cited-run telemetry
+  FIRST. The e1/e2a/e2b-082426Z runs had telemetry ONLY in trash (their runs/
+  dirs held metrics/report/snapshots). Restore telemetry into the cited runs/
+  dir, THEN delete the archive. This is now a standing rule, not tribal knowledge.
+- A run dir is only 'complete evidence' when it has telemetry + metrics + report
+  + snapshots together. Missing telemetry = incomplete, check trash.
+- Delete runs/ only after the cited-in-docs check (keep = runs/ strings that name
+  existing dirs in ANY docs/ file).
