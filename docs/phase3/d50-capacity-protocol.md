@@ -168,3 +168,38 @@ margin. Codebook degeneracy = primary blocker, upstream of capacity,
 pool organization, and decode. 2-symbol 'separation' was magnitude-
 argmax over a razor-thin margin, never robust structure.
 STOP - mechanism closed; output codec is the next registered lever.
+
+## D-50 STRAIN BASELINE (2026-09-23, 424242 8-gen verbose) - strain is FLUCTUATION, not seed-cap
+
+Corrected per-org/per-gen join (SEPSPLIT vs dead/fit/n lines):
+  org-gens: 23 measured; post-survival sep >= 0.7 in 16 (70%)
+  distribution: 1.0 x13, 0.67 x4, 0.33 x2, 0.42/0.75/0.83/0.92 x1 each
+  - NO org is consistently strained: org0 0.67->1.0->1.0->1.0 (recovers),
+    org3 0.33->1.0->0.67 (fluctuates). Every org hits 1.0 sometimes.
+  - strain does NOT correlate with size (0.33 at n=91 AND n=251; 1.0 at
+    both), with fit (0.11-0.23 uniformly), or with org index.
+  - 1-org dies per gen (dead=Some(29/22/17), fit=0.000) but the survivors
+    still fluctuate on sep.
+=> the earlier '424242 seed is strained (0.42-0.67)' was 1-gen sampling
+noise; at 8 gens the strain is GEN/ORG-RANDOM fluctuation around a
+mostly-1.0 mean. Corrected: 3-symbol post-survival separation is
+usually-clean with intermittent degradation - an INSTABILITY (which
+gen/org dips is world/growth-dependent), not a capacity ceiling or a
+seed cap.
+
+The instability (0.33<->1.0 between gens for the same lineages, with
+fitness stable) is the real target: WHY does separation swing between
+gens when the organism's survival/fitness is stable? Candidate: refs
+refreshed per-gen against a net whose output encoding swings with
+growth (the post-survival state at gen k+1 vs k differs enough that
+fresh refs re-measure different separation). THAT is consistent with
+D-55: refs must match the tested state, and at this scale the state
+changes every generation - so separation measurement is itself
+state-sensitive. The honest question: is the swing REAL (the organism's
+discrimination genuinely degrades/recovers with growth) or an artifact
+of refs-vs-state timing (capture_refs at 338 measures the pre-survival
+state, so the post-refs-measure is ALSO stale by one beat-window)?
+This is the next measurement design question (refs and responses must
+be sampled at the SAME instant, or refs must be continuously refreshed).
+STOP - strain = instability; measurement state-timing is the open
+question.
