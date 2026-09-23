@@ -412,3 +412,16 @@ inhibition. Output-segregation axis (D-45/D-46) CLOSED. Notably the
 old all-zero 424242 collapse did NOT reproduce in D-46b (all seeds
 reached g7 180-202); open: does the ~229 wall still exist under current
 config? Only 424242 reached 202, near but not past 229.
+
+## sZ SYNTHESIS - full E4->D-49 record documented (docs/phase3/sZ-synthesis.md)
+
+Arc: birth machinery broken (sink) -> fixed -> viable neurogenesis ->
+readout/output/dynamics axes each probed and closed -> "wall" moved
+229->244->267->320->434 as budget artifacts removed -> size-scaled cap
+(k=200) shows ~8x growth (55->434) with oscillating-but-never-collapsing
+recognition. Key corrections: ~320 'representational ceiling' was
+substantially the incidental 20k synapse cap; the D-45 attractor was the
+early-wrong diagnosis before D-47 measured exhaustion. Honest end-state:
+viable self-construction to ~8x, soft slope above ~350 to be understood,
+deterministic runs, 186 tests green. Open: soft slope (>350 oscillation),
+size past 434, single-pool mixing.
