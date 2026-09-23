@@ -203,3 +203,40 @@ This is the next measurement design question (refs and responses must
 be sampled at the SAME instant, or refs must be continuously refreshed).
 STOP - strain = instability; measurement state-timing is the open
 question.
+
+## D-50 STRAIN RESOLVED (2026-09-23): org 0 IS the entire strain - a synapse-starved lineage
+
+Positional join (sep vs syn_growth, 8 gens, all 32 org-slots):
+  org 0: STRAIN in ALL 8 gens (post-sep 0.33-0.67)
+  org 1/2/3: PASS in ALL 8 gens (post-sep 0.83-1.00)
+  syn_growth: strain mean -1308 (NEGATIVE - de-growing) vs pass +30
+  org 0's synapses get PRUNED AWAY every gen (-5221, -6323 late) while
+  the others build (+2129..+14978 late).
+=> NOT stochastic fluctuation, NOT seed-cap, NOT birth-timing noise.
+   424242's population contains ONE persistent low-synapse lineage
+   (org 0) that fails 3-symbol separation; three healthy ones. The
+   'strain' is a SYNASPE-STARVATION phenotype: M4 pruning/M3 failure
+   eats its connectivity (de-growth) while the others build.
+
+REFINES the prior 'fluctuation / instability' claim (4817faa): the
+per-gen dips I read as instability were actually org-0-locked (my
+positional join was wrong earlier - it assumed org index repeats; the
+correct positional pairing shows it is org-locked). The fluctuation
+was org-0's synapse starvation varying in DEGREE (0.33-0.67), not
+separation swinging between healthy orgs.
+
+CAVEAT: org 0 also showed STRAIN at d50-2 (2-symbol, 6ch) in the
+earlier control - so org 0's lineage is persistent-degenerate even at
+2 symbols: consistent with the D-53 pre-survival-degenerate lineage
+that survival dynamics DON'T fix (its connectivity is being pruned
+away, so maturity never converts it). The D-53 self-confirmation
+mechanism applies to THIS lineage's survival-loop numbers.
+
+CORRECTED CAPABILITY: 3/4 of 424242's lineages hold 3 symbols at
+0.83-1.00 (robust). The starved lineage (org 0) cannot - synapse
+starvation (de-growth) is ITS limit, not pool capacity. The goal-level
+'stores more as it grows' holds for the 75% healthy lineages; org 0's
+lineage needs synapse-growth regulation (the E4d angle: its M3/M4
+balance is net-pruning), not pool reorganization.
+STOP - strain = synapse-starved lineage; lever = growth-balance
+regulation for THAT lineage, not pool restructuring.
