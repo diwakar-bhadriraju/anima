@@ -207,7 +207,18 @@ pub fn run_world_full(
         let recognized = is_known && act == cur;
         rcog.push_back(recognized);
         if rcog.len() > rw { rcog.pop_front(); }
-        if is_known { known_n += 1; if recognized { known_ok += 1; } } else { novel_n += 1; if recognized { novel_ok += 1; } }
+        if is_known { known_n += 1; if recognized { known_ok += 1; } } else {
+            novel_n += 1;
+            // D-53b FIX: the old metric (novel_ok += recognized) was a
+            // TAUTOLOGY - recognized is false for every novel beat by
+            // construction (is_known=false -> recognized=false), so
+            // novel_recognized_frac was 0.00 ALWAYS, whether the org
+            // correctly DETECTED novelty or confidently mislabeled D as
+            // a known symbol. The honest detection metric: a novel beat
+            // is correctly handled iff act is NOVEL/UNSURE (below
+            // th_known), NOT a known symbol. Track BOTH.
+            if act == "NOVEL" || act == "UNSURE" { novel_ok += 1; }
+        }
         let r = rcog.iter().filter(|x| **x).count() as f32 / rcog.len().max(1) as f32;
         // activity boundedness (pool 24..64 mean rate, Hz)
         let rate = net.neurons.iter().skip(24).take(40).map(|n| n.rate_hz).sum::<f32>() / 40.0;
