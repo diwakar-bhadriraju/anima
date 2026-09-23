@@ -180,3 +180,41 @@ seed-specific 424242 3-symbol strain (0.42-0.67). Untested levers:
 longer survival (more selectivity-consolidation beats), seed-specific
 growth params, or genuinely structural. This replaces the 'caps at 2'
 narrative entirely.
+
+## THE REAL CAPABILITY STATEMENT (post-audit, 2026-09-23 - the session's actual bottom line)
+
+After D-53 (self-confirmation artifact), D-53b (novelty tautology),
+D-55 (stale-refs reconciliation), and the corrected uncapped baseline:
+
+WHAT IS REAL (measured, deterministic):
+1. GROWTH: heritable neurogenesis is real and uncapped at this scale
+   (55 -> 244+ neurons in 8 gens with size-scaled cap; D-49's ~8x).
+2. 2-SYMBOL KNOWN-vs-KNOWN DISCRIMINATION: real post-survival in ~67%
+   of org-gens (sep >= 0.7 at 3 symbols, mean 0.81), but carried by
+   FRAGILE magnitude-argmax over near-identical refs (cos 0.96-1.00) -
+   the 12-dim output codebook provides razor-thin margins.
+3. Novelty-not-recognized: D beats rarely decode as KNOWN-MATCH (act ==
+   cur requires cur=D which never happens in the closed loop).
+
+WHAT IS NOT REAL (falsified by honest measurement):
+- NOVELTY DETECTION: ZERO. D CONSISTENTLY decodes to a known symbol
+  (204 contamination events / 8-gen run) - the organism has never
+  demonstrated detection of a new pattern. The survival verdict's
+  'novel 0.00' was a tautology (recognized requires is_known).
+- ROBUST multi-symbol separation: the codebook's margin structure is
+  too thin to support more than 2-3 symbols reliably; 3-symbol strain
+  (33% of org-gens below 0.7) is real.
+
+TWO DISTINCT MEASURED PROBLEMS (the corrected roadmap):
+- CODEC problem: refs too similar (cos~0.99) -> th_known never fires
+  NOVEL -> novelty detection ~0. This is the 12-dim count-codebook
+  margin structure, upstream of novelty AND capacity.
+- POOL problem: 3-symbol strain (33% org-gens < 0.7) - the shared pool
+  mixes patterns as it grows (E3b verdict), capacity is strained but
+  real in majority org-gens.
+
+THE GOAL, corrected: 'an organism that grows and remembers more as it
+grows' currently has (a) growth - real; (b) memory - 2 symbols robustly
+in-living-organism, 3 partially, novelty detection absent. The output
+codec (a lossy count-collapse over a tonic-seizure-prone output band)
+is the upstream blocker for both novelty detection AND robust capacity.
