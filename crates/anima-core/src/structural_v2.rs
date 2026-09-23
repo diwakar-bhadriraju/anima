@@ -466,8 +466,30 @@ impl V2Plasticity {
         self.res_gate.push(1.0);
         self.fired_channels.push(Default::default());
         self.candidates.push(Vec::new());
-        self.live_e.push(0);
-        self.live_i.push(0);
+        // recompute the newborn's OWN live counts (it may already carry
+        // afferents from birth wiring); V2's live_e/live_i must be exact
+        // for the M5 budget assert.
+        let (mut ne, mut ni) = (0usize, 0usize);
+        for sid in &net.incoming[n - 1] {
+            let s2 = &net.synapses[sid.idx()];
+            if s2.silent_ticks != u64::MAX {
+                if s2.inhibitory { ni += 1; } else { ne += 1; }
+            }
+        }
+        self.live_e.push(ne);
+        self.live_i.push(ni);
+        // the newborn's afferents also count toward POST (its targets) - must
+        // recount the 20 partners it wired into, since they gained afferents.
+        for i in 0..self.live_e.len() {
+            let mut e = 0usize; let mut ii = 0usize;
+            for sid in &net.incoming[i] {
+                let s2 = &net.synapses[sid.idx()];
+                if s2.silent_ticks != u64::MAX {
+                    if s2.inhibitory { ii += 1; } else { e += 1; }
+                }
+            }
+            self.live_e[i] = e; self.live_i[i] = ii;
+        }
         let _ = n;
     }
 
@@ -1129,9 +1151,14 @@ impl V2Plasticity {
         if !self.params.disable_m5 {
             assert!(
                 live_e.iter().all(|&x| x <= self.params.b_e),
-                "v2 budget invariant violated: excitatory count over B_e (post={})",
-                live_e.iter().position(|&x| x > self.params.b_e).unwrap_or(0)
+                "v2 budget invariant violated: excitatory count over B_e (post={}, count={}, b_e={})",
+                live_e.iter().position(|&x| x > self.params.b_e).unwrap_or(0),
+                live_e.iter().find(|&&x| { let _ = x; false }).map(|&x| x).unwrap_or(0),
+                self.params.b_e
             );
+            if let Some((i, &v)) = live_e.iter().enumerate().find(|(_, &x)| x > self.params.b_e) {
+                eprintln!("BUDGET: post {i} count {v} > b_e {}", self.params.b_e);
+            }
             assert!(
                 live_i.iter().all(|&x| x <= self.params.b_i),
                 "v2 budget invariant violated: inhibitory count over B_i (post={})",

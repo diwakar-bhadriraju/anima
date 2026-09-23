@@ -248,6 +248,11 @@ pub struct StructuralMonitor {
     /// onto the SAME allocated partners (fan-out-matched, 20 in + 20
     /// out); false = E4c/E4 sink shape (bit-identical).
     pub wiring_bidirectional: bool,
+    /// E4f-2 (D-39): scale factor on newborn afferent/efferent weights.
+    /// <1.0 = gentler newborns (less perturbation of the assemblies they
+    /// tap). 0 => no synapses (an inert vibe that learns nothing but also
+    /// perturbs nothing). Pre-registered lever for the drain hypothesis.
+    pub wiring_w_scale: f32,
 }
 
 impl Default for StructuralMonitor {
@@ -260,7 +265,8 @@ impl Default for StructuralMonitor {
             wiring_synapses: 20,
             wiring_avoid_coactive: false,
             wiring_bidirectional: false,
-        }
+            wiring_w_scale: 1.0,
+                    }
     }
 }
 
@@ -403,14 +409,14 @@ impl StructuralMonitor {
         }
         let take = self.wiring_synapses.min(partners.len());
         for &(partner, _) in &partners[..take] {
-            let w = net.rng.gen::<f32>() * net.cfg.w_init + 0.05;
+            let w = (net.rng.gen::<f32>() * net.cfg.w_init + 0.05) * self.wiring_w_scale;
             net.add_synapse(partner, id, w, true, net.tick);
             // E4d: fan-out-matched — same partner gets an efferent back
             // from the newborn (newborn → partner), same weight family.
             // The newborn's firing now flows into the allocated pool
             // instead of accumulating as a high-gain sink.
             if self.wiring_bidirectional {
-                let w_out = net.rng.gen::<f32>() * net.cfg.w_init + 0.05;
+                let w_out = (net.rng.gen::<f32>() * net.cfg.w_init + 0.05) * self.wiring_w_scale;
                 net.add_synapse(id, partner, w_out, true, net.tick);
             }
         }
@@ -769,6 +775,7 @@ mod tests {
             wiring_synapses: 3,
             wiring_avoid_coactive: true,
             wiring_bidirectional: true,
+            wiring_w_scale: 1.0,
             ..StructuralMonitor::default()
         };
         let id = mon.birth(&mut net);
@@ -857,6 +864,7 @@ mod tests {
             wiring_synapses: 4,
             wiring_avoid_coactive: true,
             wiring_bidirectional: false,
+            wiring_w_scale: 1.0,
             ..StructuralMonitor::default()
         };
         let id = mon.birth(&mut net);
@@ -922,6 +930,7 @@ mod tests {
                 wiring_synapses: fan_in,
                 wiring_avoid_coactive: true,
                 wiring_bidirectional: false,
+            wiring_w_scale: 1.0,
                 ..StructuralMonitor::default()
             };
             let id = mon.birth(&mut net);

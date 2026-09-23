@@ -202,7 +202,12 @@ pub fn run_world_full(
         if ob_window.len() > rw { ob_window.pop_front(); }
         let ob_sustained = ob_window.len() == rw && ob_window.iter().all(|x| *x);
         let rcog_full = rcog.len() == rw && rcog.iter().all(|x| !*x);
-        if (rcog_full || ob_sustained) && died.is_none() { died = Some(beat); }
+        if (rcog_full || ob_sustained) && died.is_none() {
+            died = Some(beat);
+            if std::env::var("DBG_DEATH").is_ok() {
+                eprintln!("DEATH beat {beat}: ob_sustained={ob_sustained} (rate={rate:.1}) rcog_full={rcog_full} (r={r:.2}) n_neurons={}", net.neurons.len());
+            }
+        }
         // world-update (D-23 approach-known, D-30 forced-novelty):
         // with prob p_novel present the NEVER-TRAINED D probe (guarantees
         // the known-vs-novel falsifier is measurable); else follow the

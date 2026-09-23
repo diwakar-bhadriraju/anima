@@ -18,14 +18,22 @@ fn main() {
     let spec = SurvivalSpec { beats, r_window: 10, th_known: 0.20, q_floor: 1.0,
         a_bounds: [5.0, 250.0], horizon: 30, off_ms: 1500, p_novel: 0.2 };
     // homeostatic-saturation birth trigger
+    let avoid_coactive: bool = std::env::args().nth(4).map(|a| a == "1" || a == "true").unwrap_or(false);
     let mut mon = anima_core::structural::StructuralMonitor::default();
+    mon.wiring_avoid_coactive = avoid_coactive;
+    let bidirectional: bool = std::env::args().nth(5).map(|a| a == "1" || a == "true").unwrap_or(false);
+    mon.wiring_bidirectional = bidirectional;
+    let wscale: f32 = std::env::args().nth(6).and_then(|a| a.parse().ok()).unwrap_or(1.0);
+    mon.wiring_w_scale = wscale;
     let rate: f32 = std::env::args().nth(3).and_then(|a| a.parse().ok()).unwrap_or(30.0);
     let mut trigger = anima_core::structural::make_trigger(
         "homeostatic-saturation", Some(rate), Some(2000), Some(5000));
     let n_before = net.neurons.len();
     let syn_before = net.live_synapses().count();
     let mut traces = Traces::new(&net, 20.0);
-    let mut v2p = v2_params(); v2p.b_e = 120;
+    let mut v2p = v2_params();
+    let be: usize = std::env::args().nth(7).and_then(|a| a.parse().ok()).unwrap_or(120);
+    v2p.b_e = be;
     let mut v2 = V2Plasticity::new(&mut net, v2p, None);
     let out = survival::run_world_full(
         &mut net, seed, seed, &refs, &spec, &p, &mut traces,
