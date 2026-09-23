@@ -240,8 +240,18 @@ fn main() {
                 // INCIDENTAL monitor-wiring constant (e06bbb3), never
                 // registered - the ~229 'wall' may be this budget, not a
                 // structural ceiling; cap-raised runs test that.
+                // argv[3]: 0 = D-49 size-scaled mode (k=200 synapses per
+                // neuron, budget recomputed per check - removes the hard
+                // cap to measure the representational slope above 320);
+                // default 20000 = fixed cap (D-48 behavior, identity).
                 let syn_cap: usize = std::env::args().nth(3).and_then(|a| a.parse().ok()).unwrap_or(20_000);
-                rcfg.max_synapses = syn_cap;
+                if syn_cap == 0 {
+                    rcfg.size_scaled_synapses_k = Some(200.0); // measured k (D-49)
+                    rcfg.max_synapses = usize::MAX; // fixed path disabled
+                } else {
+                    rcfg.max_synapses = syn_cap;
+                    rcfg.size_scaled_synapses_k = None;
+                }
                 // ALIGN runaway threshold with the survival loop's own
                 // activity ceiling (a_bounds[1]=250 Hz). The harness's
                 // 50 Hz fires on HEALTHY pool operation (measured 58.9 Hz

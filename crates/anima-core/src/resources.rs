@@ -9,6 +9,11 @@ use crate::network::{NeuronClass, Network, Tick};
 pub struct ResourceConfig {
     pub max_neurons: usize,
     pub max_synapses: usize,
+    /// D-49: when Some(k), the synapse budget is SIZE-SCALED k*live_neurons
+    /// (recomputed per check) instead of the fixed max_synapses. Removes
+    /// the hard budget as a confound to measure the representational slope
+    /// above ~320 neurons. None = fixed-cap path (identity).
+    pub size_scaled_synapses_k: Option<f32>,
     pub births_per_window: usize,
     /// Metabolic cost coefficients per tick.
     pub cost_per_neuron: f32,
@@ -27,6 +32,7 @@ impl Default for ResourceConfig {
         Self {
             max_neurons: 200,
             max_synapses: 2000,
+            size_scaled_synapses_k: None,
             births_per_window: 4,
             cost_per_neuron: 1e-6,
             cost_per_synapse: 2e-7,
@@ -110,10 +116,15 @@ impl ResourceMonitor {
                 tick,
             });
         }
-        if live_synapses > self.cfg.max_synapses {
+        let cap = match self.cfg.size_scaled_synapses_k {
+            Some(k) => (k * live_neurons as f32) as usize,
+            None => self.cfg.max_synapses,
+        };
+        if live_synapses > cap {
             failure = Some(Some(Failure {
                 kind: "resource-exhaustion".into(),
-                detail: format!("synapses {live_synapses} > cap {}", self.cfg.max_synapses),
+                detail: format!("synapses {live_synapses} > cap {cap} (k={:?}, n={live_neurons})",
+                    self.cfg.size_scaled_synapses_k),
                 tick,
             }))
             .unwrap();
