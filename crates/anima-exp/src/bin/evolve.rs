@@ -393,6 +393,17 @@ fn main() {
                 // (recognition-collapse-while-alive vs runaway) is
                 // recorded - it determines the next intervention.
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                    let mut coses = String::new();
+                    for ri in 0..refs.len() {
+                        for rj in (ri+1)..refs.len() {
+                            coses.push_str(&format!("cos({}-{})={:.3} ", refs[ri].0, refs[rj].0, io::cos(&refs[ri].1, &refs[rj].1)));
+                        }
+                    }
+                    let vecs: Vec<String> = refs.iter().map(|(p,v)| {
+                        let elems: Vec<String> = v.iter().map(|x| format!("{:.2}", x)).collect();
+                        format!("{p}=[{}]", elems.join(","))
+                    }).collect();
+                    eprintln!("  org {i} mode={} REFS: {} | {}", d50_mode(), vecs.join("  "), coses);
                     eprintln!("  org {i}: dead={:?} fail={:?} n={} fit={f:.3}",
                         out.died_at, out.failed, org.net.neurons.len());
                 }

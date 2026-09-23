@@ -110,3 +110,42 @@ measured with wrong trains and is ALSO retracted. The capacity question
 is NOT yet answered - d50-3 (6ch A/C/E) must be re-run with correct
 trains. Status: D-50 reopened, verdict pending corrected measurement.
 STOP - verdict retracted; re-running with correct trains.
+
+## D-50 SECONDARY FINDING (2026-09-23): the 12-dim output-band encodes refs near-degenerate even at 8ch - a codebook limitation, not pool capacity
+
+Measured live (this codebook, seed 424242, legible ref vectors):
+  LEGACY 8ch:  A=[500,0,0,0,254,0,0,0,500,0,0,0]
+                C=[500,0,0,0,137,0,0,0,500,0,0,0]  cos(A-C)=0.988
+                (org1: 0.993)
+  d50-2 (6ch):  A=[500,0,0,0,0,500,...] C=[500,0,0,0,0,362,...] cos=0.92-1.00
+A and C collapse onto the SAME 3-4 tonic output channels (0,4,8),
+differing only in ONE channel's magnitude (254 vs 137). cos ~0.99.
+=> decode works (in legacy) only via argmax over tiny magnitude diffs;
+   6ch squeezes that difference under th_known -> chance separation.
+
+IMPLICATION (overturns prior assumption): the earlier 'legacy A/C
+separated, cross-cos 0.6-0.75' (from memory registry E3b) was a
+DIFFERENT pipeline (pool-neuron chunk telemetry), NOT the 12-dim output
+band. In the actual output codebook, A/C refs are ~0.99 cosines at ANY
+channel width. The shared-pool -> 12-neuron-output encoding produces
+nearly-identical templates for distinct inputs. This is a fundamental
+12-neuron OUTPUT-BAND ENCODING limit, present even in the working
+2-symbol case.
+
+CONSEQUENCE for D-50: the capacity question (can the pool store N
+symbols?) is UNANSWERABLE via this output codebook because the codebook
+itself cannot represent distinct symbols (refs degenerate). D-50's
+'did adding E break A-C' measured codebook collapse, not pool capacity.
+AND: the 2-symbol survival 'success' (sep 1.00 in D-46-era) ran on
+magnitude-threshold argmax over near-identical refs - fragile, not the
+robust separation the narrative implied.
+
+REAL NEXT LEVER (evidence-backed): the OUTPUT CODEC is the bottleneck,
+not the pool. Options: (a) richer output encoding (more/heterogeneous
+output neurons, or non-spike-count readout) so distinct inputs produce
+distinct output templates; (b) compartmentalized pools if even a good
+codec can't hold N>2. This reframes the goal: 'stores more as it
+grows' first needs an output codec that can represent more distinct
+symbols at all.
+STOP - codebook degeneracy is the primary blocker, upstream of both
+capacity and pool-organization questions.
