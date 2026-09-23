@@ -157,3 +157,34 @@ FALSIFIER: if 424242 still all-zero at g7 AND gene 9 stays 0 (selection
 never reaches oi>0), output inhibition is unreachable by this GA and
 the segregation axis is closed too.
 STOP.
+
+## D-46 VERDICT: FALSIFIED as causal factor (recorded 2026-09-23)
+
+TWO sequential tests, each refuting:
+RUN 1 (multiplicative init-0, inert): gene 8 hovered 0.005-0.007
+  (floor). 424242 best_g7=0.703 - but unreachable, so NOT attributable
+  to inhibition.
+RUN 2 (additive init-0, reachable): gene 8 drifted to 0.03-0.28 with 7
+  organisms at 0.19 (the probe's working zone; reachability blocker fixed).
+  424242 best_g7=0.703 - IDENTICAL to run 1.
+
+CONCLUSION: making output inhibition REACHABLE and exercised (7 orgs at
+oi=0.19) produced the SAME best fitness as the run where it stayed
+inert. oi>=0.1 breaks the 424242 degenerate-output collapse in ISOLATED
+probes (probe: die beat 22 -> survive to 108, fit 0.40->0.76), but under
+full evolution it confers NO selectable advantage - the 424242 recovery
+in GA runs is confounded (breed-order RNG shift + clamp change vs
+c94f507), NOT inhibition. The collapse either does not recur under the
+current GA config anyway (all 3 seeds grew to 152-202 g7), or inhibition
+does not change the outcome selection reaches.
+
+STATUS: output-band lateral inhibition = NOT a selectable mechanism for
+the degenerate-output wall under this GA. The D-45/D-46 axis (readout/
+output segregation) is CLOSED. 424242's earlier all-zero collapse did
+not reproduce in D-46b runs - all seeds reached g7 sizes 180-202 with
+improved/no-regression fitness vs the D-43-era collapse, indicating the
+collapse point moved or the GA config drift resolved it. Residual open
+question: whether the ~229 wall is real under the CURRENT config (only
+424242 got to 202, close but not past the old 229 threshold in D-46b).
+CLOSED pending that replication.
+STOP.

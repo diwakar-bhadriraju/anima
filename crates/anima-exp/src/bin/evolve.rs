@@ -310,7 +310,17 @@ fn main() {
                     let mut cgp = parent.growth_params;
                     for pi in 0..9 {
                         if rng.gen::<f32>() < 0.3 {
-                            cgp[pi] = (cgp[pi] * (0.5 + rng.gen::<f32>())).clamp(0.005, 300.0);
+                            if pi == 8 {
+                                // D-46: output_inhibition_gain. ADDITIVE
+                                // mutation so selection can reach the
+                                // known-good range (~0.1-0.2). Multiplicative
+                                // stuck it at the 0.005 floor (inert) - the
+                                // calibrated probes showed 0.1 works, 0.05
+                                // hurts, 0 is the healthy-seed baseline.
+                                cgp[8] = (cgp[8] + (rng.gen::<f32>() * 0.2 - 0.05)).clamp(0.0, 0.5);
+                            } else {
+                                cgp[pi] = (cgp[pi] * (0.5 + rng.gen::<f32>())).clamp(0.005, 300.0);
+                            }
                         }
                     }
                     let child = breed(&parent.net, cs, sz2, cgp[8]);

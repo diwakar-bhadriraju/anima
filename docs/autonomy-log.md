@@ -399,3 +399,16 @@ beat 108, fit 0.762, no degenerate out[]. CAVEAT: fixed oi=0.1 regresses
 healthy seeds (per-lineage optimum) => wired as GA gene 9 (init 0,
 mutate). Running 3-seed GA to test if selection discovers per-lineage
 gain. Falsifier: 424242 all-zero + gene stays 0 => segregation axis closed.
+
+## D-46 VERDICT: output-band inhibition FALSIFIED as causal (reachable-gene run showed identical 0.703)
+
+Two GA runs: (1) inert/multiplicative gene 8 -> 424242 best 0.703;
+(2) reachable additive gene 8, drifted to 0.03-0.28 with 7 orgs at 0.19
+(the probe-valid working zone) -> 424242 best STILL 0.703. In isolated
+probes oi=0.1 breaks the degenerate-output collapse (die-22 -> survive-
+108 fit 0.76), but under evolution it confers no selectable advantage:
+the 424242 GA recovery is breed-order-RNG-drift confound, not
+inhibition. Output-segregation axis (D-45/D-46) CLOSED. Notably the
+old all-zero 424242 collapse did NOT reproduce in D-46b (all seeds
+reached g7 180-202); open: does the ~229 wall still exist under current
+config? Only 424242 reached 202, near but not past 229.
