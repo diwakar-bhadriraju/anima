@@ -227,7 +227,10 @@ fn main() {
                 // mean in a surviving organism) - false death for every
                 // organism. Only genuine runaway PAST the operational
                 // envelope should trip the monitor.
-                rcfg.runaway_rate_hz = spec.a_bounds[1];
+                // margin above ceiling: near-ceiling growth (253.8 Hz at
+                // a_bounds[1]=250) is caught by survival's own a-bounds gate;
+                // the monitor is the BACKUP for genuine runaway beyond it.
+                rcfg.runaway_rate_hz = spec.a_bounds[1] + 30.0;
                 let rmon = Some(anima_core::resources::ResourceMonitor::new(rcfg));
                 let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true, rmon);
                 let syn_growth = org.net.live_synapses().count() as isize - syn_before as isize;
