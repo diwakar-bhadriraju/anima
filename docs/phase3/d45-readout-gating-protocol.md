@@ -237,3 +237,44 @@ expected under either hypothesis. The wall question needs a deliberate
 size-push run (more gens or relaxed budget) to cross 229 - NOT settled
 by this verdict.
 STOP.
+
+## SIZE-PUSH VERDICT: the ~229 wall is REAL under current config (424242, 16 gens)
+
+The size-push (the decisive open question) ran with the argv-fixed
+evolve: `evolve 424242 16` (isolated seed, 16 generations).
+
+  gen  sz    best fit
+  6    215   0.654   (healthy growth)
+  7    242.8 0.423   (warning: 0.42/0.34/0.25 + one 0.00)
+  8    244.0 0.000   (ALL organisms dead)
+  9-15 244.0 0.000   (irrecoverable)
+
+RESULT: 424242 grows stably to ~215, then the moment it crosses into
+~229-244 ALL four organisms die in the SAME generation (gen 8). The
+wall is SHARP and REPLICATED under the current (argv-fixed, gene-8
+reachable) config - NOT a D-43-era config artifact.
+
+MECHANISM (per D-45 telemetry): past ~229 neurons, growth-driven
+reciprocal excitation collapses the readout into the degenerate-output
+attractor (2 output neurons saturate at 250-cap, out[] identical for
+A/C/D, recognition -> r=0). This is the E4d amplifier seizing the
+output band.
+
+CONCLUSION: the ~229 recognition wall is structural - it survived every
+intervention (dynamic fixes E3/E3b closed, output-competition D-46
+falsified as selectable, readout-gating D-45 de-registered). The binding
+problem in this organism is REPRESENTATIONAL and SCALE-COUPLED: the
+single shared pool cannot hold separable assemblies past ~229 neurons;
+growth beyond it degenerates the readout. The self-construction is
+bounded by a structural ceiling the plasticity laws + growth shape do
+not (and, per E3b representational verdict, cannot via dynamics) escape.
+
+STATUS OF THE GROWTH-TO-RETAIN GOAL: neurogenesis is VIABLE to ~215-229
+(3-4x baseline), then hits a hard structural wall. The honest claim
+stands: the organism grows ~4x and retains recognition through that
+growth, then the shared-pool ceiling caps it. Options for a next
+registered intervention: (a) compartmentalized pools (grown neurons
+recruit into NEW pools instead of the shared one - attacks the
+representational ceiling directly); (b) accept the ~229 bound as the
+self-construction ceiling and pivot to other axes.
+STOP - wall replicated; structural.

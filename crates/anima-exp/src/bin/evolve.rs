@@ -179,16 +179,19 @@ fn main() {
     // previously IGNORED argv and always ran all 3 seeds, which
     // invalidated "single-seed" verbose parses - they were another seed.)
     let want: Option<u64> = std::env::args().nth(1).and_then(|a| a.parse().ok());
+    // optional argv[2] = gens override (size-push: run past the old
+    // ~229 wall, e.g. `evolve 424242 16`). Default GENS.
+    let gencap: u32 = std::env::args().nth(2).and_then(|a| a.parse().ok()).unwrap_or(GENS);
     for &esec in &SEEDS {
         if let Some(w) = want { if w != esec { continue; } }
-        println!("=== seed {esec} ===");
+        println!("=== seed {esec} gens={gencap} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
             Org { net: build_net(s, 40, 0.0), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0, 0.1, 30.0, 1500.0, 3000.0, 0.0] } }).collect();
         let mut formed_flags: Vec<bool> = vec![false; N_POP]; // gen-0 organisms form; offspring inherit
         let mut gen_sizes: Vec<f32> = Vec::new();
         let mut gen_fits: Vec<f32> = Vec::new();
         let mut gen_best: Vec<f32> = Vec::new();
-        for g in 0..GENS {
+        for g in 0..gencap {
             let mut scored: Vec<(f32, usize, usize, u64)> = Vec::new(); // (fitness, popidx, size, orgseed)
             for (i, (org, formed)) in pop.iter_mut().zip(formed_flags.iter_mut()).enumerate() {
                 let mut traces = Traces::new(&org.net, 20.0);
