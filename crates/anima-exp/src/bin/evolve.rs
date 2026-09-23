@@ -11,6 +11,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use anima_core::network::{NeuronId, Network, NetworkConfig, Tick, V2Params};
 use anima_core::plasticity::{stdp_tick, StdpParams, Traces};
+use anima_core::structural_v2::V2Plasticity;
 
 use anima_exp::config::SurvivalSpec;
 use anima_exp::io;
@@ -54,7 +55,8 @@ fn params() -> StdpParams {
         decay: 1e-6, w_min: 0.0, w_max: 1.0 }
 }
 fn survival_spec() -> SurvivalSpec {
-    SurvivalSpec { beats: 30, r_window: 10, th_known: 0.20, q_floor: 1.0,
+    let beat_count = std::env::var("EVO_BEATS").ok().and_then(|s| s.parse().ok()).unwrap_or(30u64);
+    SurvivalSpec { beats: beat_count, r_window: 10, th_known: 0.20, q_floor: 1.0,
         a_bounds: [5.0, 250.0], horizon: 30, off_ms: 1500, p_novel: 0.2 }
 }
 
@@ -167,14 +169,14 @@ fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> 
     child
 }
 
-struct Org { net: Network, size: usize, seed: u64 }
+struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 4] }
 fn main() {
     let spec = survival_spec();
     let p = params();
     for &esec in &SEEDS {
         println!("=== seed {esec} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
-            Org { net: build_net(s, 40), size: 40, seed: s } }).collect();
+            Org { net: build_net(s, 40), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0] } }).collect();
         let mut formed_flags: Vec<bool> = vec![false; N_POP]; // gen-0 organisms form; offspring inherit
         let mut gen_sizes: Vec<f32> = Vec::new();
         let mut gen_fits: Vec<f32> = Vec::new();
@@ -186,12 +188,27 @@ fn main() {
                 if !*formed { form_s1(&mut org.net, org.seed); *formed = true; }
                 let refs = capture_refs(&mut org.net, org.seed);
                 let world_seed = esec; // frozen across generations (comparable fitness)
-                let out = survival::run_world(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces);
+                // V2 self-construction for this life: growth-law genes are
+                // heritable AND selected (the real GA target - the rule the
+                // organism uses to build its own connections).
+                let mut v2params = v2_params();
+                v2params.theta_permanent = org.growth_params[0];
+                v2params.delta_perm = org.growth_params[1];
+                v2params.w_c_permanent = org.growth_params[2];
+                v2params.b_e = org.growth_params[3].max(20.0).min(400.0) as usize;
+                let syn_before = org.net.live_synapses().count();
+                let mut v2 = V2Plasticity::new(&mut org.net, v2params, None);
+                let out = survival::run_world_v2(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100);
+                let syn_growth = org.net.live_synapses().count() as isize - syn_before as isize;
                 org.size = org.net.neurons.len() - 24 - 12;
                 // fitness in [0,1]: mean viability scaled by the recognition
                 // fraction (multiplicative, not additive - additive let the
                 // composite exceed 1.0 and break selection ranking)
                 let f = out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac);
+                if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                    eprintln!("  org {i}: gp={:?} syn_growth={syn_growth:+} fit={f:.3}",
+                        org.growth_params, );
+                }
                 scored.push((f, i, org.size, org.seed));
             }
             scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
@@ -226,19 +243,27 @@ fn main() {
             // winner. Then 3 mutated offspring from the top 2.
             let elite_idx = scored[0].1;
             let elite = &pop[elite_idx];
+            // growth-law genes: elite gets a light mutation (0.2), offspring
+            // heavier (0.3) - selection acts on the SELF-CONSTRUCTION RULE.
+            let mut egp = elite.growth_params;
+            if rng.gen::<f32>() < 0.2 { egp[0] = (egp[0] * (0.5 + rng.gen::<f32>())).clamp(0.01, 0.2); }
             next.push(Org { net: breed_no_mut(&elite.net, elite.seed, elite.size),
-                size: elite.size, seed: elite.seed });
+                size: elite.size, seed: elite.seed, growth_params: egp });
             for (pi, (_, idx, sz, _)) in scored.iter().take(2).enumerate() {
                 let parent = &pop[*idx];
                 let n_off: u32 = if pi == 0 { 2 } else { 1 };
                 for off in 0..n_off {
-                    let mut sz2 = *sz as i32;
-                    let r = rng.gen::<f32>();
-                    if r < 0.35 { sz2 += SIZE_STEP; } else if r < 0.70 { sz2 -= SIZE_STEP; }
-                    let sz2 = sz2.clamp(BAND[0], BAND[1]) as usize;
-                    let cs = esec ^ (g as u64) << 8 ^ (off as u64 * 104729) ^ (sz2 as u64);
+                    let sz2 = *sz; // NO size mutation: growth is self-emergent
+                    // via M3 during life, never hand-resized (D-36).
+                    let cs = esec ^ (g as u64) << 8 ^ (off as u64 * 104729);
                     let child = breed(&parent.net, cs, sz2);
-                    next.push(Org { net: child, size: sz2, seed: cs });
+                    let mut cgp = parent.growth_params;
+                    for pi in 0..4 {
+                        if rng.gen::<f32>() < 0.3 {
+                            cgp[pi] = (cgp[pi] * (0.5 + rng.gen::<f32>())).clamp(0.005, 300.0);
+                        }
+                    }
+                    next.push(Org { net: child, size: sz2, seed: cs, growth_params: cgp });
                 }
             }
             formed_flags = vec![true; next.len()]; // offspring inherit trained weights

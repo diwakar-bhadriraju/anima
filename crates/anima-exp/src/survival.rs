@@ -10,6 +10,7 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::io;
+use anima_core::structural_v2::V2Plasticity;
 
 const BEAT_MS: u64 = 500;
 
@@ -59,6 +60,24 @@ pub fn run_world(
     params: &StdpParams,
     traces: &mut Traces,
 ) -> SurvivalOutcome {
+    run_world_v2(net, _org_seed, world_seed, refs, spec, params, traces, None, 100)
+}
+
+/// Variant with the V2Plasticity mechanism (M3 candidate -> self-constructed
+/// permanence) ACTIVE, so the organism builds its own new connections from
+/// experience during its life (D-36). v2 None = identity (no self-construction).
+#[allow(clippy::too_many_arguments)]
+pub fn run_world_v2(
+    net: &mut Network,
+    _org_seed: u64,
+    world_seed: u64,
+    refs: &[(String, Vec<f32>)],
+    spec: &crate::config::SurvivalSpec,
+    params: &StdpParams,
+    traces: &mut Traces,
+    mut v2: Option<&mut V2Plasticity>,
+    window_ticks: u64,
+) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
     let mut died: Option<u64> = None;
@@ -85,6 +104,18 @@ pub fn run_world(
             for c in &ev.spikes {
                 if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) {
                     out[(c.0 - io::OUTPUT_LO) as usize] += 1.0;
+                }
+            }
+            // V2 self-construction machinery (D-36): tick + structural window
+            // (M3 candidate -> permanence) so the organism builds its OWN new
+            // connections from experience. None = no self-construction.
+            if let Some(v2ref) = v2.as_deref_mut() {
+                v2ref.tick(&ev.spikes);
+                v2ref.accumulate_input_current(net, &ev.spikes); // unblocks
+                // candidate accumulation (alloc_residual gate) - the missing
+                // per-tick bookkeeping that was zeroing delta_perm
+                if net.tick.0 % window_ticks == 0 && net.tick.0 > 0 {
+                    let _ = v2ref.window(net, tick);
                 }
             }
             traces.step(&net, &ev.spikes);
