@@ -234,7 +234,14 @@ fn main() {
                 // exhaustion = death, same standard as harness. Capacity
                 // sized to allow legit self-construction growth.
                 let mut rcfg = anima_core::resources::ResourceConfig::default();
-                rcfg.max_neurons = 600; rcfg.max_synapses = 20_000;
+                rcfg.max_neurons = 600;
+                // argv[3] = synapse cap override (D-48 registered param,
+                // default 20000). NOTE: the 20000 default is an
+                // INCIDENTAL monitor-wiring constant (e06bbb3), never
+                // registered - the ~229 'wall' may be this budget, not a
+                // structural ceiling; cap-raised runs test that.
+                let syn_cap: usize = std::env::args().nth(3).and_then(|a| a.parse().ok()).unwrap_or(20_000);
+                rcfg.max_synapses = syn_cap;
                 // ALIGN runaway threshold with the survival loop's own
                 // activity ceiling (a_bounds[1]=250 Hz). The harness's
                 // 50 Hz fires on HEALTHY pool operation (measured 58.9 Hz
