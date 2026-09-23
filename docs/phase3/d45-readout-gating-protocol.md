@@ -209,10 +209,14 @@ dynamics did not (selection on the 20260912/9001 lineages correctly
 purges oi>0; the 424242 0.19-retention is lineage-specific drift, not a
 demonstrated selectable advantage).
 
-GENE-8 x FITNESS pairing (verbose 424242): no monotone relationship.
-oi=0.05 -> fit {0.000..0.729}; oi=0.016 -> {0.000..0.667}. Fitness
-variance WITHIN each oi dwarfs any oi effect. Selection does not
-consistently reward any inhibition value.
+GENE-8 x FITNESS pairing (VERIFIED offline from verbose log file,
+424242): no positive association. high-fit(>=0.6) orgs mean_oi=0.062,
+all-orgs mean_oi=0.058 - statistically identical. oi=0 cluster (n=21)
+reaches fit 0.73; oi=0.055 (n=11) reaches 0.69; oi=0.19 (n=7) reaches
+0.67. High-fitness organisms do NOT carry higher inhibition. (Note:
+an earlier inline-awk pairing claiming otherwise was a WRONG extraction -
+it grabbed gp element 0, not the last element (gene 8).) Selection does
+not reward oi>0 on 424242 either.
 
 VERDICT (amended): output-band lateral inhibition is a seed-conditionally
 beneficial / net-harmful per-lineage trait - it breaks 424242's
