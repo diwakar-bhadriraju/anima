@@ -150,3 +150,33 @@ STOP.
   + snapshots together. Missing telemetry = incomplete, check trash.
 - Delete runs/ only after the cited-in-docs check (keep = runs/ strings that name
   existing dirs in ANY docs/ file).
+
+## CORRECTED HEADLINE FACTS (D-55 reconciliation, 2026-09-23)
+
+The D-50..D-54 thread mischaracterized the organism as 'output-
+degenerate / can't represent distinct symbols / caps at 2'. That was a
+MEASUREMENT-ORDER ARTIFACT: capture_separation scored post-survival
+responses against PRE-survival refs (evolve 338 vs 401 vs 426). With
+refs matched to the tested (post-survival) state, the corrected facts:
+
+1. TWO-SYMBOL discrimination is GENUINE (post-survival sep=1.000). The
+   original survival-loop 1.00/0.91/1.00 was largely HONEST (fresh in-
+   loop refs), not self-confirmation (D-53's claim softened).
+2. THREE-SYMBOL strain is REAL but PARTIAL: 20260912/9001 separate at
+   1.000 post-survival; only 424242 is strained (0.42-0.67). The shared
+   pool is NOT capped at 2 - 424242's partial is SEED-SPECIFIC, not a
+   shared-pool law.
+3. The 'tonic-seizure degenerate output' (D-52) is the S1-ONLY immature
+   state; the SURVIVAL LOOP's STDP/growth consolidation induces output
+   selectivity over 30+ beats. outprobe (S1-only) measured the immature
+   organism.
+4. An additive output competition law (D-54) adds nothing - falsified
+   on the correct (post-survival) state; survival dynamics already
+   provide the selectivity.
+
+=> MUCH MORE OPTIMISTIC AND ACCURATE close: the organism DISCRIMINATES
+(2 symbols robustly, 3 symbols for 2/3 seeds). REMAINING OPEN: the
+seed-specific 424242 3-symbol strain (0.42-0.67). Untested levers:
+longer survival (more selectivity-consolidation beats), seed-specific
+growth params, or genuinely structural. This replaces the 'caps at 2'
+narrative entirely.
