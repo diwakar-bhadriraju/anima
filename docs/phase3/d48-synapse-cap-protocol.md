@@ -68,14 +68,30 @@ MEASURED DEATH CAUSE (D-47 verbose, n=325-383):
   THEN exhaustion fires (synapses 59341/74259 > cap 40000) as a
   SECONDARY effect once the raised cap is reached.
 
-CONCLUSION: raising the cap from 20k to 40k MOVED the death point
-(~244-267 -> ~318-347) but did NOT remove it, AND the collapse is
-observed as RECOGNITION failure (dead=None, fail=None, fit->0.3) that
-PRECEDES the exhaustion. The wall is a genuine structural/
-representational ceiling at ~320-350 neurons (recognition collapses
-independent of synapse budget), NOT an artifact of the incidental 20k
-harness constant. The earlier 'budget-artifact' hypothesis (D-48 P1) is
-FALSIFIED; P2 (structural) CONFIRMED.
+CONCLUSION (corrected 2026-09-23, SPLIT not pure P2 - advisory-
+precised): the result is a SPLIT, both pre-registered predictions
+partially true:
+  HARD WALL = BUDGET (P1 substance CONFIRMED): the kill line is set by
+  the cap value. Raising 20k->40k moved the hard collapse from ~244-267
+  to ~347; exhaustion failures (synapses 40077-74259 > cap 40000) are
+  the hard death at every cap. The 'structural wall' narrative based on
+  the incidental 20k constant was wrong - the hard bound is the budget.
+  SOFT SLOPE = REAL (P2 partial CONFIRMED, as a slope not a hard wall):
+  above ~320-350 neurons, recognition DEGRADES with cap headroom
+  remaining and NO monitor firing: at n=354, dead=None fail=None fits
+  0.29/0.36/0.37/0.65; at n=383, 0.35/0.47. A soft recognition decline
+  begins ~320 neurons and is measurable - but it is NOT a hard
+  recognition collapse; the hard collapse at gen 13 is exhaustion.
+
+So: hard wall = budget value (free parameter, should be size-scaled to
+sit above the degradation zone); soft degradation = real, quantifiable
+recognition slope above ~300 neurons, separate from (and preceding) the
+cap kill. The user fork is reframed: not 'wall real? structural?' but
+'is the soft >300-neuron recognition slope acceptable/targetable?'
+AND 'what cap value keeps the kill line above the degradation zone?'
+Immediate registered recommendation: size-scale the synapse cap
+(like b_e) so the hard kill is always above the degradation slope while
+the slope is studied.
 
 The ~229 numbers from prior nondeterministic runs were conservative
 versions of the same structural wall (budget bit sooner at 20k); the
