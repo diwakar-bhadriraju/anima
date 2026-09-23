@@ -209,8 +209,16 @@ WHAT IS NOT REAL (falsified by honest measurement):
   the earlier probe INCLUDED back-to-back probe-D presentations (no
   gap, aftereffects-biased) - the loop-side number is the honest one
   and it is weak-then-zero, not exactly-zero-at-baseline.
-  => the organism does NOT robustly detect novelty, and the capability
-  DEGRADES as the organism grows (a growth-cost, not a fixed limit).
+  => the organism does NOT robustly detect novelty, and detection
+  DECAYS ACROSS GENERATIONS under current selection. CAUSE UNTESTED:
+  two candidates (a) growth consumes/absorbs the detection capacity
+  [a growth-cost], (b) fitness is BLIND to novelty detection
+  (fitness = viability*known_recog*sep rewards nothing about detection)
+  so selection exerts no pressure to retain it and consolidation erodes
+  it. The D-56 fitness-blindness test (flag-gated fitness term)
+  distinguishes them: decay stops -> selection-pressure cause; decay
+  continues -> growth/codec cause. Do not state 'growth cost' as
+  established - it is the correlation; the cause is the D-56 question.
 - ROBUST multi-symbol separation: the codebook's margin structure is
   too thin to support more than 2-3 symbols reliably; 3-symbol strain
   (33% of org-gens below 0.7) is real.
