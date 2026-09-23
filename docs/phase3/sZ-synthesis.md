@@ -96,3 +96,33 @@ LOG the death cause, VERIFY the seed, GATE determinism.
   remains OPEN.
 - Soft slope above ~350: population fit oscillates 0.29-0.70 (alive,
   unmonitored) - real competition/quantization effect, not a wall.
+
+## RECOMMENDED: monitor/harness constants audit (before any further run)
+Every constant probed this session was mis-set or binding in unintended
+ways: the 20k synapse cap (incidental, drove 3 'structural wall'
+verdicts), the 50 Hz runaway threshold (false-positived on healthy
+58.9 Hz pool), the 280 Hz ceiling (needs margin; first GA-path runaway
+at 310 Hz n=328). A one-page audit of ALL ResourceConfig + harness
+constants (provenance, measured operating range, registered value)
+would prevent a fifth round of budget-artifact reversals. Low priority
+but cheap.
+
+## NEXT-STEP OPTIONS (post-D-49 - the old compartmentalize-vs-accept
+fork is OBSOLETE; replaced by three evidence-live questions)
+
+(a) PURE-SLOPE with k=300 (cheapest, ~12 min): fully non-binding cap ->
+   does the representational slope above ~350 ever become a real wall,
+   or does it oscillate forever? Closes the one open quantitative
+   question from D-49. Recommend first (cheap, de-risks everything else).
+
+(b) SYNAPSE-DEMAND AS SELECTABLE TRAIT: the k=200 efficiency culling is
+   arguably a FEATURE - selection discovered a pressure (genome-dependent
+   synapse demand: 180 vs 275/neuron). Register whether the GA converges
+   on low-synapse-demand genomes (adaptation to the budget) or maintains
+   diversity. Biologically interesting: efficiency as evolved trait.
+
+(c) RUNAWAY AT SCALE: first GA-path runaway observed at n=328 (310 Hz).
+   With synapse demand dropping under (b), the runaway monitor becomes
+   the nearest binding constraint at large sizes. Understand the
+   runaway trigger's behavior above 400 neurons.
+STOP.
