@@ -10,6 +10,7 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::io;
+use anima_core::resources::{Failure as ResFailure, ResourceConfig, ResourceMonitor};
 use anima_core::structural_v2::V2Plasticity;
 use anima_core::structural::{make_trigger, BirthTrigger, Signals, StructuralMonitor};
 
@@ -28,6 +29,11 @@ pub struct SurvivalOutcome {
     pub novel_recognized_frac: f32,
     pub known_beats: u32,
     pub novel_beats: u32,
+    /// In-loop resource failure (runaway-activity / resource-exhaustion),
+    /// if the monitor tripped before death-by-viability. Advisory D-38:
+    /// evolve's life must detect runaway the same way the harness does,
+    /// else registration is blind to the very failure it registers.
+    pub failed: Option<String>,
 }
 
 /// Run the closed loop after S1: `beats` beats; each presents the current
@@ -80,7 +86,7 @@ pub fn run_world_v2(
     window_ticks: u64,
 ) -> SurvivalOutcome {
     run_world_full(net, _org_seed, world_seed, refs, spec, params, traces,
-        v2, window_ticks, None, None, false)
+        v2, window_ticks, None, None, false, None)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -97,10 +103,13 @@ pub fn run_world_full(
     mut structural: Option<(StructuralMonitor, Box<dyn BirthTrigger>)>,
     mut pe_state: Option<(f32, f32)>, // (pe_mean, pe_std) for persistent error
     _birth_probe: bool,
+    // in-loop resource monitor (runaway + caps); None = no detection
+    mut mon: Option<ResourceMonitor>,
 ) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
     let mut died: Option<u64> = None;
+    let mut fail_kind: Option<String> = None;
     let mut v_sum = 0.0f32;
     let (mut a_act, mut c_act, mut wd_act, mut qt_act) = (0u64, 0u64, 0u64, 0u64);
     let mut known_v: Vec<f32> = Vec::new();
@@ -124,6 +133,17 @@ pub fn run_world_full(
             for c in &ev.spikes {
                 if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) {
                     out[(c.0 - io::OUTPUT_LO) as usize] += 1.0;
+                }
+            }
+            // in-loop resource detection (D-38): runaway / exhaustion =
+            // death, same standard as the harness monitor.
+            if let Some(m) = mon.as_mut() {
+                let (_, fail) = m.step(net, ev.spikes.len());
+                if let Some(f) = fail {
+                    if died.is_none() {
+                        died = Some(beat);
+                        fail_kind = Some(format!("{}: {}", f.kind, f.detail));
+                    }
                 }
             }
             // V2 self-construction machinery (D-36): tick + structural window
@@ -242,7 +262,7 @@ pub fn run_world_full(
     let nm = novel_v.iter().sum::<f32>() / novel_v.len().max(1) as f32;
     let kvs = if novel_n == 0 { None } else { Some(km - nm) };
     SurvivalOutcome {
-        beats: beat, died_at: died, mean_viability: mean_v,
+        beats: beat, died_at: died, mean_viability: mean_v, failed: fail_kind,
         known_vs_novel_diff: kvs, a_actions: a_act, c_actions: c_act,
         withdraw_actions: wd_act, quiet_actions: qt_act,
         known_recognized_frac: known_ok as f32 / known_n.max(1) as f32,

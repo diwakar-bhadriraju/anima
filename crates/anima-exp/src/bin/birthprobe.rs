@@ -37,15 +37,27 @@ fn main() {
     let k = be as f32;
     v2p.b_e = (k * net.neurons.len() as f32).max(40.0) as usize;
     let mut v2 = V2Plasticity::new(&mut net, v2p, None);
+    // optional in-loop monitor (args 8=max_neurons, 9=runaway_hz, 10=max_synapses): probe
+    // that the detector path actually fires (D-38 calibration).
+    let mon_opt: Option<anima_core::resources::ResourceMonitor> = match std::env::args().nth(8) {
+        Some(mn) => {
+            let mut rc = anima_core::resources::ResourceConfig::default();
+            rc.max_neurons = mn.parse().unwrap_or(200);
+            if let Some(rh) = std::env::args().nth(9) { rc.runaway_rate_hz = rh.parse().unwrap_or(50.0); }
+            if let Some(ms) = std::env::args().nth(10) { rc.max_synapses = ms.parse().unwrap_or(2000); }
+            Some(anima_core::resources::ResourceMonitor::new(rc))
+        }
+        None => None,
+    };
     let out = survival::run_world_full(
         &mut net, seed, seed, &refs, &spec, &p, &mut traces,
         Some(&mut v2), 100,
-        Some((mon, trigger)), None, true,
+        Some((mon, trigger)), None, true, mon_opt,
     );
     let born = net.neurons.len() - n_before;
     let syn_growth = net.live_synapses().count() as isize - syn_before as isize;
-    println!("birthprobe seed={seed} beats={beats}: neurons {n_before}->{} (born={born}) syn_growth={syn_growth:+} died_at={:?} fit={:.3}",
-        net.neurons.len(), out.died_at,
+    println!("birthprobe seed={seed} beats={beats}: neurons {n_before}->{} (born={born}) syn_growth={syn_growth:+} died_at={:?} failed={:?} fit={:.3}",
+        net.neurons.len(), out.died_at, out.failed,
         out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac));
 }
 
