@@ -33,7 +33,9 @@ fn main() {
     let mut traces = Traces::new(&net, 20.0);
     let mut v2p = v2_params();
     let be: usize = std::env::args().nth(7).and_then(|a| a.parse().ok()).unwrap_or(120);
-    v2p.b_e = be;
+    // size-scaled budget: k * n_neurons (survival probe passes k in arg 7)
+    let k = be as f32;
+    v2p.b_e = (k * net.neurons.len() as f32).max(40.0) as usize;
     let mut v2 = V2Plasticity::new(&mut net, v2p, None);
     let out = survival::run_world_full(
         &mut net, seed, seed, &refs, &spec, &p, &mut traces,

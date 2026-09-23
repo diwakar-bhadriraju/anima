@@ -169,14 +169,14 @@ fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool) -> 
     child
 }
 
-struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 4] }
+struct Org { net: Network, size: usize, seed: u64, growth_params: [f32; 5] }
 fn main() {
     let spec = survival_spec();
     let p = params();
     for &esec in &SEEDS {
         println!("=== seed {esec} ===");
         let mut pop: Vec<Org> = (0..N_POP).map(|i| { let s = esec ^ (i as u64 * 7919);
-            Org { net: build_net(s, 40), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0] } }).collect();
+            Org { net: build_net(s, 40), size: 40, seed: s, growth_params: [0.05, 0.01, 0.02, 120.0, 0.1] } }).collect();
         let mut formed_flags: Vec<bool> = vec![false; N_POP]; // gen-0 organisms form; offspring inherit
         let mut gen_sizes: Vec<f32> = Vec::new();
         let mut gen_fits: Vec<f32> = Vec::new();
@@ -195,10 +195,24 @@ fn main() {
                 v2params.theta_permanent = org.growth_params[0];
                 v2params.delta_perm = org.growth_params[1];
                 v2params.w_c_permanent = org.growth_params[2];
-                v2params.b_e = org.growth_params[3].max(20.0).min(400.0) as usize;
+                // b_e scales with organism size (a neuron's spare capacity =
+                // a fraction k of the pool it may connect to; the gene is k,
+                // not an absolute cap - absolute caps break as the organism
+                // legitimately grows past them, tripping the M5 assert).
+                let k = org.growth_params[3].clamp(0.5, 6.0);
+                v2params.b_e = (k * org.net.neurons.len() as f32).max(40.0) as usize;
+                // E4 viable birth (D-39): bidirectional participatory
+                // newborn + attenuated wiring + scaled budget
+                let mut mon = anima_core::structural::StructuralMonitor::default();
+                mon.wiring_bidirectional = true;
+                mon.wiring_w_scale = org.growth_params[4].clamp(0.02, 0.5);
+                let mut trigger = anima_core::structural::make_trigger(
+                    "homeostatic-saturation", Some(30.0), Some(1500), Some(3000));
+                let pe_state0 = Some((0.0f32, 0.0f32));
                 let syn_before = org.net.live_synapses().count();
                 let mut v2 = V2Plasticity::new(&mut org.net, v2params, None);
-                let out = survival::run_world_v2(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100);
+                let structural_opt = Some((mon, trigger));
+                let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true);
                 let syn_growth = org.net.live_synapses().count() as isize - syn_before as isize;
                 org.size = org.net.neurons.len() - 24 - 12;
                 // fitness in [0,1]: mean viability scaled by the recognition
@@ -258,7 +272,7 @@ fn main() {
                     let cs = esec ^ (g as u64) << 8 ^ (off as u64 * 104729);
                     let child = breed(&parent.net, cs, sz2);
                     let mut cgp = parent.growth_params;
-                    for pi in 0..4 {
+                    for pi in 0..5 {
                         if rng.gen::<f32>() < 0.3 {
                             cgp[pi] = (cgp[pi] * (0.5 + rng.gen::<f32>())).clamp(0.005, 300.0);
                         }
