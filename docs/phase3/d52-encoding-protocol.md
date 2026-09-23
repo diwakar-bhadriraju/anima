@@ -79,3 +79,40 @@ with tonic-seizure dynamics. If (b) also fails, the tonic seizure is a
 POOL-DYNAMICS mechanism (E4d-family amplifier re-arising at the output)
 and the fix is organism-side, not codec-side.
 STOP - lever (a) dead; proceeding to (b).
+
+## D-52 LEVER (b) VERDICT: FALSIFIED - widening output band does not help; tonic seizure scales with width
+
+outprobe, seed 424242:
+  n_out=12: A=[0:500,4:254,8:500] C=[0:500,4:137,8:500] cos 0.988
+            (3 active out neurons)
+  n_out=24: A=[3:500,8:500,12:500,15:500,21:500]
+            C=[SAME]                                    cos 1.000
+            (5 active out neurons, ALL at 500 = tonic every tick)
+Widening 12->24 did NOT help - the pool seized MORE output neurons
+(3->5) tonically, IDENTICALLY for both symbols. cos went 0.988->1.000
+(WORSE - more shared tonic neurons).
+
+MECHANISM (conclusive): the output degeneracy is NOT coding scheme (a)
+nor output bandwidth (b). The shared pool COLLAPSES to driving a fixed
+subset of output neurons at constant max firing (500 ticks = every tick)
+for ANY input, and the subset grows with output width. This is the
+E4d-family TONIC-SEIZURE AMPLIFIER re-arising at the readout: a
+positive-feedback loop locks output neurons into continuous firing once
+the pool has enough drive, independent of input identity.
+
+Both D-52 levers FALSIFIED:
+  (a) temporal codec: no timing difference exists at output (falsified
+      by fork-test) - pool output is timing-flat.
+  (b) output width: more neurons just seize more, identically (falsified
+      by outprobe) - refs stay cos~1.0.
+=> The problem is ORGANISM-SIDE: an all-excitatory pool with no
+inhibition (E4 builds no inhibitory synapses) locks output neurons
+into tonic seizure. The fix must PREVENT output tonic seizure - e.g.
+output-band inhibition (D-46 attempted, per-seed rescue only), or a
+mechanism making output firing input-selective. This is the definitive
+readout mechanism: the shared all-excitatory pool cannot represent
+input identity in neural output because it tonically seizes instead of
+selecting. The 2-symbol 'separation' that worked was fragile magnitude-
+argmax over an inherently degenerate output. Codec and width are both
+dead ends; the organism's output dynamics are the blocker.
+STOP - output tonic seizure is the mechanism; organism-side fix needed.
