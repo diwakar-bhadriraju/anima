@@ -40,6 +40,10 @@ fn v2_params() -> V2Params {
     }
 }
 fn build_net(seed: u64, n_internal: usize, out_inh: f32) -> Network {
+    // D-54: optional output competition gain via env (D54_COMP). Off by
+    // default = identity. Re-tested POST-survival per D-55 (the earlier
+    // sweep measured the pre-survival degenerate state - invalid).
+    let comp_gain: f32 = std::env::var("D54_COMP").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
     let cfg = NetworkConfig {
         connectivity: 0.038, w_init: 0.2, amplitude: 52.0,
         adaptation_tau_ms: 200.0, adaptation_gain: 0.05, inhibition_gain: 0.0,
@@ -47,6 +51,7 @@ fn build_net(seed: u64, n_internal: usize, out_inh: f32) -> Network {
         latch_enable: true, theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0,
         u_plateau_rel_sd: 0.0, tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0,
         v2: Some(v2_params()), output_inhibition_gain: out_inh, // D-46
+        output_competition_gain: comp_gain, // D-54
         ..NetworkConfig::default()
     };
     Network::new(cfg, 24, n_internal, 12, seed)

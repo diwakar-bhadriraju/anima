@@ -53,3 +53,22 @@ competition -> the all-excitatory single-pool platform CANNOT represent
 distinct trained identities; the honest end-state is trained-vs-novel
 only. Moves the goal to a different architecture decision.
 STOP.
+
+## D-54 FINAL VERDICT: FALSIFIED on the CORRECT state (post-survival) too
+
+Re-tested D54_COMP on the POST-survival net (the right state per D-55;
+the earlier sweep measured the pre-survival degenerate S1 state - invalid).
+424242 d50-3 (the strained seed), comp-gain sweep:
+  comp=0.0 : post-survival sep 0.667 / 0.417
+  comp=1e-3: 0.667 / 0.667
+  comp=1e-2: 0.333 (WORSE)
+  comp=3e-2: (did not improve)
+The rate-dependent output competition law does NOT add separation and
+may interfere (0.333 at 1e-2). The survival loop ALREADY induces output
+selectivity (D-55); an additive competition law on top adds nothing.
+
+CONCLUSION: D-54 closed as FALSIFIED. The selectiviting mechanism is
+the SURVIVAL LOOP's own STDP/growth consolidation (D-55), NOT an
+external competition law. The 424242 partial 3-symbol separation
+(0.417-0.667) is that seed's real, non-competition-remediable strain.
+STOP - D-54 closed; survival-dynamics selectivity is the mechanism.
