@@ -410,6 +410,17 @@ pub struct NetworkConfig {
     /// (E3b, ALL non-input) and d_ing (identity-gated): here readout-only.
     #[serde(default)]
     pub output_inhibition_gain: f32,
+    /// D-54 (docs/phase3/d54-competition-protocol.md): OUTPUT-band
+    /// RATE-DEPENDENT winner-take-most competition. Each output neuron's
+    /// current firing RATE (EMA) depresses every OTHER output neuron's
+    /// i_syn by comp * rate. Asymmetric + rate-proportional: the most-
+    /// driven output suppresses rivals more and consolidates as the
+    /// winner. Different inputs drive different winners -> input-
+    /// selectivity (opposes the D-52/D-53 tonic-seizure degeneracy).
+    /// Distinct from output_inhibition_gain (D-46: same-tick pairwise,
+    /// symmetric, no winner). 0 = identity.
+    #[serde(default)]
+    pub output_competition_gain: f32,
     /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
     /// slow_state_beta = per-spike increment; slow_state_tau_ms = decay.
     /// beta = 0 (default) => bit-identical V2.
@@ -589,6 +600,8 @@ impl Default for NetworkConfig {
             inhibition_gain: 0.0,
             // D-46 output-band inhibition default OFF: 0 = identity.
             output_inhibition_gain: 0.0,
+            // D-54 default OFF: 0 = identity.
+            output_competition_gain: 0.0,
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
@@ -1376,6 +1389,23 @@ impl Network {
             for &a in &out_sp {
                 for &b in &out_sp {
                     if a != b { self.neurons[b.idx()].i_syn -= og; }
+                }
+            }
+        }
+
+        // D-54: rate-dependent winner-take-most output competition.
+        // Each output neuron's current rate (EMA, updated above) depresses
+        // the i_syn of every OTHER output neuron. 0 = identity.
+        if self.cfg.output_competition_gain != 0.0 {
+            let cg = self.cfg.output_competition_gain;
+            let out_rates: Vec<(usize, f32)> = (0..self.neurons.len())
+                .filter(|&i| self.neurons[i].class == NeuronClass::Output)
+                .map(|i| (i, self.neurons[i].rate_hz))
+                .collect();
+            for &(a, rate_a) in &out_rates {
+                let suppress = cg * rate_a; // rate-proportional suppression
+                for &(b, _) in &out_rates {
+                    if a != b { self.neurons[b].i_syn -= suppress; }
                 }
             }
         }

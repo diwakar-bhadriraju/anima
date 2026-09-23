@@ -424,6 +424,18 @@ fn main() {
                     // N(N-1)/2 pairs, not just survive. Legacy mode: no change.
                     let sep = if d50_mode() == "d50" || d50_mode() == "d50-2" {
                         let (acc, pairs) = capture_separation(&mut org.net, org.seed, &refs, &spec);
+                        // D-53/54 reconciliation: the refs above were
+                        // captured PRE-survival (line 338); capture_separation
+                        // runs POST-survival. Re-capture on the POST-survival
+                        // net and re-measure - if sep jumps, the low sep was
+                        // a stale-refs artifact (state mismatch), not a
+                        // representation limit.
+                        let postrefs = capture_refs(&mut org.net, org.seed);
+                        let (acc2, pairs2) = capture_separation(&mut org.net, org.seed, &postrefs, &spec);
+                        if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                            eprintln!("  org {i} SEPSPLIT pre-survival-refs={acc:.3} post-survival-refs={acc2:.3}");
+                            eprintln!("  org {i} pair2-post: {:?}", pairs2);
+                        }
                         if std::env::var("EVOLVE_VERBOSE").is_ok() {
                             let mut coses = String::new();
                             for ri in 0..refs.len(){ for rj in ri+1..refs.len(){

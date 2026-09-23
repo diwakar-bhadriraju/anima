@@ -9,7 +9,8 @@ use anima_exp::io;
 fn main() {
     let seed: u64 = std::env::args().nth(1).and_then(|a|a.parse().ok()).unwrap_or(20260912);
     let n_out: usize = std::env::args().nth(2).and_then(|a|a.parse().ok()).unwrap_or(24);
-    let mut net = Network::new(v2cfg(), 24, 40, n_out, seed);
+    let comp: f32 = std::env::args().nth(3).and_then(|a|a.parse().ok()).unwrap_or(0.0); // D-54
+    let mut net = Network::new(v2cfg(comp), 24, 40, n_out, seed);
     // form A/C, legacy 8ch
     let known = ["A", "C"];
     let mut tr = Traces::new(&net, 20.0);
@@ -40,7 +41,7 @@ fn main() {
         *cnt.entry(sym.to_string()).or_insert(0)+=1;
     }}
     let refs: Vec<(String,Vec<f32>)> = acc.into_iter().map(|(p,v)|{let c=*cnt.get(&p).unwrap() as f32;(p,v.iter().map(|x|x/c).collect())}).collect();
-    println!("== outprobe seed={seed} n_out={n_out} ==");
+    println!("== outprobe seed={seed} n_out={n_out} comp={comp} ==");
     // how many output neurons ACTUALLY fire?
     let active: Vec<usize> = (0..n_out).filter(|&i| refs[0].1[i]>0.0 || refs[1].1[i]>0.0).collect();
     println!("   active out neurons: {}/{} -> {:?}", active.len(), n_out, active);
@@ -116,12 +117,24 @@ fn main() {
         }}
         println!("   th_known(0.20)-gated: A/C->correct={:.3} A/C->known_or_quiet distribution", rok as f32/rtot.max(1) as f32);
     }
+    // D-54 diag: per-output spike totals per symbol during held-out decode
+    if std::env::var("OUTPROBE_DIAG").is_ok() {
+        for sym in &known {
+            let mut tot=vec![0f32;n_out];
+            let st=io::symbol_trains(sym,seed);
+            for t in 0..io::BEAT_MS { let f=InputFrame{tick:net.tick,spikes:st.iter().filter(|(tt,_)|*tt==t).map(|(_,c)|*c).collect()};
+                let e=net.step(&f); for c in &e.spikes { let ci=c.0 as usize; if ci>=out_lo && ci<out_lo+n_out { tot[ci-out_lo]+=1.0; } }
+                net.tick=Tick(net.tick.0+1); }
+            let nz: Vec<String>=tot.iter().enumerate().filter(|(_,v)|**v>0.0).map(|(i,v)|format!("{i}:{v:.0}")).collect();
+            println!("   DIAG[{sym}] out-totals: [{}]", nz.join(", "));
+        }
+    }
     for r in &refs { // print nonzero channels
         let nz: Vec<String> = r.1.iter().enumerate().filter(|(_,v)|**v>0.0).map(|(i,v)|format!("{i}:{v:.0}")).collect();
         println!("   ref {}: nonzeros [{}]", r.0, nz.join(", "));
     }
 }
-fn v2cfg() -> NetworkConfig {
+fn v2cfg(comp: f32) -> NetworkConfig {
     NetworkConfig {
         connectivity:0.038, w_init:0.2, amplitude:52.0, adaptation_tau_ms:200.0,
         adaptation_gain:0.05, inhibition_gain:0.0, slow_state_beta:0.0046875,
@@ -145,3 +158,5 @@ fn v2p() -> V2Params {
     }
 }
 
+
+// D-54 diagnosis (append; run with OUTPROBE_DIAG=1)
