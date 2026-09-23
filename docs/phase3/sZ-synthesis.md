@@ -214,8 +214,9 @@ WHAT IS NOT REAL (falsified by honest measurement):
   two candidates (a) growth consumes/absorbs the detection capacity
   [a growth-cost], (b) fitness is BLIND to novelty detection
   (fitness = viability*known_recog*sep rewards nothing about detection)
-  so selection exerts no pressure to retain it and consolidation erodes
-  it. The D-56 fitness-blindness test (flag-gated fitness term)
+  so selection exerts no pressure to retain it (whatever erodes it -
+  consolidation, growth, or drift - is not yet identified). The D-56
+  fitness-blindness test (flag-gated fitness term)
   distinguishes them: decay stops -> selection-pressure cause; decay
   continues -> growth/codec cause. Do not state 'growth cost' as
   established - it is the correlation; the cause is the D-56 question.
