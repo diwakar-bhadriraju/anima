@@ -61,18 +61,31 @@ n~384-441 where synapses reach k*n (121279>82400 etc). The slope zone
 0.29-0.70. Recognition PERSISTS at 470+ neurons (0.30-0.55 mixed), far
 past the old 320 shelf.
 
-CONCLUSION: D-49 P1 LARGELY CONFIRMED. The ~320 'representational
-ceiling' (D-45/D-48 era) was SUBSTANTIALLY a budget artifact - with the
-cap scaling with growth, the organism survives past 434 (~8x baseline)
-and recognition never fully collapses. The soft slope (population fit
-<0.4 spread above ~350) is REAL but BOUNDED - oscillation, not a wall.
-CORRECTS: the 'neurogenesis caps at ~320' narrative. Growth is budget -
-and representationally viable to ~430+, the observed end of this window.
+CONCLUSION (amended post-review): MIXED - growth past ~320 is REAL but
+the k=200 cap SELECTIVELY RE-BOUND, so this run does NOT answer the
+pure-slope question cleanly. Verified facts:
+- Alive organisms NEVER fully collapse to fit 0.00 - every 0.000 slot in
+  gens 13-15 is a MONITOR-DEAD org (runaway 310Hz at n=328; exhaustion
+  at n=384/412/441). So 'recognition never fully collapses' for LIVING
+  organisms is TRUE.
+- BUT the cap re-bound for HIGH-SYNAPSE-DEMAND genomes: 3 exhaustion
+  deaths (77185>76800 at n=384 [barely, 0.5%], 121279>82400 at n=412,
+  124736>88200 at n=441) + 1 runaway (310Hz, n=328). The k=200 budget
+  (~3% headroom at n=383, matching the advisor's warning) culls
+  organisms whose synapse demand exceeds ~200/neuron.
+- FINDING (new): synapse demand is GENOME-DEPENDENT (275/neuron for the
+  121k@441 org vs ~180/neuron for survivors) - the E4d amplifier
+  strength varies between genomes, so k=200 SELECTS for synapse
+  efficiency. This is biologically interesting (selection on efficiency)
+  but means the observed ~8x is '~8x for low-synapse-demand lineages',
+  and the pure representational-slope question (cap fully non-binding,
+  k=250-300) technically REMAINS OPEN.
 
-REVISED CAPABILITY: organism grows 55 -> ~434 neurons (~8x) retaining
-non-collapsing recognition under selection, with the size-scaled budget.
-The soft slope above 350 is a quantization/competition oscillation to
-be understood, not a ceiling.
+REVISED CAPABILITY (honest): organism grows 55 -> ~434 neurons (~8x)
+with recognition never fully collapsing in LIVING organisms, under a
+size-scaled budget that selectively culls high-synapse-demand genomes.
+The soft slope above ~350 oscillates 0.29-0.70 but is not a wall. The
+pure-slope question (cap=0 binding) needs k=250-300.
 NEXT (user): (a) extend gens past 15 / check 500+; (b) attack the soft
 slope (compartmentalize or output-competition in the >350 regime);
 (c) accept ~8x evident end-state as the honest self-construction bound.
