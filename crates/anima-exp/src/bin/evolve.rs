@@ -5,7 +5,7 @@
 //! formation (live STDP) + closed survival loop; fitness = mean viability
 //! (+ small recognition bonus); 8 gens x 3 seeds. PRIMARY: does population
 //! mean size rise/fall/flat (the user's "network too small" question).
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
@@ -122,7 +122,11 @@ fn breed(parent: &Network, seed: u64, n_internal: usize, out_inh: f32) -> Networ
     breed_inner(parent, seed, n_internal, true, out_inh)
 }
 fn breed_inner(parent: &Network, seed: u64, n_internal: usize, mutate: bool, out_inh: f32) -> Network {
-    let mut wmap: HashMap<(u32, u32), f32> = HashMap::new();
+    // BTreeMap: ORDERED iteration. Residual-add + mutation draw rng
+    // against ordered keys; HashMap order is per-process
+    // nondeterministic -> offspring differ run-to-run (measured: same
+    // cmd twice, gen-1 mean_fit 0.532 vs 0.531). BTreeMap fixes it.
+    let mut wmap: BTreeMap<(u32, u32), f32> = BTreeMap::new();
     // build weight map from LIVE parent synapses only (skip tombstones)
     for s in &parent.synapses {
         if s.silent_ticks == u64::MAX { continue; }
@@ -265,6 +269,14 @@ fn main() {
                 } else {
                     out.mean_viability * (0.5 + 0.5 * out.known_recognized_frac)
                 };
+                // death-cause instrumentation (D-47): thread died_at +
+                // fail kind into the scoring line so the wall mechanism
+                // (recognition-collapse-while-alive vs runaway) is
+                // recorded - it determines the next intervention.
+                if std::env::var("EVOLVE_VERBOSE").is_ok() {
+                    eprintln!("  org {i}: dead={:?} fail={:?} n={} fit={f:.3}",
+                        out.died_at, out.failed, org.net.neurons.len());
+                }
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     eprintln!("  org {i}: gp={:?} syn_growth={syn_growth:+} fit={f:.3}",
                         org.growth_params, );
