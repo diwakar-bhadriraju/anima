@@ -234,3 +234,34 @@ OPEN FOLLOW-UPS (registered):
       DETECTION survives the growth-decay that killed the codec's
       (re-asks D-56's question WITH a working mechanism).
 STOP - D-58 closed with verified, deduplicated code.
+
+## D-58 stage-3 margin CORRECTION (2026-09-23): drift is NOT STDP-learning of D
+
+ADVISORY CLAIM: "D presentations run STDP live, the pool learns D."
+SOURCE CHECK: capture_ref (the ONLY path that presents D in the library
+harness) calls net.step WITHOUT stdp_tick - NO plasticity during D or
+known presentations. The STDP-learning-in hypothesis is FALSE for this
+code.
+
+MEASURED margin data (9001 stage3): D min-L2 = 90.5, 90.5 (novel), then
+35.0, 22.0, 21.0 (familiar) - monotonically declining across the 5
+beats. 424242 stage3: 135.0 (novel), then 6.0, 8.0, 9.0 (familiar).
+This is PROGRESSIVE, beat-by-beat - but the mechanism is INTRINSIC
+STATE DRIFT in net.step (slow_state/u_slow per-spike accumulation,
+i_adapt), NOT weight learning: repeated presentations of knowns AND D
+shift the pool's intrinsic state, so later D beats evoke a response
+closer to the known band. The per-beat templates are captured fresh,
+but the POOL STATE has converged toward known-firing by later beats.
+
+Honest record: stage-3 novelty is robust early-beat, degrades
+later-beat as the pool's intrinsic state (slow depolarization /
+adaptation) converges to known-firing regardless of input. This is a
+DYNAMICS effect (net.step intrinsic adaptation), not an STDP/learning
+effect, and not knife-edge threshold placement (margins go 90->21,
+135->6 - clear drift, not boundary noise).
+
+Fix direction (registered): the probe presentations should not perturb
+the intrinsic state - either zero the slow-state contribution during
+probing, or interleave probes with longer rest gaps so the state
+resets. (NOT STDP gating - there is no STDP on this path.)
+STOP - drift mechanism identified as intrinsic-state convergence.
