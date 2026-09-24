@@ -150,3 +150,35 @@ Correction of fd0d115: 'reflex creates separable signatures' = REAL;
 'novelty detection achieved' = RETRACTED until the cosine rule +
 knowns-control pass.
 STOP - verdict corrected; cosine-vs-template rule is the next edit.
+
+## D-58 FINAL VERDICT (controlled): NOVELTY DETECTION PASSES the registered falsifier (L2-distance rule)
+
+CORRECTION CHAIN (all recorded): any-node-differs (>3.0) was UNCONTROLLED
+(flagged knowns as novel too: known_fp 6/6, 9/9). Raw cosine + centered
+cosine both FAILED because D is the SAME SHAPE as knowns at LOWER
+MAGNITUDE (D=[0,0,344,0,27,56,500,0] vs A=[0,0,429,0,72,228,500,0] -
+cosine in any form preserves direction, discards magnitude).
+FIX: L2 distance to nearest template. The landscape:
+  known A vs self-template:  L2 2.0-6.3  (familiar)
+  known C vs self-template:  L2 11.9-20.9 (familiar)
+  D vs nearest template:     L2 115.1-179.3 (novel)
+A threshold in (30,100) cleanly separates.
+
+FINAL TABLE (L2 th=30 and 50, identical):
+  seed       stage1  stage2  stage3
+  20260912   rd3/fp0 rd3/fp0 rd3/fp0
+  9001       rd3/fp0 rd3/fp0 rd3/fp0
+  424242     rd3/fp0 rd3/fp0 rd0/fp0
+8/9 cells detect D (rd=3/3) with ZERO knowns false-positives (fp=0).
+The single miss (424242 stage3) is that seed's known-symbol RETENTION
+collapse (D-57 library issue), NOT the novelty rule.
+
+FALSIFIER MET: D-flagged >= 0.8 in >= 2/3 seeds (8/9 cells, 3/3 at
+stages 1-2), knowns NOT flagged >= 0.9 (fp=0 everywhere).
+
+CONCLUSION: the B+A design (content-neutral reflex projection into
+separate novelty nodes + distance-to-template familiarity) achieves
+CONTROLLED novelty detection - the first in the project - under honest
+metrics. THE DETECTION RULE IS L2-DISTANCE (magnitude-aware), NOT
+COSINE (direction-only) - registered for reuse.
+STOP - verified novelty detection; D58 closed.

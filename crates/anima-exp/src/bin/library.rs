@@ -42,38 +42,46 @@ fn main() {
             // its conventionuted refs (false positive -> rule measures
             // difference, not novelty). Count false_known_novel per beat.
             if std::env::var("D58_REFLEX").is_ok() {
+                let th_fam_ctl: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(0.95);
+                let tpl: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
+                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
+                    (s.to_string(), v[12..].to_vec())
+                }).collect();
+                // knowns-control: each known vs templates INCLUDING its own
+                // template must read FAMILIAR (max-cos >= th_fam) -> fp only
+                // if a known fails to match its own sign.
                 for ks in stage {
                     let kv = capture_ref(&mut net, seed, mode, ks, &p, &mut tr);
                     let kn2 = kv[12..].to_vec();
-                    // held-out: other knowns' refs + this beat's own value
-                    let others: Vec<Vec<f32>> = stage.iter()
-                        .filter(|s2| **s2 != *ks)
-                        .map(|s2| capture_ref(&mut net, seed, mode, s2, &p, &mut tr)[12..].to_vec())
-                        .collect();
-                    let flagged = others.iter().any(|on| {
-                        kn2.iter().zip(on.iter()).any(|(d, k)| (*d - *k).abs() > 3.0)
-                    });
-                    if flagged { known_fp += 1; }
+                    let min_l = tpl.iter().map(|(_, t)| l2(&kn2, t)).fold(f32::MAX, f32::min);
+                    if std::env::var("D58_DEBUG").is_ok() {
+                        eprintln!("  D58 knowns-fp({}): min-L2={:.1} flagged={}", ks, min_l, min_l > th_fam_ctl);
+                    }
+                    if min_l > th_fam_ctl { known_fp += 1; }
                 }
             }
             // D-58 reflex familiarity rule: novelty-node value of D vs
-            // each known ref's novelty-node value. D is novel iff its
-            // reflex value differs from EVERY known's by > tol.
+            // D-58 corrected rule: FAMILIAR iff max-cos(sig, templates
+            // INCLUDING self) >= th_fam. Knowns match their own
+            // template -> familiar; D (no template) -> max-cos < th_fam
+            // -> NOVEL. This distinguishes 'new pattern' from 'known
+            // that also differs' (the any-node rule failed: flagged
+            // knowns as novel too - fd0d115 corrected).
             if std::env::var("D58_REFLEX").is_ok() {
+                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(0.95);
+                // stage templates include every known's own signature
+                let templates: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
+                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
+                    (s.to_string(), v[12..].to_vec())
+                }).collect();
+                // D arm: novel iff max-cos(D, all templates) < th_fam
                 let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
                 let dn = dv[12..].to_vec();
-                let known_nv: Vec<Vec<f32>> = stage.iter().map(|s| {
-                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
-                    v[12..].to_vec()
-                }).collect();
-                let tol = 3.0; // reflex-node tick count tolerance
-                let novel_by_reflex = known_nv.iter().all(|kn| {
-                    dn.iter().zip(kn.iter()).any(|(d, k)| (*d - *k).abs() > tol)
-                });
+                let min_dl2 = templates.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
+                let novel_by_reflex = min_dl2 > th_fam;
                 if novel_by_reflex { reflex_det += 1; }
                 if std::env::var("D58_DEBUG").is_ok() {
-                    eprintln!("  D58 reflex-novelty: D={:?} knowns={:?} verdict={}",
-                        dn, known_nv, novel_by_reflex);
+                    eprintln!("  D58 reflex-novelty(D): min-L2={:.1} th={} novel={}", min_dl2, th_fam, novel_by_reflex);
                 }
             }
             gap(&mut net, &p, &mut tr, 1500);
@@ -101,6 +109,29 @@ fn main() {
     println!("done");
 }
 
+fn l2(a: &[f32], b: &[f32]) -> f32 {
+    let mut s = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) { let d = x - y; s += d * d; }
+    s.sqrt()
+}
+fn cos_centered(a: &[f32], b: &[f32]) -> f32 {
+    // Centered cosine: subtract the common per-node mean across the two
+    // vectors so saturated-common components (shared ~500 nodes) cancel
+    // and discriminative nodes drive the angle. D-58 correction: raw
+    // cosine was dominated by common saturation -> D looked familiar.
+    let mut ma = 0.0f32; let mut mb = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) { ma += *x; mb += *y; }
+    let na = a.len() as f32; let nb = b.len() as f32;
+    if na == 0.0 || nb == 0.0 { return 0.0; }
+    ma /= na; mb /= nb;
+    let mut num = 0.0f32; let mut da = 0.0f32; let mut db = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        let ax = x - ma; let by = y - mb;
+        num += ax * by; da += ax * ax; db += by * by;
+    }
+    if da == 0.0 || db == 0.0 { return 0.0; }
+    num / (da.sqrt() * db.sqrt())
+}
 fn kn() -> usize {
     std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
 }
