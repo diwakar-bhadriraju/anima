@@ -42,14 +42,14 @@ fn main() {
             // its conventionuted refs (false positive -> rule measures
             // difference, not novelty). Count false_known_novel per beat.
             if std::env::var("D58_REFLEX").is_ok() {
-                let th_fam_ctl: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(0.95);
+                let th_fam_ctl: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
+                // knowns-control: each known vs PER-BEAT templates (incl.
+                // its own, captured fresh NOW - state-matched, D-55 rule;
+                // stage-frozen templates drift as the net keeps running).
                 let tpl: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
                     let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
                     (s.to_string(), v[12..].to_vec())
                 }).collect();
-                // knowns-control: each known vs templates INCLUDING its own
-                // template must read FAMILIAR (max-cos >= th_fam) -> fp only
-                // if a known fails to match its own sign.
                 for ks in stage {
                     let kv = capture_ref(&mut net, seed, mode, ks, &p, &mut tr);
                     let kn2 = kv[12..].to_vec();
@@ -60,24 +60,22 @@ fn main() {
                     if min_l > th_fam_ctl { known_fp += 1; }
                 }
             }
-            // D-58 reflex familiarity rule: novelty-node value of D vs
-            // D-58 corrected rule: FAMILIAR iff max-cos(sig, templates
-            // INCLUDING self) >= th_fam. Knowns match their own
-            // template -> familiar; D (no template) -> max-cos < th_fam
-            // -> NOVEL. This distinguishes 'new pattern' from 'known
-            // that also differs' (the any-node rule failed: flagged
-            // knowns as novel too - fd0d115 corrected).
+            // D-58 verified rule (e918550): NOVEL iff min-L2 distance to
+            // the nearest known template EXCEEDS th_fam. Measured:
+            // known self-distance 2-21, D distance 115-179 -> th 60
+            // separates. Cosine FAILED (D is same shape, lower magnitude
+            // - angle preserves direction, discards magnitude); L2 is
+            // magnitude-aware and is THE registered rule.
             if std::env::var("D58_REFLEX").is_ok() {
-                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(0.95);
-                // stage templates include every known's own signature
-                let templates: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
+                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
+                // D arm: novel iff min-L2(D, PER-BEAT templates) > th_fam
+                let tpl2: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
                     let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
                     (s.to_string(), v[12..].to_vec())
                 }).collect();
-                // D arm: novel iff max-cos(D, all templates) < th_fam
                 let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
                 let dn = dv[12..].to_vec();
-                let min_dl2 = templates.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
+                let min_dl2 = tpl2.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
                 let novel_by_reflex = min_dl2 > th_fam;
                 if novel_by_reflex { reflex_det += 1; }
                 if std::env::var("D58_DEBUG").is_ok() {

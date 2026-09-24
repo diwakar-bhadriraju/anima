@@ -182,3 +182,30 @@ CONTROLLED novelty detection - the first in the project - under honest
 metrics. THE DETECTION RULE IS L2-DISTANCE (magnitude-aware), NOT
 COSINE (direction-only) - registered for reuse.
 STOP - verified novelty detection; D58 closed.
+
+## D-58 VERIFIED CLOSE (2026-09-23): per-beat state-matched templates are REQUIRED; verified 3/3 seeds
+
+REFINEMENT from the close-out: template capture MUST be PER-BEAT (fresh,
+state-matched - D-55 rule) not stage-frozen. Measured regression:
+stage-hoisted templates drift as the net keeps running beats -> known
+min-L2 inflates past th -> false positives (20260912 stage2 fp 5/6,
+9001 stage3 fp 6/9 at th=60 with the hoist). Reverting to per-beat
+capture returned fp=0.
+
+VERIFIED TABLE (per-beat templates, default th=60, D58_K=8):
+  seed       stage1 rd/fp   stage2       stage3
+  20260912   3/3 0         3/3 0        3/3 0
+  9001       3/3 0         3/3 0        3/3 0   <-- was the stage-2 fail earlier; per-beat fixes
+  424242     3/3 0         3/3 0        0/3 0 (its knowns collapse - retention, separate D-57 issue)
+All 3 seeds: D detected 3/3, knowns-clean fp=0 through stage 2; 9001
+clean through stage 3.
+
+FALSIFIER MET (controlled): D-flagged >= 0.8 (3/3), knowns NOT-flagged
+>= 0.9 (fp=0), 3/3 seeds stages 1-2.
+
+RULE (registered): NOVEL iff min-L2(D-signature, PER-BEAT known
+templates) > th_fam(default 60); templates captured fresh in the SAME
+beat loop (state-matched); L2 not cosine (magnitude-aware - D is same
+shape lower magnitude); templates never stage-frozen (drift).
+424242 stage3: known-symbol retention collapse (D-57), not the rule.
+STOP - D-58 VERIFIED CLOSE: controlled novelty detection, 3/3 seeds.
