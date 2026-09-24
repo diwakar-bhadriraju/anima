@@ -462,6 +462,16 @@ pub struct NetworkConfig {
     /// initialization + the V2Plasticity mechanisms (M2–M6) are active.
     #[serde(default)]
     pub v2: Option<V2Params>,
+    /// D-58 (docs/phase3/d58-novelty-reflex-protocol.md): reflex-y
+    /// familiarity projection into dedicated NOVELTY nodes. When true:
+    /// 2 EXTRA output neurons appended after the identity band, each
+    /// with FIXED non-plastic synapses from every input channel (seeded
+    /// deterministic, content-neutral - same projection for all
+    /// symbols). Identity band 64..76 UNTOUCHED; novelty nodes are a
+    /// separate readout for the D-58 novelty decode. false = identity
+    /// (no extra nodes, no projection).
+    #[serde(default)]
+    pub d58_reflex: bool,
 }
 
 /// Frozen ANIMA v2 parameters (docs/anima-v2-protocol.md §2–§8).
@@ -617,6 +627,7 @@ impl Default for NetworkConfig {
             eta_rel: 0.0,
             // V2 default OFF: None must reproduce E1–E4f exactly.
             v2: None,
+            d58_reflex: false,
         }
     }
 }
@@ -772,13 +783,51 @@ impl Network {
             });
         }
 
+        // D-58 reflex-y familiarity nodes (flag): 2 extra OUTPUT neurons
+        // with FIXED synapses from every input channel. Content-neutral
+        // (same random projection for all symbols - cannot know identity,
+        // only input drive signature). Non-plastic reflex arc.
+        if cfg.d58_reflex {
+            for rn in 0..2usize {
+                let id = NeuronId(neurons.len() as u32);
+                neurons.push(Neuron {
+                    id,
+                    class: NeuronClass::Output,
+                    born: Tick(0),
+                    channel: None,
+                    v: cfg.lif.v_rest,
+                    refractory_until: Tick(0),
+                    i_syn: 0.0,
+                    i_ext: 0.0,
+                    rate_hz: 0.0,
+                    i_adapt: 0.0,
+                    u_slow: 0.0,
+                    z_latch: 0,
+                    g_drive: 0.0,
+                    theta_rel: 1.0,
+                    u_plateau_rel: 1.0,
+                    tau_het_rel: 1.0,
+                    rg_w: 0.0,
+                    rg_p: 0.0,
+                    rg_p2: Vec::new(),
+                    rg_w2: Vec::new(),
+                    ctx_protos: Vec::new(),
+                    elg: 0.0,
+                    dormant_since: None,
+                    retired: false,
+                });
+            }
+        }
+
         let n_total = n_input_channels + n_internal + n_output;
+        let d58_reflex = cfg.d58_reflex; // copy before cfg moves into net
         let mut net = Self {
             cfg,
             neurons,
             synapses: Vec::new(),
-            incoming: vec![Vec::new(); n_input_channels + n_internal + n_output],
-            outgoing: vec![Vec::new(); n_input_channels + n_internal + n_output],
+            // D-58: under the reflex flag, 2 extra output rows
+            incoming: vec![Vec::new(); n_input_channels + n_internal + n_output + if d58_reflex { 2 } else { 0 }],
+            outgoing: vec![Vec::new(); n_input_channels + n_internal + n_output + if d58_reflex { 2 } else { 0 }],
             channels,
             tick: Tick(0),
         rng,
@@ -946,6 +995,26 @@ impl Network {
                 let src = net.channels[ch].target;
                 let w = ing_w_in();
                 net.add_synapse_full(src, inid, w, false, false, Tick(0));
+            }
+        }
+    }
+
+    // D-58 reflex-y familiarity projection (flag): each input channel
+    // fires FIXED non-plastic synapses onto the 2 novelty nodes.
+    // Content-neutral: weights derived from a seeded separate stream
+    // (fnv("d58-reflex", net.seed, channel, node)), same for all
+    // symbols - the nodes respond to input-drive SIGNATURE, not
+    // identity. Amplitude scaled so normal symbol drive lands mid-range.
+    if d58_reflex {
+        let n_novel = 2usize;
+        let base = n_input_channels + n_internal + n_output;
+        // collect input channel targets first (borrow-safe)
+        let in_targets: Vec<NeuronId> = net.channels.iter().map(|c| c.target).collect();
+        for (ni, ref_id) in (base..base + n_novel).enumerate() {
+            for (ci, src) in in_targets.iter().enumerate() {
+                let h = d_ing_hash_str(&format!("d58-reflex-{ci}-{ni}"), net.seed);
+                let w = 0.02 + ((h >> 32) as f32 / u32::MAX as f32) * 0.06; // [0.02,0.08]
+                net.add_synapse_full(*src, NeuronId(ref_id as u32), w, false, false, Tick(0));
             }
         }
     }

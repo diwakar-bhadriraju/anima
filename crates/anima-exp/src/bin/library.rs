@@ -35,7 +35,35 @@ fn main() {
             }
             let act_d = decode_beat(&mut net, seed, mode, "D", &p, &mut tr, &refs);
             if act_d == "NOVEL" || act_d == "UNSURE" { novel_det += 1; }
+            // D-58 reflex familiarity rule: novelty-node value of D vs
+            // each known ref's novelty-node value. D is novel iff its
+            // reflex value differs from EVERY known's by > tol.
+            if std::env::var("D58_REFLEX").is_ok() {
+                let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
+                let dn = dv[12..].to_vec();
+                let known_nv: Vec<Vec<f32>> = stage.iter().map(|s| {
+                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
+                    v[12..].to_vec()
+                }).collect();
+                let tol = 3.0; // reflex-node tick count tolerance
+                let novel_by_reflex = known_nv.iter().all(|kn| {
+                    dn.iter().zip(kn.iter()).any(|(d, k)| (*d - *k).abs() > tol)
+                });
+                if std::env::var("D58_DEBUG").is_ok() {
+                    eprintln!("  D58 reflex-novelty: D={:?} knowns={:?} verdict={}",
+                        dn, known_nv, novel_by_reflex);
+                }
+            }
             gap(&mut net, &p, &mut tr, 1500);
+        }
+        if std::env::var("D58_DEBUG").is_ok() && std::env::var("D58_REFLEX").is_ok() {
+            for s in stage {
+                let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
+                let nv = &v[12..];
+                eprintln!("  D58[{}] novelty-nodes: {:?}", s, nv);
+            }
+            let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
+            eprintln!("  D58[D] novelty-nodes: {:?}", &dv[12..]);
         }
         let mut line = format!("  stage{} vocab={:?} ", si + 1, stage);
         for s in known_all {
@@ -54,13 +82,19 @@ fn main() {
 fn capture_ref(net: &mut Network, seed: u64, mode: &str, sym: &str, _p: &StdpParams, _tr: &mut Traces) -> Vec<f32> {
     let st = io::symbol_trains_mode(sym, mode, seed);
     let mut out = vec![0.0f32; 12];
+    let rfx = std::env::var("D58_REFLEX").is_ok();
+    let mut nov = vec![0.0f32; if rfx { 2 } else { 0 }];
     for t in 0..io::BEAT_MS {
         let f = InputFrame { tick: net.tick, spikes: st.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
         let e = net.step(&f);
-        for c in &e.spikes { if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) { out[(c.0 - io::OUTPUT_LO) as usize] += 1.0; } }
+        for c in &e.spikes {
+            let ci = c.0 as usize;
+            if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) { out[(ci - io::OUTPUT_LO as usize) as usize] += 1.0; }
+            else if rfx && ci >= 76 && ci < 78 { nov[ci - 76] += 1.0; }
+        }
         net.tick = Tick(net.tick.0 + 1);
     }
-    out
+    if rfx { { let mut v = out; v.extend(nov); v } } else { out }
 }
 fn decode_beat(net: &mut Network, seed: u64, mode: &str, sym: &str, p: &StdpParams, tr: &mut Traces, refs: &[(String, Vec<f32>)]) -> String {
     let v = capture_ref(net, seed, mode, sym, p, tr);
@@ -92,7 +126,9 @@ fn v2cfg() -> NetworkConfig {
         adaptation_gain: 0.05, inhibition_gain: 0.0, slow_state_beta: 0.0046875,
         slow_state_tau_ms: 5000.0, slow_state_beta_drive: false, latch_enable: true,
         theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: 0.0,
-        tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2p()), ..Default::default()
+        tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2p()),
+        d58_reflex: std::env::var("D58_REFLEX").is_ok(),
+        ..Default::default()
     }
 }
 fn v2p() -> anima_core::network::V2Params {
