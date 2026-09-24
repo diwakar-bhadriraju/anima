@@ -26,6 +26,7 @@ fn main() {
         let mut rec: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
         let mut pres: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
         let mut novel_det = 0u32;
+        let mut reflex_det = 0u32;
         for _ in 0..beat_n {
             for s in stage {
                 let act = decode_beat(&mut net, seed, mode, s, &p, &mut tr, &refs);
@@ -49,6 +50,7 @@ fn main() {
                 let novel_by_reflex = known_nv.iter().all(|kn| {
                     dn.iter().zip(kn.iter()).any(|(d, k)| (*d - *k).abs() > tol)
                 });
+                if novel_by_reflex { reflex_det += 1; }
                 if std::env::var("D58_DEBUG").is_ok() {
                     eprintln!("  D58 reflex-novelty: D={:?} knowns={:?} verdict={}",
                         dn, known_nv, novel_by_reflex);
@@ -73,24 +75,27 @@ fn main() {
                 line.push_str(&format!("{s}={ok}/{tot} "));
             } else { line.push_str(&format!("{s}=UNTRAINED ")); }
         }
-        line.push_str(&format!("novel_det={}/{}", novel_det, beat_n));
+        line.push_str(&format!("novel_det={}/{} reflex_det={}/{}", novel_det, beat_n, reflex_det, beat_n));
         println!("{line}");
     }
     println!("done");
 }
 
+fn kn() -> usize {
+    std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
+}
 fn capture_ref(net: &mut Network, seed: u64, mode: &str, sym: &str, _p: &StdpParams, _tr: &mut Traces) -> Vec<f32> {
     let st = io::symbol_trains_mode(sym, mode, seed);
     let mut out = vec![0.0f32; 12];
     let rfx = std::env::var("D58_REFLEX").is_ok();
-    let mut nov = vec![0.0f32; if rfx { 2 } else { 0 }];
+    let mut nov = vec![0.0f32; if rfx { kn() } else { 0 }];
     for t in 0..io::BEAT_MS {
         let f = InputFrame { tick: net.tick, spikes: st.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
         let e = net.step(&f);
         for c in &e.spikes {
             let ci = c.0 as usize;
             if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) { out[(ci - io::OUTPUT_LO as usize) as usize] += 1.0; }
-            else if rfx && ci >= 76 && ci < 78 { nov[ci - 76] += 1.0; }
+            else if rfx && ci >= 76 && ci < 76 + kn() { nov[ci - 76] += 1.0; }
         }
         net.tick = Tick(net.tick.0 + 1);
     }
@@ -127,7 +132,9 @@ fn v2cfg() -> NetworkConfig {
         slow_state_tau_ms: 5000.0, slow_state_beta_drive: false, latch_enable: true,
         theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: 0.0,
         tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2p()),
-        d58_reflex: std::env::var("D58_REFLEX").is_ok(),
+        d58_reflex: if std::env::var("D58_REFLEX").is_ok() {
+            std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
+        } else { 0 },
         ..Default::default()
     }
 }

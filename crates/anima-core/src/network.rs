@@ -471,7 +471,7 @@ pub struct NetworkConfig {
     /// separate readout for the D-58 novelty decode. false = identity
     /// (no extra nodes, no projection).
     #[serde(default)]
-    pub d58_reflex: bool,
+    pub d58_reflex: usize,
 }
 
 /// Frozen ANIMA v2 parameters (docs/anima-v2-protocol.md §2–§8).
@@ -627,7 +627,7 @@ impl Default for NetworkConfig {
             eta_rel: 0.0,
             // V2 default OFF: None must reproduce E1–E4f exactly.
             v2: None,
-            d58_reflex: false,
+            d58_reflex: 0,
         }
     }
 }
@@ -787,8 +787,8 @@ impl Network {
         // with FIXED synapses from every input channel. Content-neutral
         // (same random projection for all symbols - cannot know identity,
         // only input drive signature). Non-plastic reflex arc.
-        if cfg.d58_reflex {
-            for rn in 0..2usize {
+        if cfg.d58_reflex > 0 {
+            for rn in 0..cfg.d58_reflex {
                 let id = NeuronId(neurons.len() as u32);
                 neurons.push(Neuron {
                     id,
@@ -826,8 +826,8 @@ impl Network {
             neurons,
             synapses: Vec::new(),
             // D-58: under the reflex flag, 2 extra output rows
-            incoming: vec![Vec::new(); n_input_channels + n_internal + n_output + if d58_reflex { 2 } else { 0 }],
-            outgoing: vec![Vec::new(); n_input_channels + n_internal + n_output + if d58_reflex { 2 } else { 0 }],
+            incoming: vec![Vec::new(); n_input_channels + n_internal + n_output + d58_reflex],
+            outgoing: vec![Vec::new(); n_input_channels + n_internal + n_output + d58_reflex],
             channels,
             tick: Tick(0),
         rng,
@@ -1005,16 +1005,38 @@ impl Network {
     // (fnv("d58-reflex", net.seed, channel, node)), same for all
     // symbols - the nodes respond to input-drive SIGNATURE, not
     // identity. Amplitude scaled so normal symbol drive lands mid-range.
-    if d58_reflex {
-        let n_novel = 2usize;
+    if d58_reflex > 0 {
+        let n_novel = d58_reflex;
         let base = n_input_channels + n_internal + n_output;
         // collect input channel targets first (borrow-safe)
         let in_targets: Vec<NeuronId> = net.channels.iter().map(|c| c.target).collect();
+        // D-58 diagnosis: record per-reflex-node incoming synapse count
+        // + weight sum + silent state BEFORE the projection (the deposit
+        // loop skips silent_ticks==u64::MAX synapses; if the nodes'
+        // afferents get tombstoned, node 0 stays dead - the advisory's
+        // hypothesis to rule out before sweeping k).
+        let pre_incoming = (0..n_novel).map(|ni| {
+            let sid = base + ni;
+            (sid, net.incoming[sid].clone())
+        }).collect::<Vec<_>>();
         for (ni, ref_id) in (base..base + n_novel).enumerate() {
             for (ci, src) in in_targets.iter().enumerate() {
                 let h = d_ing_hash_str(&format!("d58-reflex-{ci}-{ni}"), net.seed);
                 let w = 0.02 + ((h >> 32) as f32 / u32::MAX as f32) * 0.06; // [0.02,0.08]
                 net.add_synapse_full(*src, NeuronId(ref_id as u32), w, false, false, Tick(0));
+            }
+        }
+        // D-58 diagnosis: node anatomy after projection
+        if std::env::var("D58_DIAG").is_ok() {
+            for (sid, _) in &pre_incoming {
+                let syns: Vec<(&str, f32, f32)> = net.incoming[*sid].iter().map(|sid2| {
+                    let s = &net.synapses[sid2.idx()];
+                    (if s.silent_ticks == u64::MAX { "TOMBSTONED" } else { "live" }, s.w, s.amplitude)
+                }).collect();
+                let sumw: f32 = syns.iter().filter(|(k,_,_)| *k=="live").map(|(_,w,_)| *w).sum();
+                eprintln!("  D58 DIAG node {}: incoming={} live={}/{} sum_w={:.4} amp={}",
+                    sid - base, syns.len(), syns.iter().filter(|(k,_,_)| *k=="live").count(), syns.len(),
+                    sumw, net.cfg.amplitude);
             }
         }
     }

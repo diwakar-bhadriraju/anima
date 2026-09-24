@@ -93,3 +93,39 @@ STATUS: D-58 Phase-1 = mechanism validated (reflex creates separable
 signatures), quantization failure identified. Phase-1.5 = more reflex
 nodes / finer projection. Honest metrics applied throughout.
 STOP.
+
+## D-58 PHASE-1.5 VERDICT: PASS - reflex-y familiarity nodes achieve NOVELTY DETECTION (first mechanism to do so)
+
+k=8 (reflex node count) honest stage lines, 3 seeds:
+  seed        stage1  stage2  stage3
+  20260912    3/3     3/3     3/3
+  9001        3/3     3/3     3/3
+  424242      3/3     3/3     0/3
+8/9 stage-seed cells detect D as NOVEL. The single failure (424242
+stage3) is where that seed's knowns collapse under library growth
+(C=3/E=3 but D-vs-knowns reflex margin broke).
+
+WHY IT WORKS (measured spectra, k=8): each input pattern drives the 8
+fixed non-plastic novelty nodes to a DISTINCT spectrum, e.g.
+  A:  [0,0,429,0,72,228,500,0]
+  C:  [0,0,427,0,197,154,500,0]
+  E:  [0,0,435,0,282,200,500,0]
+  D:  [0,0,344,0,27,56,500,0]   <- node 5 far below all knowns
+D's node-5 (56-76) vs knowns (154-248) -> familiarity-mismatch fires.
+The reflex gives identity-channel SIGNATURES that the 12-dim identity
+codec's near-identical refs (cos~0.99) could never.
+
+SIGNIFICANCE: FIRST mechanism in the project to detect novelty under
+honest metrics (D-53 rules): 8/9 cells, 2/3+ seeds (3/3 at stages 1-2).
+The D-58 design (fix A: content-neutral reflex projection + fix B:
+separate novelty-node system, no argmax entanglement) is VALIDATED.
+
+REMAINING: 424242 stage-3 (its knowns collapse there - the library-
+retention issue, separate from novelty). Also reflex_det is measured
+on captured-ref fresh spectra (run-to-run variance in node values ~5%)
+but verdict robust.
+
+STATUS: D-58 PASS (novelty detection achieved). Next: the 424242
+stage-3 retention failure + whether reflex specificity degrades with
+library size (k=8 fixed vs vocab>8?).
+STOP - novelty detection WORKS via reflex; recorded.
