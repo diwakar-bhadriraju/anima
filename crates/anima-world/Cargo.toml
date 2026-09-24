@@ -1,0 +1,15 @@
+[package]
+name = "anima-world"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anima-core = { path = "../anima-core" }
+anima-exp = { path = "../anima-exp" }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+
+[lib]
+name = "anima_world"
+path = "src/lib.rs"

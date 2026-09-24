@@ -15,6 +15,7 @@ use anima_core::structural_v2::V2Plasticity;
 
 use anima_exp::config::SurvivalSpec;
 use anima_exp::io;
+use anima_exp::reflex;
 use anima_exp::survival;
 
 const N_POP: usize = 4;
@@ -52,6 +53,10 @@ fn build_net(seed: u64, n_internal: usize, out_inh: f32) -> Network {
         u_plateau_rel_sd: 0.0, tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0,
         v2: Some(v2_params()), output_inhibition_gain: out_inh, // D-46
         output_competition_gain: comp_gain, // D-54
+        // D-59: reflex band in-life (the D-58 rule moved into the survival
+        // loop). D59_REFLEX set => REFLEX_K novelty nodes appended after the
+        // identity band; unset = 0 = byte-identical baseline.
+        d58_reflex: if std::env::var("D59_REFLEX").is_ok() { reflex::REFLEX_K } else { 0 },
         ..NetworkConfig::default()
     };
     Network::new(cfg, 24, n_internal, 12, seed)
@@ -326,6 +331,13 @@ fn main() {
     // optional argv[2] = gens override (size-push: run past the old
     // ~229 wall, e.g. `evolve 424242 16`). Default GENS.
     let gencap: u32 = std::env::args().nth(2).and_then(|a| a.parse().ok()).unwrap_or(GENS);
+    // D-59 (docs/phase3/d59-reflex-integration-protocol.md): in-life gates.
+    // D59_REFLEX=1 -> reflex band + reflex novelty detection; D59_MOTOR=1
+    // -> closed-loop motor world. Both off = byte-identical baseline.
+    let d59_reflex_k: usize = if std::env::var("D59_REFLEX").is_ok() { reflex::REFLEX_K } else { 0 };
+    let d59_motor: bool = std::env::var("D59_MOTOR").is_ok();
+    // D-59 per-gen summary columns only when the run is D-59-active.
+    let d59_show = d59_reflex_k > 0 || d59_motor;
     for &esec in &SEEDS {
         if let Some(w) = want { if w != esec { continue; } }
         println!("=== seed {esec} gens={gencap} ===");
@@ -337,6 +349,11 @@ fn main() {
         let mut gen_best: Vec<f32> = Vec::new();
         for g in 0..gencap {
             let mut scored: Vec<(f32, usize, usize, u64)> = Vec::new(); // (fitness, popidx, size, orgseed)
+            // D-59 per-gen columns: means of per-org fractions, printed
+            // only when Some across ALL organisms of the gen.
+            let mut g_reflex: Vec<f32> = Vec::new();
+            let mut g_cons: Vec<f32> = Vec::new();
+            let mut g_wv: Vec<f32> = Vec::new();
             for (i, (org, formed)) in pop.iter_mut().zip(formed_flags.iter_mut()).enumerate() {
                 let mut traces = Traces::new(&org.net, 20.0);
                 if !*formed { form_s1(&mut org.net, org.seed); *formed = true; }
@@ -403,7 +420,7 @@ fn main() {
                 // the monitor is the BACKUP for genuine runaway beyond it.
                 rcfg.runaway_rate_hz = spec.a_bounds[1] + 30.0;
                 let rmon = Some(anima_core::resources::ResourceMonitor::new(rcfg));
-                let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true, rmon, d50_mode());
+                let out = survival::run_world_full(&mut org.net, org.seed, world_seed, &refs, &spec, &p, &mut traces, Some(&mut v2), 100, structural_opt, pe_state0, true, rmon, d50_mode(), d59_reflex_k, d59_motor);
                 let syn_growth = org.net.live_synapses().count() as isize - syn_before as isize;
                 org.size = org.net.neurons.len() - 24 - 12;
                 // fitness in [0,1]: mean viability scaled by the recognition
@@ -466,6 +483,10 @@ fn main() {
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     eprintln!("  org {i} NOVEL: detected={} contaminated={} (loop-side, gap-separated)",
                         out.novel_detected_frac, out.novel_contaminated);
+                    if d59_show {
+                        eprintln!("  org {i} reflex: det_frac={:?} cons_frac={:?} wv_frac={:?}",
+                            out.reflex_novel_detected_frac, out.consequence_novel_frac, out.world_consequence_violation_frac);
+                    }
                     let mut coses = String::new();
                     for ri in 0..refs.len() {
                         for rj in (ri+1)..refs.len() {
@@ -477,22 +498,38 @@ fn main() {
                         format!("{p}=[{}]", elems.join(","))
                     }).collect();
                     eprintln!("  org {i} mode={} REFS: {} | {}", d50_mode(), vecs.join("  "), coses);
-                    eprintln!("  org {i}: dead={:?} fail={:?} n={} fit={f:.3}",
-                        out.died_at, out.failed, org.net.neurons.len());
+                    eprintln!("  org {i}: dead={:?} fail={:?} n={} syn={} fit={f:.3}",
+                        out.died_at, out.failed, org.net.neurons.len(),
+                        org.net.live_synapses().count());
                 }
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     eprintln!("  org {i}: gp={:?} syn_growth={syn_growth:+} fit={f:.3}",
                         org.growth_params, );
                 }
                 scored.push((f, i, org.size, org.seed));
+                if let Some(v) = out.reflex_novel_detected_frac { g_reflex.push(v); }
+                if let Some(v) = out.consequence_novel_frac { g_cons.push(v); }
+                if let Some(v) = out.world_consequence_violation_frac { g_wv.push(v); }
             }
             scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             let mean_sz = scored.iter().map(|(_, _, s, _)| *s as f32).sum::<f32>() / scored.len() as f32;
             let mean_f = scored.iter().map(|(f, _, _, _)| *f).sum::<f32>() / scored.len() as f32;
-            gen_sizes.push(mean_sz); gen_fits.push(mean_f); gen_best.push(scored[0].0);
-            println!(" gen {g}: fit=[{}] mean_sz={mean_sz:.1} mean_fit={mean_f:.3} best={best:.3}",
-                scored.iter().map(|(f, _, s, _)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "),
-                best = scored[0].0);
+            let best = scored[0].0;
+            gen_sizes.push(mean_sz); gen_fits.push(mean_f); gen_best.push(best);
+            // D-59: append reflex/cons/wv columns ONLY on active runs
+            // (fields all Some); flag-off prints the legacy line
+            // byte-identically. '-' = not Some across all organisms.
+            if d59_show {
+                let mean = |v: &Vec<f32>| if v.len() == N_POP {
+                    format!("{:.2}", v.iter().sum::<f32>() / N_POP as f32)
+                } else { "-".to_string() };
+                println!(" gen {g}: fit=[{}] mean_sz={mean_sz:.1} mean_fit={mean_f:.3} best={best:.3} reflex={} cons={} wv={}",
+                    scored.iter().map(|(f, _, s, _)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "),
+                    mean(&g_reflex), mean(&g_cons), mean(&g_wv));
+            } else {
+                println!(" gen {g}: fit=[{}] mean_sz={mean_sz:.1} mean_fit={mean_f:.3} best={best:.3}",
+                    scored.iter().map(|(f, _, s, _)| format!("{s}:{f:.2}")).collect::<Vec<_>>().join(" "));
+            }
             // selection: ELITISM (best organism carried verbatim - prevents
             // destructive mutation from erasing the winner) + breed 3
             // mutated offspring from the top 2

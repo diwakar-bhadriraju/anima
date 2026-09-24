@@ -101,6 +101,12 @@ pub struct V2Plasticity {
     /// scan). Used for the pool-pressure test P2 ('co-active input channel
     /// fired with no pool candidate'). Cleared at window start.
     fired_channels: Vec<std::collections::BTreeSet<u32>>,
+    /// D-61 (docs/phase3/d61-readout-exclusivity-protocol.md): id range of
+    /// the readout band (reflex nodes) that V2 machinery must NOT touch —
+    /// M2/M3/M4/sparse-commit/ctx exclude it so the fixed non-plastic
+    /// projection stays fixed in-life. (0,0) = off (identity).
+    readout_lo: usize,
+    readout_hi: usize,
 }
 
 impl V2Plasticity {
@@ -147,10 +153,39 @@ impl V2Plasticity {
     /// channel-id then neuron-id; D8: no candidates onto input neurons).
     pub fn new(net: &mut Network, params: V2Params, e6: Option<E6Params>) -> Self {
         let n = net.neurons.len();
+        // D-61 readout exclusivity (see protocol doc): band posts are
+        // read-only for V2 machinery. Active iff a band exists AND
+        // D61_EXCL != "0" (control = D61_EXCL=0).
+        let excl = std::env::var("D61_EXCL").map(|v| v != "0").unwrap_or(true);
+        let (readout_lo, readout_hi) = if excl && net.cfg.d58_reflex > 0 {
+            let lo = n.saturating_sub(net.cfg.d58_reflex);
+            debug_assert!(
+                lo < n && net.neurons[lo..n].iter().all(|x| x.class == NeuronClass::Output),
+                "D-61: readout band must be the last k construction neurons (V2Plasticity::new before mid-life appends)"
+            );
+            (lo, n)
+        } else {
+            (0, 0)
+        };
+        // PURGE: the band's afferents = the fixed input projection ONLY.
+        // Remove M3-legacy pool->band wiring (inherited through breeding).
+        if readout_hi > 0 {
+            let n_in = net.channels.len();
+            for post in readout_lo..readout_hi {
+                let incoming: Vec<SynapseId> = net.incoming[post].clone();
+                for sid in incoming {
+                    let s = &net.synapses[sid.idx()];
+                    if s.silent_ticks != u64::MAX && s.pre.0 >= n_in as u32 {
+                        net.prune_synapse(sid);
+                    }
+                }
+            }
+        }
         let mut candidates = vec![Vec::new(); n];
         for post in 0..n {
-            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
-                continue; // D8: input neurons are pure sources
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory
+                || (readout_hi > 0 && post >= readout_lo && post < readout_hi) {
+                continue; // D8: input neurons are pure sources; D-61: readout is read-only
             }
             let mut pool = Vec::with_capacity(params.c_slots);
             while pool.len() < params.c_slots {
@@ -176,10 +211,17 @@ impl V2Plasticity {
             res_ip_t: vec![0.0; n * dcore_tracks()],
             res_iw_t: vec![0.0; n * dcore_tracks()],
             ctx_acc: vec![0.0; n * 24],
-            cur_ctx: vec![0; n],
+            cur_ctx: vec![0u8; n],
             res_gate: vec![1.0; n],
-            fired_channels: (0..n).map(|_| std::collections::BTreeSet::new()).collect(),
+            fired_channels: vec![Default::default(); n],
+            readout_lo,
+            readout_hi,
         }
+    }
+
+    /// D-61: is `post` a readout-band neuron V2 machinery must not touch?
+    fn is_readout(&self, post: usize) -> bool {
+        post >= self.readout_lo && post < self.readout_hi
     }
 
     /// Fast-path hook: record which neurons fired this tick (no mutation),
@@ -320,7 +362,7 @@ impl V2Plasticity {
         if !self.d_sparse_enabled() { return; }
         let drop = crate::network::dcore_floor_drop();
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory { continue; }
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) { continue; }
             let Some(t) = self.committed_track(net, post) else { continue };
             let incoming: Vec<SynapseId> = net.incoming[post].clone();
             for sid in incoming {
@@ -353,7 +395,7 @@ impl V2Plasticity {
         let theta = self.params.theta_prune;
         let t_e = self.params.t_e;
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                 continue;
             }
             let p_tot = self.consolidated_mass(net, NeuronId(post as u32));
@@ -498,7 +540,7 @@ impl V2Plasticity {
         let k = dcore_tracks();
         let dims = 24usize;
         for i in 0..net.neurons.len() {
-            if net.neurons[i].class == NeuronClass::Input || net.neurons[i].class == NeuronClass::Inhibitory {
+            if net.neurons[i].class == NeuronClass::Input || net.neurons[i].class == NeuronClass::Inhibitory || self.is_readout(i) {
                 continue;
             }
             // protocol §6.2a: no working input current delivered => no update
@@ -618,7 +660,7 @@ impl V2Plasticity {
         if !self.params.disable_m3_m4 {
             let mut candidates = std::mem::take(&mut self.candidates);
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                     continue;
                 }
                 candidates[post] = self.candidate_pass(net, post, std::mem::take(&mut candidates[post]), tick, &mut events);
@@ -665,6 +707,12 @@ impl V2Plasticity {
         for sid in 0..net.synapses.len() {
             let s = &net.synapses[sid];
             if s.silent_ticks == u64::MAX || s.inhibitory {
+                self.low_windows[sid] = 0;
+                continue;
+            }
+            // D-61: readout-band afferents are never pruned (the fixed
+            // projection must stay fixed; see protocol doc).
+            if self.is_readout(s.post.idx()) {
                 self.low_windows[sid] = 0;
                 continue;
             }
@@ -963,7 +1011,7 @@ impl V2Plasticity {
             } else {
                 let k = dcore_tracks();
                 for post in 0..net.neurons.len() {
-                    if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+                    if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                         continue;
                     }
                     let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -1013,7 +1061,7 @@ impl V2Plasticity {
         // precedence whenever assembly_protect is set.
         if self.params.assembly_protect {
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                     continue;
                 }
                 let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -1043,7 +1091,7 @@ impl V2Plasticity {
         }
         if n_buckets == 1 {
             for post in 0..net.neurons.len() {
-                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+                if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                     continue;
                 }
                 let incoming: Vec<SynapseId> = net.incoming[post].clone();
@@ -1070,7 +1118,7 @@ impl V2Plasticity {
         }
         // Partitioned, capacity-matched (V2.3 §2).
         for post in 0..net.neurons.len() {
-            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory {
+            if net.neurons[post].class == NeuronClass::Input || net.neurons[post].class == NeuronClass::Inhibitory || self.is_readout(post) {
                 continue;
             }
             let incoming: Vec<SynapseId> = net.incoming[post].clone();

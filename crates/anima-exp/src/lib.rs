@@ -3,6 +3,8 @@
 //! (closed-loop), env, harness.
 pub mod config;
 pub mod io;
+pub mod reflex;
+pub mod encoders;
 pub mod survival;
 pub mod env;
 pub mod harness;

@@ -10,11 +10,31 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::io;
+use crate::reflex;
 use anima_core::resources::{Failure as ResFailure, ResourceConfig, ResourceMonitor};
 use anima_core::structural_v2::V2Plasticity;
 use anima_core::structural::{make_trigger, BirthTrigger, Signals, StructuralMonitor};
 
 const BEAT_MS: u64 = 500;
+
+// ---- D-59 closed-loop motor world (docs/phase3/d59-reflex-integration-protocol.md).
+// PRE-REGISTERED constants, v1 world; NOT tuned on outcomes (if
+// consequence-novelty is uninformative, record and stop - do not re-fit).
+/// Motor drive gain: the next beat's afferent rate is scaled by
+/// 1.0 +/- drive * MOTOR_GAIN (drive in [0,1]).
+const MOTOR_GAIN: f32 = 0.2;
+/// Effect clamp on the sensed consequence.
+const MOTOR_EFF_LO: f32 = 0.5;
+const MOTOR_EFF_HI: f32 = 2.0;
+/// D-59 fault injection (verification only, registered): for beats >=
+/// D59_FAULT_BEAT the world responds OPPOSITE to the action (eff =
+/// 1.0 - drive*GAIN). A working organism-side detector must fire.
+const D59_FAULT_BEAT: u64 = 60;
+/// Harness-side ground-truth tracker: EMA alpha (expected drive + residual
+/// sigma) and the 3-sigma violation rule. Instrumentation only - explicitly
+/// NOT organism knowledge (cross-check for the organism-side signal).
+const WORLD_EMA_ALPHA: f32 = 0.2;
+const WORLD_SIGMA_K: f32 = 3.0;
 
 pub struct SurvivalOutcome {
     pub beats: u64,
@@ -35,6 +55,22 @@ pub struct SurvivalOutcome {
     /// D-53b: count of novel beats that decoded to a KNOWN symbol
     /// (contamination - org misattributed the novel pattern).
     pub novel_contaminated: u32,
+    /// D-59: reflex-CIRCUIT novelty detection on D beats (min-L2 of the
+    /// live reflex-band response vs per-symbol templates > REFLEX_TH_FAM).
+    /// Runs ALONGSIDE the codec metric (novel_detected_frac) - the honest
+    /// per-structure comparison asked by the user (the D-58 rule now lives
+    /// in real life). None when reflex_k == 0.
+    pub reflex_novel_detected_frac: Option<f32>,
+    /// D-59: ORGANISM-side consequence-novelty fraction (motor mode): known
+    /// beats whose reflex response violates the symbol's existing template
+    /// - the organism's own reflex circuit registering "this does NOT do
+    /// that". None unless motor_mode && reflex_k > 0.
+    pub consequence_novel_frac: Option<f32>,
+    /// D-59: HARNESS-side ground-truth tracker (instrumentation only, NOT
+    /// the claim): known beats whose motor drive deviated > 3sigma from the
+    /// per-symbol EMA expectation. Cross-checks consequence_novel_frac.
+    /// None unless motor_mode && reflex_k > 0.
+    pub world_consequence_violation_frac: Option<f32>,
     pub known_beats: u32,
     pub novel_beats: u32,
     /// In-loop resource failure (runaway-activity / resource-exhaustion),
@@ -94,7 +130,7 @@ pub fn run_world_v2(
     window_ticks: u64,
 ) -> SurvivalOutcome {
     run_world_full(net, _org_seed, world_seed, refs, spec, params, traces,
-        v2, window_ticks, None, None, false, None, "")
+        v2, window_ticks, None, None, false, None, "", 0, false)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -115,6 +151,13 @@ pub fn run_world_full(
     mut mon: Option<ResourceMonitor>,
     // D-50: i/o alphabet mode ("" = legacy 8ch A/C/D; d50 = 6ch A/C/E/D)
     mode: &str,
+    // D-59 (docs/phase3/d59-reflex-integration-protocol.md): reflex band
+    // size (0 = off, byte-identical baseline; must equal the network's
+    // cfg.d58_reflex).
+    reflex_k: usize,
+    // D-59: closed-loop motor world (motor command -> sensed consequence ->
+    // organism-side expectation check). false = off, byte-identical.
+    motor_mode: bool,
 ) -> SurvivalOutcome {
     let mut cur = "A".to_string(); // world starts on a known pattern
     let mut beat = 0u64;
@@ -130,12 +173,69 @@ pub fn run_world_full(
     let mut rcog: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
     let mut ob_window: std::collections::VecDeque<bool> = std::collections::VecDeque::with_capacity(rw);
     let mut tick = net.tick;
+    // ---- D-59 state (reflex band + closed-loop motor world) ----
+    // Reflex band = the last `reflex_k` neurons at loop entry (the nodes
+    // appended at construction; mid-life births append AFTER them, so the
+    // band cannot shift under growth).
+    let reflex_base: usize = if reflex_k > 0 && net.cfg.d58_reflex == reflex_k {
+        net.neurons.len() - reflex_k
+    } else { 0 };
+    let mut reflex_vec = vec![0.0f32; reflex_k];
+    let mut templates: std::collections::BTreeMap<String, Vec<f32>> = Default::default();
+    let (mut reflex_novel_detected, mut reflex_novel_n) = (0u32, 0u32);
+    let (mut consequence_novel, mut consequence_novel_n) = (0u32, 0u32);
+    let (mut world_viol, mut world_n) = (0u32, 0u32);
+    // harness-side ground-truth: per-symbol EMA expected drive + residual sigma
+    let mut exp_drive: std::collections::BTreeMap<String, f32> = Default::default();
+    let mut sig_drive: std::collections::BTreeMap<String, f32> = Default::default();
+    let mut exp_n: std::collections::BTreeMap<String, u32> = Default::default();
+    let mut prev_drive: f32 = 0.0; // scalar drive of the previous beat's action
+    let fault = std::env::var("D59_FAULT").is_ok();
+    // diagnostics only (per-beat min-L2 vs templates); no behavior change
+    let d59dbg = std::env::var("D59_DEBUG").is_ok();
+    // D-60a (docs/phase3/d60-slow-parity-protocol.md): reflex-path
+    // slow-state parity - clamp the BAND's own u_slow at beat end so the
+    // next beat starts state-matched. Identity when unset. Registered.
+    let d60_parity = std::env::var("D60_PARITY").is_ok();
+    // D-60b (docs/phase3/d60b-input-parity-protocol.md): input-afferent
+    // slow-state parity - clamp the INPUT neurons' u_slow at beat end.
+    // Identity when unset. Registered.
+    let d60b_parity = std::env::var("D60B_PARITY").is_ok();
+    // D-62 (docs/phase3/d62-band-start-parity-protocol.md): full band
+    // start-state reset at beat end (u_slow, v, z_latch, i_syn) - the
+    // band's response becomes a deterministic function of the train.
+    // Identity when unset. Registered.
+    let d62_parity = std::env::var("D62_PARITY").is_ok();
 
     while beat < spec.beats && died.is_none() {
-        let tr = io::symbol_trains_mode(&cur, mode, world_seed);
+        // D-59: the previous action's consequence - motor drive modulates
+        // THIS beat's afferent rate (eff); D59_FAULT reverses the effect
+        // for beats >= D59_FAULT_BEAT (verification-only fault injection).
+        let eff = if motor_mode {
+            let d0 = if fault && beat >= D59_FAULT_BEAT { -prev_drive } else { prev_drive };
+            (1.0 + d0 * MOTOR_GAIN).clamp(MOTOR_EFF_LO, MOTOR_EFF_HI)
+        } else { 1.0 };
+        let tr = if motor_mode {
+            io::symbol_trains_mode_eff(&cur, mode, world_seed, eff)
+        } else {
+            io::symbol_trains_mode(&cur, mode, world_seed)
+        };
         // D-50: known-set derived from refs (mode-agnostic: [A,C] or
         // [A,C,E]). A symbol is 'known' iff it has a captured ref.
         let is_known = refs.iter().any(|(p, _)| *p == cur);
+        // D-60c (diagnostic only): band PRE-beat state snapshot - which
+        // carry-over variable correlates with the beat-to-beat min-L2
+        // variance (u_slow, g_drive afferent-EMA, v residual, i_syn tail).
+        let (mut pre_u, mut pre_g, mut pre_v, mut pre_i) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+        if reflex_k > 0 {
+            for n in net.neurons.iter().skip(reflex_base).take(reflex_k) {
+                pre_u += n.u_slow;
+                pre_g += n.g_drive;
+                pre_v += n.v;
+                pre_i += n.i_syn;
+            }
+        }
+        reflex_vec.iter_mut().for_each(|x| *x = 0.0);
         let mut out = vec![0.0f32; 12];
         for t in 0..BEAT_MS {
             let frame = InputFrame {
@@ -146,6 +246,14 @@ pub fn run_world_full(
             for c in &ev.spikes {
                 if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) {
                     out[(c.0 - io::OUTPUT_LO) as usize] += 1.0;
+                }
+                // D-59: accumulate the reflex band in the SAME pass (no
+                // extra probe presentations - riding the real beats).
+                if reflex_k > 0 {
+                    let ci = c.0 as usize;
+                    if ci >= reflex_base && ci < reflex_base + reflex_k {
+                        reflex_vec[ci - reflex_base] += 1.0;
+                    }
                 }
             }
             // in-loop resource detection (D-38): runaway / exhaustion =
@@ -201,6 +309,34 @@ pub fn run_world_full(
             }
             tick = Tick(tick.0 + 1);
         }
+        // D-60a: band slow-state parity at beat end (see protocol doc).
+        if d60_parity && reflex_k > 0 {
+            for n in net.neurons.iter_mut().skip(reflex_base).take(reflex_k) {
+                n.u_slow = 0.0;
+            }
+        }
+        // D-60b: input-afferent slow-state parity at beat end (see
+        // protocol doc) - ids 0..channels.len() are the neurons each
+        // InputChannel drives; the band's afferent source.
+        if d60b_parity {
+            let n_in = net.channels.len();
+            for n in net.neurons.iter_mut().take(n_in) {
+                n.u_slow = 0.0;
+            }
+        }
+        // D-62: full band start-state reset at beat end (see protocol
+        // doc) - u_slow, v, z_latch, i_syn so the next beat starts
+        // state-clean and the band's response is a deterministic
+        // function of the train.
+        if d62_parity && reflex_k > 0 {
+            let v_rest = net.cfg.lif.v_rest;
+            for n in net.neurons.iter_mut().skip(reflex_base).take(reflex_k) {
+                n.u_slow = 0.0;
+                n.v = v_rest;
+                n.z_latch = 0;
+                n.i_syn = 0.0;
+            }
+        }
         // decode action via frozen codebook (plain-cos argmax + amp floor)
         let act = io::decode(&out, refs, spec.q_floor, spec.th_known);
         match act.as_str() {
@@ -209,6 +345,76 @@ pub fn run_world_full(
             "NOVEL" | "UNSURE" => wd_act += 1,
             "QUIET" => qt_act += 1,
             _ => {}
+        }
+        // D-59: motor command (linear proportional: activation -> drive)
+        // and scalar drive from THIS beat's output.
+        let drive = if motor_mode {
+            let mc = io::motor(&out);
+            (mc.rates_hz.iter().sum::<f32>() / mc.rates_hz.len().max(1) as f32 / 1000.0).clamp(0.0, 1.0)
+        } else { 0.0 };
+        // D-59 reflex verdicts + template maintenance. ORDERING RULE: a beat
+        // is judged against the PRE-beat expectation FIRST, then the
+        // template is overwritten (the organism's own just-experienced
+        // response is the new per-symbol expectation; state-matched by
+        // construction).
+        if reflex_k > 0 {
+            let min_l = if templates.is_empty() { f32::MAX } else {
+                templates.values().map(|t| reflex::l2(&reflex_vec, t)).fold(f32::MAX, f32::min)
+            };
+            if d59dbg {
+                let dists: Vec<(String, f32)> = templates
+                    .iter().map(|(s, t)| (s.clone(), reflex::l2(&reflex_vec, t))).collect();
+                // ownL2: distance to the symbol's OWN template (-1 when
+                // none exists yet = first occurrence; only own-template
+                // beats are eligible for the known-side familiarity
+                // metric).
+                let own_l2 = templates.get(&cur).map(|t| reflex::l2(&reflex_vec, t)).unwrap_or(-1.0);
+                eprintln!("D59DBG beat={} cur={} is_known={} minL2={:.1} ownL2={:.1} dists={:?} rv={:?} pre_u={:.3} pre_g={:.3} pre_v={:.3} pre_i={:.3}",
+                    beat, cur, is_known, min_l, own_l2, dists, reflex_vec, pre_u, pre_g, pre_v, pre_i);
+            }
+            if !is_known && !templates.is_empty() {
+                // D beat vs known templates: NOVEL iff min-L2 > th (the
+                // verified D-58 rule, now riding real beats).
+                reflex_novel_n += 1;
+                if min_l > reflex::REFLEX_TH_FAM { reflex_novel_detected += 1; }
+            } else if is_known {
+                if motor_mode && templates.contains_key(&cur) {
+                    // organism-side consequence check ("knows this does
+                    // that exactly"): the reflex response to a known symbol
+                    // must match its template.
+                    consequence_novel_n += 1;
+                    if min_l > reflex::REFLEX_TH_FAM { consequence_novel += 1; }
+                }
+                templates.insert(cur.clone(), reflex_vec.clone());
+            }
+        }
+        // D-59 harness-side ground-truth tracker (instrumentation ONLY,
+        // explicitly NOT organism knowledge): per-symbol EMA expected
+        // drive; a known beat whose drive deviates > 3sigma is a
+        // world-side consequence violation (cross-check for the
+        // organism-side signal). First sample initializes expectation;
+        // violations judged from sample 3 on (sigma then has an update).
+        if motor_mode && is_known {
+            world_n += 1;
+            let e = exp_drive.entry(cur.clone()).or_insert(0.0);
+            let n0 = exp_n.entry(cur.clone()).or_insert(0);
+            if *n0 == 0 {
+                *e = drive;
+            } else {
+                let residual = (drive - *e).abs();
+                let s = sig_drive.entry(cur.clone()).or_insert(0.0);
+                if *n0 >= 2 && residual > WORLD_SIGMA_K * *s { world_viol += 1; }
+                *s += WORLD_EMA_ALPHA * (residual - *s);
+                *e += WORLD_EMA_ALPHA * (drive - *e);
+            }
+            *n0 += 1;
+        }
+        prev_drive = drive;
+        if motor_mode {
+            eprintln!("MOTOR beat={} drive={:.3} eff={:.3} cons_novel={} world_viol={} cons_frac={:.3} world_frac={:.3}",
+                beat, drive, eff, consequence_novel, world_viol,
+                consequence_novel as f32 / consequence_novel_n.max(1) as f32,
+                world_viol as f32 / world_n.max(1) as f32);
         }
         // recognition: a known beat is recognized ONLY if it decodes to
         // its own ref (exact match). A mismatched known beat (cur=A decoded
@@ -294,6 +500,15 @@ pub fn run_world_full(
         novel_recognized_frac: novel_ok as f32 / novel_n.max(1) as f32,
         novel_detected_frac: novel_detected as f32 / novel_n.max(1) as f32,
         novel_contaminated: novel_n - novel_detected,
+        reflex_novel_detected_frac: if reflex_k > 0 {
+            Some(reflex_novel_detected as f32 / reflex_novel_n.max(1) as f32)
+        } else { None },
+        consequence_novel_frac: if motor_mode && reflex_k > 0 {
+            Some(consequence_novel as f32 / consequence_novel_n.max(1) as f32)
+        } else { None },
+        world_consequence_violation_frac: if motor_mode && reflex_k > 0 {
+            Some(world_viol as f32 / world_n.max(1) as f32)
+        } else { None },
         known_beats: known_n, novel_beats: novel_n,
     }
 }

@@ -40,12 +40,17 @@ pub fn known_syms(mode: &str) -> Vec<&'static str> {
 }
 pub const RATE_HZ: f32 = 20.0;
 
-fn hash_str(s: &str) -> u64 {
+/// Verified name-hash (FNV-1a) used by the train derivers; pub so the
+/// world crate's retina encoder uses the SAME convention (determinism
+/// across crates).
+pub fn hash_str(s: &str) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     for b in s.as_bytes() { h ^= *b as u64; h = h.wrapping_mul(0x100000001b3); }
     h
 }
-fn derive_seed64(master: u64, a: u64, b: u64) -> u64 {
+/// Verified seed-derivation (splitmix64-style) used by the train
+/// derivers; pub for the same convention-sharing reason.
+pub fn derive_seed64(master: u64, a: u64, b: u64) -> u64 {
     let mut z = master.wrapping_add(a.wrapping_mul(0x9E3779B97F4A7C15)).wrapping_add(b);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
     (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB) ^ (z >> 31)
@@ -57,10 +62,17 @@ pub fn symbol_trains(sym: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
     symbol_trains_mode(sym, "", seed)
 }
 /// mode-aware trains (D-50: mode selects channel layout). Empty mode =
-/// legacy.
+/// legacy. eff=1.0 -> byte-identical to symbol_trains_mode (multiplying
+/// RATE_HZ by 1.0 is exact).
 pub fn symbol_trains_mode(sym: &str, mode: &str, seed: u64) -> Vec<(u64, InputChannelId)> {
+    symbol_trains_mode_eff(sym, mode, seed, 1.0)
+}
+/// D-59 closed-loop motor world: `eff` scales the per-channel Poisson rate
+/// of the beat's train (the world's sensed response to the previous
+/// action). eff=1.0 = identity; consumers clamp.
+pub fn symbol_trains_mode_eff(sym: &str, mode: &str, seed: u64, eff: f32) -> Vec<(u64, InputChannelId)> {
     let Some(chans) = alphabet(mode).iter().find(|(s, _)| *s == sym).map(|(_, c)| c.to_vec()) else { return vec![] };
-    let lambda = RATE_HZ / 1000.0;
+    let lambda = RATE_HZ * eff / 1000.0;
     let mut out = Vec::new();
     for &ch in &chans {
         let mut rng = Xoshiro256PlusPlus::seed_from_u64(derive_seed64(seed, hash_str(sym), ch as u64));
@@ -75,6 +87,21 @@ pub fn symbol_trains_mode(sym: &str, mode: &str, seed: u64) -> Vec<(u64, InputCh
     }
     out.sort_unstable();
     out
+}
+
+/// D-59 (docs/phase3/d59-reflex-integration-protocol.md): motor command -
+/// one rate per output neuron, LINEAR PROPORTIONAL mapping from a beat's
+/// output spike counts ("how much that neuron activates, that much the
+/// motor moves"). No thresholding; consumers clamp.
+pub struct MotorCommand {
+    pub rates_hz: Vec<f32>,
+}
+
+/// Rate-proportional motor readout: spike count over the 500ms beat -> Hz.
+pub fn motor(out: &[f32]) -> MotorCommand {
+    MotorCommand {
+        rates_hz: out.iter().map(|x| x * 1000.0 / BEAT_MS as f32).collect(),
+    }
 }
 
 /// Plain cosine (the outselect-validated 100% A/C convention), NOT

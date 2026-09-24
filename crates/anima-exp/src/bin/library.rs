@@ -4,7 +4,7 @@
 //! no tautology). refs refreshed per stage (D-55 state-matching).
 use anima_core::network::{Network, NetworkConfig, Tick, InputFrame};
 use anima_core::plasticity::{stdp_tick, StdpParams, Traces};
-use anima_exp::io;
+use anima_exp::{io, reflex};
 
 fn main() {
     let seed: u64 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(20260912);
@@ -59,18 +59,17 @@ fn main() {
                 // Per-beat template set for BOTH arms, captured ONCE
                 // before either arm's presentations (state-matched;
                 // stage-frozen templates drift as the net runs).
-                let tpl: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
-                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
-                    (s.to_string(), v[12..].to_vec())
+                let kk = kn();
+                let tpl: Vec<Vec<f32>> = stage.iter().map(|s| {
+                    reflex::signature(&mut net, seed, mode, s, kk)
                 }).collect();
-                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
+                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(reflex::REFLEX_TH_FAM);
                 // A. knowns-control: each known vs tpl (incl. its own
                 // template) must read FAMILIAR (min-L2 <= th) -> fp only
                 // if a known fails to match its own template.
                 for ks in stage {
-                    let kv = capture_ref(&mut net, seed, mode, ks, &p, &mut tr);
-                    let kn2 = kv[12..].to_vec();
-                    let min_l = tpl.iter().map(|(_, t)| l2(&kn2, t)).fold(f32::MAX, f32::min);
+                    let kn2 = reflex::signature(&mut net, seed, mode, ks, kk);
+                    let min_l = tpl.iter().map(|t| reflex::l2(&kn2, t)).fold(f32::MAX, f32::min);
                     if std::env::var("D58_DEBUG").is_ok() {
                         eprintln!("  D58 knowns-fp({}): min-L2={:.1} flagged={}", ks, min_l, min_l > th_fam);
                     }
@@ -79,9 +78,8 @@ fn main() {
                 // B. D arm: NOVEL iff min-L2(D, same tpl) > th_fam.
                 // probe_this gates D probing to the first beat (D58_ONCE).
                 if probe_this {
-                    let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
-                    let dn = dv[12..].to_vec();
-                    let min_dl2 = tpl.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
+                    let dn = reflex::signature(&mut net, seed, mode, "D", kk);
+                    let min_dl2 = tpl.iter().map(|t| reflex::l2(&dn, t)).fold(f32::MAX, f32::min);
                     let novel_by_reflex = min_dl2 > th_fam;
                     if novel_by_reflex { reflex_det += 1; }
                     if std::env::var("D58_DEBUG").is_ok() {
@@ -104,13 +102,11 @@ fn main() {
             gap(&mut net, &p, &mut tr, cross_rest);
         }
         if std::env::var("D58_DEBUG").is_ok() && std::env::var("D58_REFLEX").is_ok() {
+            let kk = kn();
             for s in stage {
-                let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
-                let nv = &v[12..];
-                eprintln!("  D58[{}] novelty-nodes: {:?}", s, nv);
+                eprintln!("  D58[{}] novelty-nodes: {:?}", s, reflex::signature(&mut net, seed, mode, s, kk));
             }
-            let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
-            eprintln!("  D58[D] novelty-nodes: {:?}", &dv[12..]);
+            eprintln!("  D58[D] novelty-nodes: {:?}", reflex::signature(&mut net, seed, mode, "D", kk));
         }
         let mut line = format!("  stage{} vocab={:?} ", si + 1, stage);
         for s in known_all {
@@ -126,11 +122,6 @@ fn main() {
     println!("done");
 }
 
-fn l2(a: &[f32], b: &[f32]) -> f32 {
-    let mut s = 0.0f32;
-    for (x, y) in a.iter().zip(b.iter()) { let d = x - y; s += d * d; }
-    s.sqrt()
-}
 fn cos_centered(a: &[f32], b: &[f32]) -> f32 {
     // Centered cosine: subtract the common per-node mean across the two
     // vectors so saturated-common components (shared ~500 nodes) cancel
@@ -150,24 +141,21 @@ fn cos_centered(a: &[f32], b: &[f32]) -> f32 {
     num / (da.sqrt() * db.sqrt())
 }
 fn kn() -> usize {
-    std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
+    std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(reflex::REFLEX_K)
 }
 fn capture_ref(net: &mut Network, seed: u64, mode: &str, sym: &str, _p: &StdpParams, _tr: &mut Traces) -> Vec<f32> {
     let st = io::symbol_trains_mode(sym, mode, seed);
     let mut out = vec![0.0f32; 12];
-    let rfx = std::env::var("D58_REFLEX").is_ok();
-    let mut nov = vec![0.0f32; if rfx { kn() } else { 0 }];
     for t in 0..io::BEAT_MS {
         let f = InputFrame { tick: net.tick, spikes: st.iter().filter(|(tt, _)| *tt == t).map(|(_, c)| *c).collect() };
         let e = net.step(&f);
         for c in &e.spikes {
             let ci = c.0 as usize;
             if (io::OUTPUT_LO..io::OUTPUT_HI).contains(&c.0) { out[(ci - io::OUTPUT_LO as usize) as usize] += 1.0; }
-            else if rfx && ci >= 76 && ci < 76 + kn() { nov[ci - 76] += 1.0; }
         }
         net.tick = Tick(net.tick.0 + 1);
     }
-    if rfx { { let mut v = out; v.extend(nov); v } } else { out }
+    out
 }
 fn decode_beat(net: &mut Network, seed: u64, mode: &str, sym: &str, p: &StdpParams, tr: &mut Traces, refs: &[(String, Vec<f32>)]) -> String {
     let v = capture_ref(net, seed, mode, sym, p, tr);
@@ -201,7 +189,7 @@ fn v2cfg() -> NetworkConfig {
         theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: 0.0,
         tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2p()),
         d58_reflex: if std::env::var("D58_REFLEX").is_ok() {
-            std::env::var("D58_K").ok().and_then(|v| v.parse().ok()).unwrap_or(2)
+            kn()
         } else { 0 },
         ..Default::default()
     }

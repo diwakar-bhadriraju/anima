@@ -253,6 +253,11 @@ pub struct StructuralMonitor {
     /// tap). 0 => no synapses (an inert vibe that learns nothing but also
     /// perturbs nothing). Pre-registered lever for the drain hypothesis.
     pub wiring_w_scale: f32,
+    /// D-63 (docs/phase3/d63-birth-exclusivity-protocol.md): id of the
+    /// first readout-band neuron (last cfg.d58_reflex construction neurons),
+    /// computed lazily at the FIRST birth; newborns never wire efferent
+    /// synapses onto the band. 0 = inactive (no band / exclusivity off).
+    band_lo: usize,
 }
 
 impl Default for StructuralMonitor {
@@ -266,6 +271,7 @@ impl Default for StructuralMonitor {
             wiring_avoid_coactive: false,
             wiring_bidirectional: false,
             wiring_w_scale: 1.0,
+            band_lo: 0,
                     }
     }
 }
@@ -329,7 +335,7 @@ impl StructuralMonitor {
         StructuralEvents { births, dormant, reactivated, retired }
     }
 
-    fn birth(&self, net: &mut Network) -> NeuronId {
+    fn birth(&mut self, net: &mut Network) -> NeuronId {
         use rand::Rng;
         let id = NeuronId(net.neurons.len() as u32);
         net.neurons.push(Neuron {
@@ -408,6 +414,15 @@ impl StructuralMonitor {
             partners.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         }
         let take = self.wiring_synapses.min(partners.len());
+        // D-63 readout exclusivity: lazily record the band range at the
+        // FIRST birth. The band = the last cfg.d58_reflex CONSTRUCTION
+        // neurons; the newborn's id is exactly the pre-birth population
+        // size, so band_lo = id - k (push-order independent).
+        if self.band_lo == 0 && net.cfg.d58_reflex > 0
+            && !std::env::var("D61_EXCL").map(|v| v == "0").unwrap_or(false)
+        {
+            self.band_lo = id.0 as usize - net.cfg.d58_reflex;
+        }
         for &(partner, _) in &partners[..take] {
             let w = (net.rng.gen::<f32>() * net.cfg.w_init + 0.05) * self.wiring_w_scale;
             net.add_synapse(partner, id, w, true, net.tick);
@@ -415,7 +430,14 @@ impl StructuralMonitor {
             // from the newborn (newborn → partner), same weight family.
             // The newborn's firing now flows into the allocated pool
             // instead of accumulating as a high-gain sink.
-            if self.wiring_bidirectional {
+            // D-63: NEVER onto a readout-band post (the band's afferents
+            // are the fixed projection; mid-life birth wiring re-drifted
+            // it in D-61/D-62 — see protocol doc).
+            let p = partner.0 as usize;
+            let in_band = self.band_lo > 0
+                && p >= self.band_lo
+                && p < (self.band_lo + net.cfg.d58_reflex);
+            if self.wiring_bidirectional && !in_band {
                 let w_out = (net.rng.gen::<f32>() * net.cfg.w_init + 0.05) * self.wiring_w_scale;
                 net.add_synapse(id, partner, w_out, true, net.tick);
             }
@@ -819,7 +841,7 @@ mod tests {
             for (k, id) in internals.iter().enumerate() {
                 net.neurons[id.idx()].rate_hz = k as f32;
             }
-            let mon = StructuralMonitor {
+            let mut mon = StructuralMonitor {
                 wiring_synapses: 3,
                 wiring_avoid_coactive: true,
                 wiring_bidirectional: bidirectional,
@@ -860,7 +882,7 @@ mod tests {
         for (k, id) in internals.iter().enumerate() {
             net.neurons[id.idx()].rate_hz = k as f32;
         }
-        let mon = StructuralMonitor {
+        let mut mon = StructuralMonitor {
             wiring_synapses: 4,
             wiring_avoid_coactive: true,
             wiring_bidirectional: false,
@@ -926,7 +948,7 @@ mod tests {
                 n_candidates >= fan_in,
                 "test net must have enough candidates for fan-in {fan_in}"
             );
-            let mon = StructuralMonitor {
+            let mut mon = StructuralMonitor {
                 wiring_synapses: fan_in,
                 wiring_avoid_coactive: true,
                 wiring_bidirectional: false,

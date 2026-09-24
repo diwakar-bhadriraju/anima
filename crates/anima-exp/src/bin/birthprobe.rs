@@ -6,6 +6,7 @@ use anima_core::plasticity::{stdp_tick, StdpParams, Traces};
 use anima_core::structural_v2::V2Plasticity;
 use anima_exp::config::SurvivalSpec;
 use anima_exp::io;
+use anima_exp::reflex;
 use anima_exp::survival;
 
 fn main() {
@@ -53,7 +54,7 @@ fn main() {
     let out = survival::run_world_full(
         &mut net, seed, seed, &refs, &spec, &p, &mut traces,
         Some(&mut v2), 100,
-        Some((mon, trigger)), None, true, mon_opt, "",
+        Some((mon, trigger)), None, true, mon_opt, "", 0, false,
     );
     let born = net.neurons.len() - n_before;
     let syn_growth = net.live_synapses().count() as isize - syn_before as isize;
@@ -84,6 +85,7 @@ fn build(seed: u64, n_internal: usize, out_inh: f32) -> Network {
         theta_rel_mean: 1.0, theta_rel_sd: 0.0, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: 0.0,
         tau_het_rel_sd: 0.0, phi_rel: 0.5, eta_rel: 0.0, v2: Some(v2_params()),
         output_inhibition_gain: out_inh, // D-46: 0 = identity
+        d58_reflex: if std::env::var("D59_REFLEX").is_ok() { reflex::REFLEX_K } else { 0 },
         ..NetworkConfig::default()
     };
     Network::new(cfg, 24, n_internal, 12, seed)
