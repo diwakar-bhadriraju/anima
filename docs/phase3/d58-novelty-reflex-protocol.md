@@ -265,3 +265,28 @@ the intrinsic state - either zero the slow-state contribution during
 probing, or interleave probes with longer rest gaps so the state
 resets. (NOT STDP gating - there is no STDP on this path.)
 STOP - drift mechanism identified as intrinsic-state convergence.
+
+## D-58 STAGE-3 STABILITY (2026-09-23): mechanism is INTRINSIC-STATE SENSITIVE; levers measured
+
+Drift-fix experiments (424242, the stage-3-sensitive seed):
+  baseline (3x D probes/stage): stage3 D min-L2 135->6 (collapse)
+  D58_ONCE (probe D once/stage):   stage3 6.0 (still miss; 200->135->6
+                                   across stages = CROSS-STAGE accumulation)
+  D58_ONCE + XGAP=8000 (deep reset): stage3 0.0 (WORSE - reorganizes pool,
+                                   D maps onto a known)
+Intrinsic state (slow_state beta, tau 5000) accumulates across the run;
+neither rest nor reset cleanly fixes stage-3. The D-collapse tracks the
+known-symbol RETENTION collapse (C=0/E=2 in the same stage) - the D-57
+issue - not the novelty rule.
+
+ROBUST FINDING: novelty detection is solid in stages 1-2 (min-L2
+200/135, well above th 60; fp=0 EVERYWHERE always) in all seeds. Stage-3
+degradation is the known-retention/dynamics coupling, not a rule
+failure. The levers (D58_ONCE single-probe, D58_REST, D58_XGAP) are
+registered for the survival-loop-integration work where the net's
+state is governed by the full closed loop (the D-55 living-codebook
+requirement: the detector must read the net in the state it's actually
+in, which integration provides).
+STATUS: novelty detection = VERIFIED in clean state (stages 1-2);
+stage-3 needs the survival-loop integration (next registration).
+STOP - levers measured; stage-3 = retention/dynamics coupling.

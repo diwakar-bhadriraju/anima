@@ -29,7 +29,14 @@ fn main() {
         let mut novel_det = 0u32;
         let mut reflex_det = 0u32;
         let mut known_fp = 0u32;
-        for _ in 0..beat_n {
+        for bidx in 0..beat_n {
+            // D-58 single-probe gate: with D58_ONCE, D is probed only on
+            // the FIRST beat of the stage. A novelty probe must not be a
+            // repeated stimulus - repeated D probes stack the pool's
+            // intrinsic state (u_slow/adaptation) and drift D's signature
+            // toward the known band (measured monotone 90->21). The
+            // knowns-control still runs every beat.
+            let probe_this = !(std::env::var("D58_ONCE").is_ok() && bidx > 0);
             for s in stage {
                 let act = decode_beat(&mut net, seed, mode, s, &p, &mut tr, &refs);
                 if act == *s { *rec.entry(s.to_string()).or_insert(0) += 1; }
@@ -69,19 +76,32 @@ fn main() {
                     }
                     if min_l > th_fam { known_fp += 1; }
                 }
-                // B. D arm: NOVEL iff min-L2(D, same tpl) > th_fam
-                // (L2 magnitude-aware - D is same shape lower magnitude;
-                // cosine failed on this. Verified e918550.)
-                let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
-                let dn = dv[12..].to_vec();
-                let min_dl2 = tpl.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
-                let novel_by_reflex = min_dl2 > th_fam;
-                if novel_by_reflex { reflex_det += 1; }
-                if std::env::var("D58_DEBUG").is_ok() {
-                    eprintln!("  D58 reflex-novelty(D): min-L2={:.1} th={} novel={}", min_dl2, th_fam, novel_by_reflex);
-                }
+                // B. D arm: NOVEL iff min-L2(D, same tpl) > th_fam.
+                // probe_this gates D probing to the first beat (D58_ONCE).
+                if probe_this {
+                    let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
+                    let dn = dv[12..].to_vec();
+                    let min_dl2 = tpl.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
+                    let novel_by_reflex = min_dl2 > th_fam;
+                    if novel_by_reflex { reflex_det += 1; }
+                    if std::env::var("D58_DEBUG").is_ok() {
+                        eprintln!("  D58 reflex-novelty(D): min-L2={:.1} th={} novel={}", min_dl2, th_fam, novel_by_reflex);
+                    }
+                } // end probe_this
             }
-            gap(&mut net, &p, &mut tr, 1500);
+            // D-58 drift-fix: rest BEFORE probing D so the pool's
+            // intrinsic state (u_slow/adaptation) partially resets - a
+            // probe must measure the state, not stack drive into it.
+            let rest: u64 = std::env::var("D58_REST").ok().and_then(|v| v.parse().ok()).unwrap_or(3000);
+            gap(&mut net, &p, &mut tr, rest);
+        }
+        // D-58 cross-stage reset: long rest after a stage so the pool's
+        // intrinsic state (slow depolarization, tau 5000) settles fully
+        // before the next stage - the cross-stage accumulation is what
+        // drives stage-3's D-collapse (200->135->6 across stages).
+        if std::env::var("D58_REFLEX").is_ok() {
+            let cross_rest: u64 = std::env::var("D58_XGAP").ok().and_then(|v| v.parse().ok()).unwrap_or(5000);
+            gap(&mut net, &p, &mut tr, cross_rest);
         }
         if std::env::var("D58_DEBUG").is_ok() && std::env::var("D58_REFLEX").is_ok() {
             for s in stage {
