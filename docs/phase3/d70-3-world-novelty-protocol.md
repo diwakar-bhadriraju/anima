@@ -131,6 +131,32 @@ cumulative metric negative — recorded, not tuned.
 Determinism: same seeds ran twice (sweep + verbose) -> identical
 RESULT lines and identical per-beat streams (reproducible verdicts).
 
+TH-DERIVATION APPLICATION (the frozen midpoint rule, applied to the
+validation data; the sweep itself ran at TH=60): K=8 distributions on
+the validation seed — known beats (2..39): minL2 <= 1.4 max; first
+sight (beat 40): 126.4. MIDPOINT rule: TH = (known max + first-sight
+min)/2 ~= (1.4 + 126.4)/2 ~= 63.9 ~= the registered 60. The 24-to-56
+channel scale concern is empirically moot: the two distributions
+separate by two orders of magnitude, and TH=60 sits inside the gap.
+(The retina band's count scale did NOT inflate: fixed weights
+[0.02,0.08] over 56 channels at floor-ish rates keep beats quiet
+(~0-8 counts/node).)
+
+VISIBILITY PRECONDITION trace (the "object must occupy >=1 retina
+cell at T1" acceptance): WN_VERBOSE shows obj_az=0.00 obj_d=20.0 from
+beat 40 through beat 45 — the novel object is on-axis and in-view for
+the whole first-sight window (camera-relative placement, verified).
+Caveat: the az/el used world-frame elevation (pitch-sensitive
+approximation); irrelevant here because the object sat on the camera
+axis at every measured beat.
+
+SEP=0 direct evidence for the fit-0.000 mystery: alive orgs with
+krec/mv healthy and fit exactly 0.000 imply sep=0.0 (fitness formula
+f = mv x (0.5 + 0.5 x krec) x sep has no other zero factors) — the
+D-50 post-survival decode-separation falsifier collapsed for those
+orgs (selection pruning by design, same representational-binding
+failure family as E3/E3b).
+
 Verdict: Stage 1 first-sight detection PASSES under the registered
 ordering rule's semantics (T1 flagged at every K; K=8 selected);
 Stage 2 cumulative consequence bar FAILS with the event-level
