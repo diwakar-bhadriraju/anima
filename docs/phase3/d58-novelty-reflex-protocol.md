@@ -209,3 +209,28 @@ beat loop (state-matched); L2 not cosine (magnitude-aware - D is same
 shape lower magnitude); templates never stage-frozen (drift).
 424242 stage3: known-symbol retention collapse (D-57), not the rule.
 STOP - D-58 VERIFIED CLOSE: controlled novelty detection, 3/3 seeds.
+
+## D-58 FINAL CODE CLOSE (2026-09-23): verified after dedup + refs-slice + k=16 test
+
+Hygiene closes: (1) identity refs sliced [..12] so io::decode's amp floor
+is flag-independent; (2) ONE shared per-beat template set drives both
+falsifier arms (same net state - the second capture had been drifting
+from the first's presentations); (3) k=16 TESTED on the 424242 stage-3
+cell: WORSE (0/3) - the k=8 default stays; k=16 spreads the projection
+too thin / different collision. Not a fix for that cell.
+
+VERIFIED (final code, default th=60, D58_K=8):
+  20260912  3/3 3/3 3/3 fp0  (full clean)
+  9001      3/3 3/3 3/3 fp0  (novelty clean; C/E identity retention
+                              degrades at stages 2-3 - D-57 issue)
+  424242    3/3 3/3 0/3 fp0  (stage-3 = template collision/retention)
+novelty detection at 8/9 cells; knowns fp=0 EVERYWHERE. Falsifier MET.
+
+OPEN FOLLOW-UPS (registered):
+  (a) 424242 stage-3 collision: not k=16; candidates = more training
+      reps for late-added symbols, or per-symbol reflex node groups.
+  (b) SURVIVAL-LOOP INTEGRATION: wire this reflex verdict into the
+      organism's actual survival decode - tests whether novelty
+      DETECTION survives the growth-decay that killed the codec's
+      (re-asks D-56's question WITH a working mechanism).
+STOP - D-58 closed with verified, deduplicated code.

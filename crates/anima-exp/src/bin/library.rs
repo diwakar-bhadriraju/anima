@@ -20,7 +20,8 @@ fn main() {
         for s in stage { if !prev.contains(s) { form_one(&mut net, seed, mode, s, &p, &mut tr); } }
         prev = stage.clone();
         let refs: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
-            (s.to_string(), capture_ref(&mut net, seed, mode, s, &p, &mut tr))
+            let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
+            (s.to_string(), v[..12].to_vec()) // identity = first 12 dims only (flag-independent)
         }).collect();
         let beat_n = 3u64;
         let mut rec: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
@@ -46,6 +47,9 @@ fn main() {
                 // knowns-control: each known vs PER-BEAT templates (incl.
                 // its own, captured fresh NOW - state-matched, D-55 rule;
                 // stage-frozen templates drift as the net keeps running).
+                // ONE per-beat template set, shared by both falsifier arms
+                // (captured before either arm's presentations -> both arms
+                // scored against the SAME net state).
                 let tpl: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
                     let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
                     (s.to_string(), v[12..].to_vec())
