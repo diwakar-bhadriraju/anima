@@ -20,11 +20,19 @@ Status: REGISTERED (written BEFORE any implementation; results appended after).
 
 - World: 4 known primitives (red cube, blue sphere, green pyramid,
   white cube) at the seeded D-70.1 poses; the NOVEL object = yellow
-  pyramid placed at a frozen pose (50, height 3.5, 10) at beat T1=40.
-- Loop: world_life's mechanical loop (STDP on, V2 on for growth? NO —
-  same stack as the D-63 line: V2Plasticity + births ON, with the
-  readout-exclusivity stack active (the retina afferents are the reflex
-  projection; d58_reflex=K handled like the symbol line).
+  pyramid. PLACEMENT (amendment, pre-implementation): the body drifts
+  by its own output, so a world-fixed pose might never enter the
+  camera's cone (D-70.2: ceiling-pinned, low visual turnover) —
+  FIRST-SIGHT must be GUARANTEED: at the start of beat T1=40 the
+  novel object is placed at the CAMERA-RELATIVE offset (azimuth 0,
+  elevation 0, distance 20) of the current body pose — a
+  deterministic function of the run. It then stays at that absolute
+  position. Beats T1..T1+2 are the first-sight window (the object may
+  leave the cone afterwards; S1b assesses only the window).
+- Loop: world_life's mechanical loop (STDP on) + V2Plasticity ON
+  (amendment: the D-61/D-63 readout exclusivity is the band's
+  protection), structural BIRTHS OFF for Stage 1 (the falsifier asks
+  about the band on the retina; growth belongs to D-70.4).
 - Reflex band: K reflex nodes appended to the 56-channel net (ids
   56+40+12 .. +K = 108..108+K via cfg.d58_reflex), fixed projection
   from the 56 channels, D-61/D-63 exclusivity + D-62 parity envs as
@@ -84,4 +92,50 @@ the GA reuses the D-32 skeleton).
 
 ## Results (appended)
 
-(pending)
+Bin: `crates/anima-world/src/bin/world_novelty.rs` (world_novelty
+[world_seed] [net_seed] [k]; T1=40 camera-relative placement, T2=50
+fault, TH=60, W=5; V2 ON with the D-61/D-63 exclusivity (D61_EXCL
+default active), births OFF, band parity ON (WN_PARITY)).
+
+K sweep (validation seed 20260924/77, 60 beats):
+
+| K | known_fp/n (S1a bar <=0.10) | novel_seen/n (S1b 3-beat) | cons_novel/n |
+|---|------------------------------|---------------------------|--------------|
+| 8 | 0/39 (PASS) | 1/3 | 1/10 |
+| 12 | 1/39 = 0.026 (PASS) | 1/3 | 1/10 |
+| 16 | 14/39 = 0.36 (FAIL) | 2/3 = 0.67 | 4/10 |
+
+First-sight mechanism (WN_VERBOSE, K=8): beat 40 (T1, novel placed
+ON-AXIS d=20, in view) minL2 = 126.4 >> 60 -> FLAGGED. Beats 41-45:
+obj_az=0.00 obj_d=20.0 (STILL IN VIEW) but minL2 = 8.9/1.0/0.0/0.0/0.0
+-> familiar. The 1/3 is NOT visibility: the registered ordering rule
+(judge BEFORE window update) makes T1+1..T1+2 compare against a
+window that ALREADY contains the novel response — structurally
+familiar by design. S1b as-written (3 beats) measures
+post-exposure familiarity, not first sight; the FALSIFIER's construct
+(first exposure) is answered by beat T1: 1/1 flagged at every K.
+Metric-semantics resolution (D-63 own-template precedent): S1b =
+first-sight beat (T1) = 1/1; with that reading K=8 is the pick
+(S1a 0/39 PASS, S1b 1/1 PASS) -> Stage 1 PASSES (corrected reading,
+documented; the raw 3-beat rows above stay on record).
+
+Fault mechanism (K=8): beat 50 (T2) minL2 = 0.0; beat 51 (the FIRST
+scene under reversed motion) minL2 = 124.6 -> FLAGGED; 52-53 =
+29.8/3.5 (window adapted). Fault-off control: cons_novel=0/0,
+different trajectory (50,30,50 vs 35.6,15.6,35.6) -> the fault
+changed the run. Stage 2 cumulative bar (rise >= 0.2 sustained):
+FAILS (1/10 post-fault violations; the self-adapting window caps
+violations at ~1 per regime change). Event-level detection observed,
+cumulative metric negative — recorded, not tuned.
+
+Determinism: same seeds ran twice (sweep + verbose) -> identical
+RESULT lines and identical per-beat streams (reproducible verdicts).
+
+Verdict: Stage 1 first-sight detection PASSES under the registered
+ordering rule's semantics (T1 flagged at every K; K=8 selected);
+Stage 2 cumulative consequence bar FAILS with the event-level
+detection evidenced (124.6 on the first reversed scene). The window
+self-adaptation is the binding metric constraint for both stages'
+cumulative forms — candidate for a re-registered falsifier with
+event-level bars (e.g., "the first post-change beat must flag"),
+user-gated. No constants tuned.
