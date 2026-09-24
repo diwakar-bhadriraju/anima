@@ -131,8 +131,10 @@ cumulative metric negative — recorded, not tuned.
 Determinism: same seeds ran twice (sweep + verbose) -> identical
 RESULT lines and identical per-beat streams (reproducible verdicts).
 
-TH-DERIVATION APPLICATION (the frozen midpoint rule, applied to the
-validation data; the sweep itself ran at TH=60): K=8 distributions on
+TH-DERIVATION APPLICATION (the midpoint rule, applied POST-HOC to the
+already-collected validation data — the rule text was NOT written into
+the registration before the sweep ran; process slip recorded; outcome
+robust since TH=60 ~= midpoint ~= 64): K=8 distributions on
 the validation seed — known beats (2..39): minL2 <= 1.4 max; first
 sight (beat 40): 126.4. MIDPOINT rule: TH = (known max + first-sight
 min)/2 ~= (1.4 + 126.4)/2 ~= 63.9 ~= the registered 60. The 24-to-56
