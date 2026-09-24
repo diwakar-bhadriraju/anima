@@ -42,44 +42,39 @@ fn main() {
             // each KNOWN symbol; the reflex must NOT flag it novel vs
             // its conventionuted refs (false positive -> rule measures
             // difference, not novelty). Count false_known_novel per beat.
+            // ONE template set for BOTH falsifier arms, captured here
+            // (before either arm's presentations) -> both arms scored
+            // against the SAME net state. Per-beat, NOT stage-frozen:
+            // frozen templates drift as the net keeps running beats.
+            // ONE merged block (single D58_REFLEX check, shared tpl +
+            // threshold): knowns-control then D-arm, same net state.
             if std::env::var("D58_REFLEX").is_ok() {
-                let th_fam_ctl: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
-                // knowns-control: each known vs PER-BEAT templates (incl.
-                // its own, captured fresh NOW - state-matched, D-55 rule;
-                // stage-frozen templates drift as the net keeps running).
-                // ONE per-beat template set, shared by both falsifier arms
-                // (captured before either arm's presentations -> both arms
-                // scored against the SAME net state).
+                // Per-beat template set for BOTH arms, captured ONCE
+                // before either arm's presentations (state-matched;
+                // stage-frozen templates drift as the net runs).
                 let tpl: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
                     let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
                     (s.to_string(), v[12..].to_vec())
                 }).collect();
+                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
+                // A. knowns-control: each known vs tpl (incl. its own
+                // template) must read FAMILIAR (min-L2 <= th) -> fp only
+                // if a known fails to match its own template.
                 for ks in stage {
                     let kv = capture_ref(&mut net, seed, mode, ks, &p, &mut tr);
                     let kn2 = kv[12..].to_vec();
                     let min_l = tpl.iter().map(|(_, t)| l2(&kn2, t)).fold(f32::MAX, f32::min);
                     if std::env::var("D58_DEBUG").is_ok() {
-                        eprintln!("  D58 knowns-fp({}): min-L2={:.1} flagged={}", ks, min_l, min_l > th_fam_ctl);
+                        eprintln!("  D58 knowns-fp({}): min-L2={:.1} flagged={}", ks, min_l, min_l > th_fam);
                     }
-                    if min_l > th_fam_ctl { known_fp += 1; }
+                    if min_l > th_fam { known_fp += 1; }
                 }
-            }
-            // D-58 verified rule (e918550): NOVEL iff min-L2 distance to
-            // the nearest known template EXCEEDS th_fam. Measured:
-            // known self-distance 2-21, D distance 115-179 -> th 60
-            // separates. Cosine FAILED (D is same shape, lower magnitude
-            // - angle preserves direction, discards magnitude); L2 is
-            // magnitude-aware and is THE registered rule.
-            if std::env::var("D58_REFLEX").is_ok() {
-                let th_fam: f32 = std::env::var("D58_TH").ok().and_then(|v| v.parse().ok()).unwrap_or(60.0);
-                // D arm: novel iff min-L2(D, PER-BEAT templates) > th_fam
-                let tpl2: Vec<(String, Vec<f32>)> = stage.iter().map(|s| {
-                    let v = capture_ref(&mut net, seed, mode, s, &p, &mut tr);
-                    (s.to_string(), v[12..].to_vec())
-                }).collect();
+                // B. D arm: NOVEL iff min-L2(D, same tpl) > th_fam
+                // (L2 magnitude-aware - D is same shape lower magnitude;
+                // cosine failed on this. Verified e918550.)
                 let dv = capture_ref(&mut net, seed, mode, "D", &p, &mut tr);
                 let dn = dv[12..].to_vec();
-                let min_dl2 = tpl2.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
+                let min_dl2 = tpl.iter().map(|(_, t)| l2(&dn, t)).fold(f32::MAX, f32::min);
                 let novel_by_reflex = min_dl2 > th_fam;
                 if novel_by_reflex { reflex_det += 1; }
                 if std::env::var("D58_DEBUG").is_ok() {
