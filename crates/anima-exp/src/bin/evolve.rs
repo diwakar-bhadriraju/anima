@@ -392,16 +392,16 @@ fn main() {
                 // sized to allow legit self-construction growth.
                 let mut rcfg = anima_core::resources::ResourceConfig::default();
                 rcfg.max_neurons = 600;
-                // argv[3] = synapse cap override (D-48 registered param,
-                // default 20000). NOTE: the 20000 default is an
-                // INCIDENTAL monitor-wiring constant (e06bbb3), never
-                // registered - the ~229 'wall' may be this budget, not a
-                // structural ceiling; cap-raised runs test that.
-                // argv[3]: 0 = D-49 size-scaled mode (k=200 synapses per
-                // neuron, budget recomputed per check - removes the hard
-                // cap to measure the representational slope above 320);
-                // default 20000 = fixed cap (D-48 behavior, identity).
-                let syn_cap: usize = std::env::args().nth(3).and_then(|a| a.parse().ok()).unwrap_or(20_000);
+                // argv[3] = synapse budget override. D-71 (docs/phase3/d71-growth-wall-protocol.md):
+                // the 20000 default was an INCIDENTAL monitor-wiring constant (e06bbb3),
+                // never registered; it was the growth-death WALL (organisms crossing 20k
+                // live synapses died resource-exhaustion by gen 6-8, zeroing every late
+                // gate). DEFAULT NOW: 0 = D-49 size-scaled mode (k=200 synapses per
+                // neuron, budget recomputed per check - removes the hard cap), verified
+                // in D-71 Stage B/C (populations survive past 300, no total-death gen;
+                // early gens byte-identical to the capped baseline - the cap only trips
+                // late). argv[3]: nonzero = fixed cap (D-48 behavior for compatibility).
+                let syn_cap: usize = std::env::args().nth(3).and_then(|a| a.parse().ok()).unwrap_or(0);
                 if syn_cap == 0 {
                     rcfg.size_scaled_synapses_k = Some(200.0); // measured k (D-49)
                     rcfg.max_synapses = usize::MAX; // fixed path disabled

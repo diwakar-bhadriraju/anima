@@ -61,6 +61,15 @@ when unset.
 - F3: fix works but the reflex gate still dips (seed-9001-style) ->
   the dip is a separate question, recorded, no tuning.
 
+DEFAULT FLIP (registered follow-up, D-71): evolve.rs synapse-budget
+default changed 20000 -> 0 (size-scaled k=200, D-49 mode). Verified:
+flag-off identity gen 0/1 byte-identical (the cap never trips early —
+it only deleted late generations), and the new default reproduces
+Stage C's 424242 columns exactly (g6 reflex=1.00, g7 reflex=1.00,
+sizes 266, no total death). argv[3] keeps the fixed-cap compatibility
+path. Suite 196/0. Committed with the D-59..D-71 checkpoint
+(a3b4848) + flip commit.
+
 ## Results (appended after runs)
 
 Stage A (diagnosis; seed 424242 x 8 gens, verbose + DBG_DEATH):
