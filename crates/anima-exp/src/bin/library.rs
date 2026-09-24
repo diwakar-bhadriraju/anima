@@ -27,6 +27,7 @@ fn main() {
         let mut pres: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
         let mut novel_det = 0u32;
         let mut reflex_det = 0u32;
+        let mut known_fp = 0u32;
         for _ in 0..beat_n {
             for s in stage {
                 let act = decode_beat(&mut net, seed, mode, s, &p, &mut tr, &refs);
@@ -36,6 +37,25 @@ fn main() {
             }
             let act_d = decode_beat(&mut net, seed, mode, "D", &p, &mut tr, &refs);
             if act_d == "NOVEL" || act_d == "UNSURE" { novel_det += 1; }
+            // D-58 CONTROL (registered falsifier's knowns-arm): present
+            // each KNOWN symbol; the reflex must NOT flag it novel vs
+            // its conventionuted refs (false positive -> rule measures
+            // difference, not novelty). Count false_known_novel per beat.
+            if std::env::var("D58_REFLEX").is_ok() {
+                for ks in stage {
+                    let kv = capture_ref(&mut net, seed, mode, ks, &p, &mut tr);
+                    let kn2 = kv[12..].to_vec();
+                    // held-out: other knowns' refs + this beat's own value
+                    let others: Vec<Vec<f32>> = stage.iter()
+                        .filter(|s2| **s2 != *ks)
+                        .map(|s2| capture_ref(&mut net, seed, mode, s2, &p, &mut tr)[12..].to_vec())
+                        .collect();
+                    let flagged = others.iter().any(|on| {
+                        kn2.iter().zip(on.iter()).any(|(d, k)| (*d - *k).abs() > 3.0)
+                    });
+                    if flagged { known_fp += 1; }
+                }
+            }
             // D-58 reflex familiarity rule: novelty-node value of D vs
             // each known ref's novelty-node value. D is novel iff its
             // reflex value differs from EVERY known's by > tol.
@@ -75,7 +95,7 @@ fn main() {
                 line.push_str(&format!("{s}={ok}/{tot} "));
             } else { line.push_str(&format!("{s}=UNTRAINED ")); }
         }
-        line.push_str(&format!("novel_det={}/{} reflex_det={}/{}", novel_det, beat_n, reflex_det, beat_n));
+        line.push_str(&format!("novel_det={}/{} reflex_det={}/{} known_fp={}/{}", novel_det, beat_n, reflex_det, beat_n, known_fp, beat_n * stage.len() as u64));
         println!("{line}");
     }
     println!("done");

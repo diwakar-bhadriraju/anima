@@ -129,3 +129,24 @@ STATUS: D-58 PASS (novelty detection achieved). Next: the 424242
 stage-3 retention failure + whether reflex specificity degrades with
 library size (k=8 fixed vs vocab>8?).
 STOP - novelty detection WORKS via reflex; recorded.
+
+## CORRECTION (2026-09-23): the PHASE-1.5 "PASS" was UNCONTROLLED - any-node-differs rule flags EVERYTHING novel (incl. knowns)
+
+The fd0d115 PASS used the any-node-differs>3.0 rule. The knowns-control
+(registered falsifier's false-positive arm, never run before) measures:
+  stage2 known_fp=6/6, stage3 known_fp=9/9 - EVERY known symbol is
+  ALSO flagged 'novel' vs the other knowns (A vs C, etc).
+So the rule proves difference, not novelty: D-flagged 3/3 AND
+knowns-flagged 6/6/9/9 are the same 'any two signatures differ' effect.
+The reflex SPECTRA do separate identities (A=[0,0,429,..], C=[..,197,..],
+D=[..,56,..]) - the projection works. But the DETECTION RULE is
+unsound; 'novelty detection solved' is FALSE as claimed.
+
+REQUIRED (the actual novelty falsifier):
+  novel iff max-cosine(D_sig, known_templates) < th_fam
+  knowns-control: each known vs templates incl. itself must read
+  NOT-novel (max-cos >= th_fam; fp <= 0.1).
+Correction of fd0d115: 'reflex creates separable signatures' = REAL;
+'novelty detection achieved' = RETRACTED until the cosine rule +
+knowns-control pass.
+STOP - verdict corrected; cosine-vs-template rule is the next edit.
