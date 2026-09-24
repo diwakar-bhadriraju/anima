@@ -70,6 +70,22 @@ sizes 266, no total death). argv[3] keeps the fixed-cap compatibility
 path. Suite 196/0. Committed with the D-59..D-71 checkpoint
 (a3b4848) + flip commit.
 
+AMENDMENT (12-gen probe, seed 424242, full stack + EVOLVE_VERBOSE):
+- No new failure mode past gen 8: sizes 63 -> 414 by gen 11, all
+  orgs alive, no resource trips; the size-scaled monitor (k=200 x n)
+  scales with headroom (23.1k synapses at n=450 vs ~90k budget).
+- fit=0.000-with-no-death mystery SOLVED (algebraic): the fitness
+  formula has exactly three factors (mv x (0.5+0.5*krec) x sep); orgs
+  with healthy mv/krec yet fit=0.000 imply sep=0.0 — the D-50
+  separation falsifier (capture_separation, decode-against-refs)
+  collapsed, so selection zeroed their fitness BY DESIGN (prunes
+  non-separating brains; the same representational-binding failure the
+  E3/E3b line measured). Instrumentation added: EVOLVE_VERBOSE org
+  line now carries krec (known_recognized_frac) and mv
+  (mean_viability) next to dead/fail/n/syn/fit.
+- Reflex column holds the full stack through 12 gens at 414 neurons
+  (1.00 at gens 7/9/11; 0.86-0.96 elsewhere; 424242 only).
+
 ## Results (appended after runs)
 
 Stage A (diagnosis; seed 424242 x 8 gens, verbose + DBG_DEATH):

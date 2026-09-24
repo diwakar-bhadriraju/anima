@@ -498,9 +498,10 @@ fn main() {
                         format!("{p}=[{}]", elems.join(","))
                     }).collect();
                     eprintln!("  org {i} mode={} REFS: {} | {}", d50_mode(), vecs.join("  "), coses);
-                    eprintln!("  org {i}: dead={:?} fail={:?} n={} syn={} fit={f:.3}",
+                    eprintln!("  org {i}: dead={:?} fail={:?} n={} syn={} krec={:.3} mv={:.3} fit={f:.3}",
                         out.died_at, out.failed, org.net.neurons.len(),
-                        org.net.live_synapses().count());
+                        org.net.live_synapses().count(),
+                        out.known_recognized_frac, out.mean_viability);
                 }
                 if std::env::var("EVOLVE_VERBOSE").is_ok() {
                     eprintln!("  org {i}: gp={:?} syn_growth={syn_growth:+} fit={f:.3}",

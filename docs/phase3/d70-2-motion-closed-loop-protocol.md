@@ -70,6 +70,13 @@ band computes from structure (96..108), NOT the survival anatomy's
   fixed.)
 - Seed sensitivity (bonus): world/net seed changes -> different
   trajectories (50.0/30.0/8.4 vs 8.9/30.0/7.2 vs 9.4/30.0/9.1).
+- OBSERVATION (D-70.3-relevant): pos.y = 30.000 = the arena ceiling in
+  every motor-on run — the lift channel (motor[2]) dominates and pins
+  the body at the ceiling; only 7/60 beats changed the visual frame
+  (low turnover for the first 60 beats). Not a correctness issue for
+  A2, but the D-70.3 novelty falsifier's power analysis must expect
+  low per-beat visual turnover, and motor-channel balance (lift vs
+  steering) is a steering-relevant knob for later milestones.
 - Workspace suite: 196 passed / 0 failed.
 
 Acceptance: PASS. D-70.3 (registered novelty-on-first-sight + motor
