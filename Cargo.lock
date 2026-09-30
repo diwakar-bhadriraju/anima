@@ -82,8 +82,12 @@ version = "0.1.0"
 dependencies = [
  "anima-core",
  "anima-exp",
+ "axum",
+ "futures-util",
  "rand",
  "rand_xoshiro",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

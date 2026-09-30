@@ -421,6 +421,13 @@ pub struct NetworkConfig {
     /// symmetric, no winner). 0 = identity.
     #[serde(default)]
     pub output_competition_gain: f32,
+    /// SL2_IINH: INTERNAL-band sibling of D-46/U1 — only Internal-class
+    /// co-spikers inhibit each other (same-tick pairwise). The internal
+    /// (KC/expansion) band saturates (every neuron every tick), which
+    /// makes selective reward credit impossible; this de-saturates it.
+    /// 0 = identity (bit-identical baseline).
+    #[serde(default)]
+    pub internal_inhibition_gain: f32,
     /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
     /// slow_state_beta = per-spike increment; slow_state_tau_ms = decay.
     /// beta = 0 (default) => bit-identical V2.
@@ -612,6 +619,8 @@ impl Default for NetworkConfig {
             output_inhibition_gain: 0.0,
             // D-54 default OFF: 0 = identity.
             output_competition_gain: 0.0,
+            // SL2_IINH internal-band inhibition default OFF: 0 = identity.
+            internal_inhibition_gain: 0.0,
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
@@ -1480,6 +1489,22 @@ impl Network {
             for &a in &out_sp {
                 for &b in &out_sp {
                     if a != b { self.neurons[b.idx()].i_syn -= og; }
+                }
+            }
+        }
+
+        // SL2_IINH: INTERNAL-band lateral inhibition — only Internal-class
+        // co-spikers inhibit each other (D-46 sibling). De-saturates the
+        // KC/expansion band so reward credit can be selective. 0 = identity.
+        if self.cfg.internal_inhibition_gain != 0.0 {
+            let ig = self.cfg.internal_inhibition_gain;
+            let int_sp: Vec<NeuronId> = spikers
+                .iter().copied()
+                .filter(|&id| self.neurons[id.idx()].class == NeuronClass::Internal)
+                .collect();
+            for &a in &int_sp {
+                for &b in &int_sp {
+                    if a != b { self.neurons[b.idx()].i_syn -= ig; }
                 }
             }
         }

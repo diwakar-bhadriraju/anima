@@ -9,6 +9,11 @@ anima-core = { path = "../anima-core" }
 anima-exp = { path = "../anima-exp" }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
+# world_survival --serve (watch-only live viewer)
+axum = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+serde_json = { workspace = true }
 
 [lib]
 name = "anima_world"

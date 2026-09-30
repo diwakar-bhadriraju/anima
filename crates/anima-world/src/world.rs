@@ -38,7 +38,10 @@ impl Vec3 {
 
 /// The organism's body: 3D position, heading yaw (radians, about +Y) and
 /// pitch (radians, about +X), plus velocities. Full 3D kinematics; gravity
-/// OFF (registered D-70.1), ground plane z=0 clamps with zero bounce.
+/// OFF in `Body::step` (registered D-70.1; the survival bin adds the
+/// environment rule), ground plane z=0 clamps with zero bounce. Energy
+/// tank: starts at 100.0, drained by `World::touch_food` (1.0/beat),
+/// refilled on food contact; `alive=false` exactly when it hits 0.
 #[derive(Debug, Clone)]
 pub struct Body {
     pub pos: Vec3,
@@ -47,11 +50,25 @@ pub struct Body {
     pub pitch: f32,
     pub yaw_rate: f32,
     pub pitch_rate: f32,
+    /// Energy tank (registered: start 100.0, drain 1.0/beat via
+    /// `World::touch_food`).
+    pub energy: f32,
+    /// Dead exactly when energy reaches 0 (registered death rule).
+    pub alive: bool,
 }
 
 impl Body {
     pub fn new(pos: Vec3, yaw: f32, pitch: f32) -> Self {
-        Self { pos, vel: Vec3::ZERO, yaw, pitch, yaw_rate: 0.0, pitch_rate: 0.0 }
+        Self {
+            pos,
+            vel: Vec3::ZERO,
+            yaw,
+            pitch,
+            yaw_rate: 0.0,
+            pitch_rate: 0.0,
+            energy: 100.0,
+            alive: true,
+        }
     }
 
     /// Apply one fixed step with the given motor drive (rates_hz per
@@ -127,6 +144,9 @@ pub struct Primitive {
     pub pos: Vec3,
     /// Flat RGB color in [0,1].
     pub color: [f32; 3],
+    /// Food flag: touching within the refill radius refills the body's
+    /// energy tank (world-survival goal 1).
+    pub food: bool,
 }
 
 impl Primitive {
@@ -238,14 +258,15 @@ impl World {
         };
         use rand::Rng;
         let mut primitives = Vec::new();
-        let defs: [(Shape, [f32; 3]); 5] = [
-            (Shape::Cube { half: 3.0 }, [0.85, 0.15, 0.15]),
-            (Shape::Sphere { r: 3.0 }, [0.15, 0.35, 0.85]),
-            (Shape::Pyramid { half_base: 3.0, height: 6.0 }, [0.15, 0.75, 0.25]),
-            (Shape::Cube { half: 2.0 }, [0.9, 0.9, 0.9]),
-            (Shape::Pyramid { half_base: 2.5, height: 5.0 }, [0.9, 0.85, 0.2]),
+        // (shape, color, food): the green pyramid is THE food source.
+        let defs: [(Shape, [f32; 3], bool); 5] = [
+            (Shape::Cube { half: 3.0 }, [0.85, 0.15, 0.15], false),
+            (Shape::Sphere { r: 3.0 }, [0.15, 0.35, 0.85], false),
+            (Shape::Pyramid { half_base: 3.0, height: 6.0 }, [0.15, 0.75, 0.25], true),
+            (Shape::Cube { half: 2.0 }, [0.9, 0.9, 0.9], false),
+            (Shape::Pyramid { half_base: 2.5, height: 5.0 }, [0.9, 0.85, 0.2], false),
         ];
-        for (shape, color) in defs {
+        for (shape, color, food) in defs {
             // Deterministic placement INSIDE the camera's forward cone
             // (the D-70.1 body starts at the origin facing +Z): z in
             // [5, 40], x within +/-0.9*z (azimuth half-FOV 0.8 rad),
@@ -253,7 +274,7 @@ impl World {
             let z = 5.0 + rng.gen::<f32>() * (ARENA_XZ * 0.8 - 5.0);
             let x = (rng.gen::<f32>() - 0.5) * 2.0 * (z * 0.9);
             let y = 2.0 + rng.gen::<f32>() * 2.0;
-            primitives.push(Primitive { shape, pos: Vec3::new(x, y, z), color });
+            primitives.push(Primitive { shape, pos: Vec3::new(x, y, z), color, food });
         }
         World { body: Body::new(Vec3::new(0.0, 1.5, 0.0), 0.0, 0.0), primitives }
     }
@@ -261,6 +282,35 @@ impl World {
     /// One world step: body responds to the motor drive. Scene static.
     pub fn step(&mut self, rates: &[f32]) {
         self.body.step(rates);
+    }
+
+    /// Energy bookkeeping, called once per beat AFTER `step` (refill then
+    /// drain). Registered constants (NOT tuned on outcomes): touch radius
+    /// 6.0 around the food primitive, refill +30.0, drain 1.0/beat, death
+    /// exactly when the tank reaches 0 (clamped, then `alive=false`; a
+    /// dead body never drains again). Deterministic: fixed iteration
+    /// order over primitives, pure f32 math.
+    pub fn touch_food(&mut self) {
+        if !self.body.alive {
+            return;
+        }
+        for p in &self.primitives {
+            if p.food {
+                let dx = p.pos.x - self.body.pos.x;
+                let dy = p.pos.y - self.body.pos.y;
+                let dz = p.pos.z - self.body.pos.z;
+                let d2 = dx * dx + dy * dy + dz * dz;
+                if d2 < 6.0 * 6.0 {
+                    self.body.energy += 30.0;
+                    break;
+                }
+            }
+        }
+        self.body.energy -= 1.0;
+        if self.body.energy <= 0.0 {
+            self.body.energy = 0.0;
+            self.body.alive = false;
+        }
     }
 }
 
@@ -336,5 +386,42 @@ mod tests {
         }
         assert!(b.pos.z <= ARENA_XZ + 1e-4, "escaped arena z={}", b.pos.z);
         assert!(b.pos.y >= -1e-4, "below ground y={}", b.pos.y);
+    }
+
+    #[test]
+    fn fresh_body_starts_full_energy() {
+        let w = World::new(7);
+        assert_eq!(w.body.energy, 100.0, "fresh body starts with a full tank");
+        assert!(w.body.alive, "fresh body is alive");
+        // Exactly one food primitive, and it is the green pyramid.
+        let foods: Vec<&Primitive> = w.primitives.iter().filter(|p| p.food).collect();
+        assert_eq!(foods.len(), 1, "scene has exactly one food source");
+        assert_eq!(foods[0].color, [0.15, 0.75, 0.25], "food is the green pyramid");
+    }
+
+    #[test]
+    fn food_refill_and_exact_death() {
+        // Refill: a body spawned adjacent to the food primitive gains
+        // +30 on the first touch (then drains 1.0) -> tank > 100.
+        let mut a = World::new(7);
+        let food = a.primitives.iter().find(|p| p.food).expect("scene has food");
+        a.body.pos = Vec3::new(food.pos.x + 1.0, food.pos.y, food.pos.z);
+        a.touch_food();
+        assert!(a.body.energy > 100.0, "touching food must refill, got {}", a.body.energy);
+        assert!(a.body.alive);
+        // Death: empty arena -> 1.0/beat drain from 100.0.
+        let mut b = World::new(7);
+        b.primitives.clear();
+        for _ in 0..99 {
+            b.touch_food();
+        }
+        assert!(b.body.alive, "must survive 99 beats (100 -> 1)");
+        assert_eq!(b.body.energy, 1.0);
+        b.touch_food();
+        assert!(!b.body.alive, "must die exactly when energy hits 0");
+        assert_eq!(b.body.energy, 0.0, "tank clamps at 0");
+        // A dead body never drains again (early return).
+        b.touch_food();
+        assert_eq!(b.body.energy, 0.0);
     }
 }

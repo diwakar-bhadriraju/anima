@@ -89,6 +89,14 @@ impl RetinaEncoder {
         }
         Self { rates_hz: rates }
     }
+
+    /// Read-only view of the 8 proprioception rates (cells 48..56) for
+    /// observability frames. Pure read — determinism unaffected.
+    pub fn proprio_rates(&self) -> [f32; PROPRIO_CHANNELS] {
+        let mut out = [0.0f32; PROPRIO_CHANNELS];
+        out.copy_from_slice(&self.rates_hz[VISION_CHANNELS..]);
+        out
+    }
 }
 
 impl SensoryEncoder for RetinaEncoder {
