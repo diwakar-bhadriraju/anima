@@ -9,7 +9,7 @@ brain what to do? We built ANIMA, a developmental spiking neural organism writte
 Rust, and studied what it can learn on its own. The organism lives in a 3D arena, senses its
 surroundings, controls its own body, finds and eats food, and dies when its energy runs out. It is
 deterministic and experiments are pre-registered, so every result can be re-run. We show that the
-organism learns to forage, that persistent food supports a genuine feeding loop, and that a home
+organism forages, that persistent food supports a sustained feeding loop, and that a home
 and rest drive can emerge when returning home is rewarded. Two measured limitations block further
 progress: the internal layer saturates, so selective within-life learning is not possible yet, and
 the fitness economy saturates once food is reachable, so evolution stops improving. The conclusion
@@ -102,7 +102,7 @@ These rules are also why the failures in section 7 are useful. They are honest, 
 
 The creature did real things, and some of them surprised us.
 
-It found and fixed its own steering mix-up, which is not what we set out to do but is the most important moment of the whole project. For a long time, the creature kept flying away from food. We eventually traced that to a single bug: when food was to its right, the command that should have turned right actually turned left. One sign error had been silently sabotaging months of runs. The moment we fixed it, the creature started chasing food like a normal hungry thing. This is the bug we keep telling people about, because it explains why so many early "failures" were really one bug in disguise.
+We found a steering bug in the code, and it changed the whole project, so it is probably the single most important fix here. For a long time the creature kept flying away from food, and the failures looked like the brain was simply not working. The real cause was one sign error: when food was to its right, the command that should have turned right actually turned left. One line had been quietly sabotaging months of runs. The moment we fixed it, the creature started chasing food like a normal hungry thing. This is the bug we keep telling people about, because it explains why so many early failures were really one bug in disguise.
 
 It forages well. Under a teaching schedule (a curriculum where food starts close and moves farther as it improves), a single creature ate as many as 126 meals in one life. That is a strong forager by any measure we have.
 
@@ -110,7 +110,7 @@ It builds a real feeding loop when food stays put. By default, food teleports to
 
 It lives long when the difficulty is honest. With a bigger energy tank and food that moves a little farther each time it wins (a ladder of difficulty), one creature survived 2,230 beats. Its usual lifespan was 60 to 200. It did not die of boredom; it died because the ladder got genuinely too hard.
 
-It learned a home. We added a second need: a nest the creature should return to for rest, and returning restores its stamina. Then we made the interesting choice of also rewarding returns. One lineage of the creature started coming home repeatedly. It foraged out, came back, rested, and went out again. That is the first real hint of the behavior we actually care about: go find food far away, then find your way home.
+A home and rest behavior emerged, but only under the right setup, so we report it as partial rather than solved. We added a second need: a nest the creature should return to for rest, and returning restores its stamina. Then we made the choice of also rewarding returns. Under that configuration, one lineage of the creature started coming home repeatedly: it foraged out, came back, rested, and went out again. The other lineage did not, which is why the results table calls home behavior partial. Still, it is the closest we have come to the behavior we actually care about: go find food far away, then find your way home.
 
 Hunger changes how it searches, the way it should. When well fed, the creature settles down and stops wandering, which keeps it near a food patch. When hungry, it searches wide to find the next meal. Real foragers do exactly this.
 
@@ -118,7 +118,7 @@ Hunger changes how it searches, the way it should. When well fed, the creature s
 
 Science does not work unless you write down the failures too. Here they are.
 
-A curiosity switch, which rewarded the creature for seeing thing it had not seen before, made it explore more but did not make it survive better. The reward was interesting, and it just did not translate into food.
+A curiosity switch, which rewarded the creature for seeing things it had not seen before, made it explore more but did not make it survive better. The reward was interesting, and it just did not translate into food.
 
 Several learning rules, in the family of "make the wires change when eating happens," all did something. The wires really did change. We could measure it. But the change was too small and too scattered to matter to survival, so evolution never noticed it. This pattern came up again and again: easy to make the brain change, hard to make the change count.
 
@@ -134,7 +134,7 @@ After dozens of experiments, we found two walls standing between this creature a
 
 Wall one: the brain is too excited. Every light is always on.
 
-Remember the light-bulb neurons? In this creature's brain, every single bulb blinks all the time. We proved it with a probe: 256 out of 256 internal neurons were firing at every beat. Nothing was ever quiet.
+Remember the light-bulb neurons? In this creature's brain, every single bulb blinks all the time. We measured it with a probe: 256 out of 256 internal neurons were firing at every beat. Nothing was ever quiet.
 
 Here is why that kills learning. A learning brain needs differences. When you eat, the brain should strengthen the few wires that led to the meal and leave the rest alone. But if every neuron was firing, then everything was active right before eating, so the reward strengthens everything equally. That is not learning. It is a participation trophy for the whole brain, and nobody learns anything. No differences means no selective learning, and no selective learning means no real learning.
 
@@ -187,7 +187,7 @@ The catch we measured: evolution only sees changes big enough to change survival
 
 ## 10. What it all means
 
-The creature is real in the way that matters: it moves, senses, finds food, survives, and dies. That part fully works, and it took real engineering to get there.
+The creature works, in the way that matters here: it moves, senses, finds food, survives, and dies, and it did so reliably across the runs in this report. That took real engineering.
 
 We found and fixed a genuine bug that had been quietly sabotaging everything for a long time.
 
