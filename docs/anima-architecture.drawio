@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="ANIMA architecture">
+    <mxGraphModel dx="1100" dy="640" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- title -->
+        <mxCell id="2" value="ANIMA architecture" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="380" height="30" as="geometry" />
+        </mxCell>
+        <!-- Sensors -->
+        <mxCell id="3" value="Sensors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3f8;strokeColor=#5b7a9d;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="retina grid (48)&#xa;proprioception (8)&#xa;smell (optional, 6)" style="text;html=1;align=center;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="45" y="170" width="190" height="70" as="geometry" />
+        </mxCell>
+        <!-- Brain -->
+        <mxCell id="5" value="Brain (spiking LIF)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffdf7;strokeColor=#36454f;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="200" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="inputs (poisson)&#xa;internal pool (40/128/256)&#xa;STDP + structural growth&#xa;outputs (12 motor)&#xa;&#xa;changes its own wiring" style="text;html=1;align=center;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="45" y="320" width="190" height="130" as="geometry" />
+        </mxCell>
+        <!-- World -->
+        <mxCell id="7" value="3D world" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f5ec;strokeColor=#8a7a3c;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="300" width="260" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="body (position, heading, pitch, velocity)&#xa;arena 100 x 100, gravity, ground&#xa;food patches (+30 energy)&#xa;energy tank, death at 0&#xa;&#xa;world steps once per beat" style="text;html=1;align=center;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="425" y="330" width="250" height="130" as="geometry" />
+        </mxCell>
+        <!-- Home / rest -->
+        <mxCell id="9" value="Home / rest (optional)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef6ef;strokeColor=#5c8a5c;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="505" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="nest landmark, stamina&#xa;return to rest and recover" style="text;html=1;align=center;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="45" y="530" width="190" height="50" as="geometry" />
+        </mxCell>
+        <!-- Evolution -->
+        <mxCell id="11" value="Evolution (GA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3eefb;strokeColor=#7a5c9e;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="300" width="200" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="4 creatures per generation&#xa;score = fitness (food + life)&#xa;best breed, mutations&#xa;next generation of brains" style="text;html=1;align=center;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="855" y="330" width="190" height="130" as="geometry" />
+        </mxCell>
+        <!-- Determinism (dashed) -->
+        <mxCell id="13" value="Determinism" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#c9a227;dashed=1;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="140" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="seeded randomness&#xa;env-gated switches&#xa;same seed = same run" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="855" y="170" width="190" height="60" as="geometry" />
+        </mxCell>
+        <!-- legend -->
+        <mxCell id="15" value="loop: sense, think, act, survive or die, repeat. The brain changes its wiring inside a life; the population changes across generations." style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="600" width="820" height="30" as="geometry" />
+        </mxCell>
+        <!-- edges -->
+        <mxCell id="20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5b7a9d;" edge="1" parent="1" source="7" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#36454f;" edge="1" parent="1" source="3" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#36454f;" edge="1" parent="1" source="5" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5c8a5c;" edge="1" parent="1" source="9" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7a5c9e;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="7" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7a5c9e;" edge="1" parent="1" source="5" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -52,10 +52,12 @@ These are measured limits, not hidden defects. The white paper covers each of th
 
 ## Architecture
 
-<img src="docs/anima-architecture.svg" alt="ANIMA architecture" width="720">
+<img src="docs/anima-architecture.svg" alt="ANIMA architecture" width="760">
 
-The loop is sense, think, act, survive or die, repeat. The brain changes its own wiring (STDP)
-inside a life, and the population changes across generations (mutation and selection).
+The editable source is a native draw.io file: [`docs/anima-architecture.drawio`](docs/anima-architecture.drawio)
+(open it in the draw.io app or view it on the GitHub file page). The loop is sense, think, act,
+survive or die, repeat. The brain changes its own wiring (STDP) inside a life, and the population
+changes across generations (mutation and selection).
 
 ## Getting started
 
@@ -99,8 +101,10 @@ Every feature is a switch you put in front of the command. For example, stable f
    reward-gated learning rule is a non-selective global wash the GA ignores. We probed competition,
    threshold, input amplitude, and per-neuron heterogeneity, all bounded negative; the band is
    temporally bistable (cold to sparse, then a sharp phase transition to saturated).
-2. **Fitness-economy ceiling.** Evolution pins at roughly 121 to 137.6 depending on scoring family,
-   because the survival-plus-meals score saturates once food is reachable.
+2. **Fitness-economy ceiling.** Evolution pins at a scoring-family value: roughly 121.8 / 121.0
+   under plain survival scoring, 137.5 to 137.6 under the density / ARS scoring families, and 179.4
+   under the homing family (that last one includes the +40-per-return bonus and is not an escape).
+   In every case the survival-plus-meals core saturates once food is reachable.
 
 Both are explained, with the measured evidence and the exact constants, in the
 [white paper](docs/white-paper.md).
@@ -116,7 +120,7 @@ crates/anima-telemetry/   run recording and analysis
 scripts/                  config and protocol generators
 configs/                  experiment configuration files
 docs/white-paper.md       the white paper
-docs/anima-architecture.svg   architecture diagram (this README)
+docs/anima-architecture.drawio  architecture diagram (this README)
 experiments/              index of experiment protocols and results
 research/                 index of research lineage and corrections
 paper/                    older manuscript lineage (separate)

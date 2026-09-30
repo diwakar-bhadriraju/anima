@@ -152,7 +152,7 @@ So the honest summary of wall one: the brain is stuck in everything-on, all the 
 
 Wall two: evolution stops caring once food is reachable.
 
-The creature evolves across generations (section 9). Fitness, the score that decides who gets to be a parent, is roughly this: energy left at the end of life, plus 3 points per meal. Here is the problem. Once any creature can reach food, energy fills up, and every decent creature scores about the same. There is no gradient left for evolution to climb. The population settles around a fitness of about 121 to 138, depending on which scoring formula you use, and stays there no matter what learning rule we added.
+The creature evolves across generations (section 9). Fitness, the score that decides who gets to be a parent, is roughly this: energy left at the end of life, plus 3 points per meal. Here is the problem. Once any creature can reach food, energy fills up, and every decent creature scores about the same. There is no gradient left for evolution to climb. The population settles at a scoring-family pin and stays there no matter what learning rule we added: about 121.8 / 121.0 under plain survival scoring, 137.5 to 137.6 under the density and ARS scoring families, and 179.4 under the homing family (that last one includes a +40-per-return bonus and is not a real escape). In all three the survival-plus-meals core saturates once food is reachable.
 
 The plain version: once finding food is good enough, evolution cannot tell a great forager from an average one, so it stops improving. The scoring itself is the ceiling.
 
@@ -169,7 +169,7 @@ Together, the two walls explain essentially every failure in this project. The c
 | Long survival | Demonstrated | up to 2,230 beats under a difficulty ladder |
 | Home / rest behavior | Partial | recurring returns on seed 7; not on seed 20260924 |
 | Selective within-life learning | Not demonstrated | internal band saturates; reward is non-selective |
-| Evolutionary improvement | Partial | reaches a ceiling (~121 to 137.6 by scoring family) |
+| Evolutionary improvement | Partial | reaches a ceiling: plain 121.8 / 121.0, density/ARS 137.5 to 137.6, homing 179.4 (includes the +40-per-return bonus) |
 | Open-ended improvement | Not demonstrated | the two walls above are not crossed |
 
 The status column uses three words only: demonstrated, partial, or not demonstrated. "Not

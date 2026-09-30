@@ -1,100 +1,88 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="980" height="560" viewBox="0 0 980 560" font-family="Inter, Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640" font-family="Inter, Segoe UI, Arial, sans-serif">
   <defs>
     <style>
       .box { fill: #fffdf7; stroke: #36454f; stroke-width: 2.2; }
-      .acc { fill: #eef3f8; }
-      .line { stroke: #5b7a9d; stroke-width: 2; fill: none; }
-      .arrow { stroke: #5b7a9d; stroke-width: 2; fill: #5b7a9d; }
-      .t { font-size: 15px; fill: #20303c; }
-      .ts { font-size: 12px; fill: #445c6e; }
-      .hl { font-size: 14px; font-weight: bold; fill: #20303c; }
-      .st { fill: none; stroke: #c9a227; stroke-width: 1.6; stroke-dasharray: 5 4; }
+      .sens { fill: #eef3f8; stroke: #5b7a9d; }
+      .world { fill: #f9f5ec; stroke: #8a7a3c; }
+      .home { fill: #eef6ef; stroke: #5c8a5c; }
+      .evo { fill: #f3eefb; stroke: #7a5c9e; }
+      .det { fill: #ffffff; stroke: #c9a227; stroke-dasharray: 5 4; }
+      .line { stroke: #5b7a9d; stroke-width: 2.2; fill: none; }
+      .line2 { stroke: #36454f; stroke-width: 2.2; fill: none; }
+      .line3 { stroke: #5c8a5c; stroke-width: 2.2; fill: none; }
+      .line4 { stroke: #7a5c9e; stroke-width: 2.2; fill: none; }
+      .arrow { fill: none; }
+      .t { font-size: 14px; fill: #20303c; }
+      .ts { font-size: 12.5px; fill: #445c6e; }
+      .hl { font-size: 16px; font-weight: 600; fill: #20303c; }
+      .ht { font-size: 21px; font-weight: 700; fill: #182733; }
     </style>
   </defs>
 
-  <text x="20" y="32" class="hl" font-size="18">ANIMA architecture</text>
-  <text x="20" y="52" class="ts">a spiking neural organism: sensory in, motor out, world and survival in between</text>
+  <text x="20" y="38" class="ht">ANIMA architecture</text>
 
-  <!-- world block -->
-  <g>
-    <rect class="box" x="360" y="300" width="260" height="150" rx="14"/>
-    <text x="490" y="330" text-anchor="middle" class="hl">3D world</text>
-    <text x="490" y="352" text-anchor="middle" class="t">body (position, yaw, pitch, velocity)</text>
-    <text x="490" y="374" text-anchor="middle" class="t">arena 100 x 100, gravity, ground</text>
-    <text x="490" y="396" text-anchor="middle" class="t">food (patches, +30 energy)</text>
-    <text x="490" y="418" text-anchor="middle" class="t">energy tank, death at 0</text>
-    <text x="490" y="440" text-anchor="middle" class="ts">world steps once per beat</text>
-  </g>
+  <!-- Sensors -->
+  <rect class="box sens" x="30" y="120" width="220" height="120" rx="12"/>
+  <text x="140" y="148" text-anchor="middle" class="hl">Sensors</text>
+  <text x="140" y="172" text-anchor="middle" class="t">retina grid (48)</text>
+  <text x="140" y="192" text-anchor="middle" class="t">proprioception (8)</text>
+  <text x="140" y="212" text-anchor="middle" class="t">smell (optional, 6)</text>
 
-  <!-- sensing -->
-  <g>
-    <rect class="box acc" x="40" y="90" width="220" height="80" rx="12"/>
-    <text x="150" y="120" text-anchor="middle" class="hl">Sensors</text>
-    <text x="150" y="140" text-anchor="middle" class="t">retina grid (48)</text>
-    <text x="150" y="158" text-anchor="middle" class="t">proprioception (8)</text>
-    <text x="150" y="176" text-anchor="middle" class="t">smell (optional, 6)</text>
-  </g>
+  <!-- Brain -->
+  <rect class="box" x="30" y="290" width="220" height="195" rx="12"/>
+  <text x="140" y="318" text-anchor="middle" class="hl">Brain (spiking LIF)</text>
+  <text x="140" y="342" text-anchor="middle" class="t">inputs (poisson)</text>
+  <text x="140" y="362" text-anchor="middle" class="t">internal pool (40/128/256)</text>
+  <text x="140" y="382" text-anchor="middle" class="t">STDP + structural growth</text>
+  <text x="140" y="402" text-anchor="middle" class="t">outputs (12 motor)</text>
+  <text x="140" y="430" text-anchor="middle" class="ts">changes its own wiring</text>
+  <text x="140" y="448" text-anchor="middle" class="ts">inside each life</text>
 
-  <!-- brain -->
-  <g>
-    <rect class="box" x="40" y="230" width="220" height="170" rx="12"/>
-    <text x="150" y="258" text-anchor="middle" class="hl">Brain (spiking LIF)</text>
-    <text x="150" y="280" text-anchor="middle" class="t">inputs (poisson)</text>
-    <text x="150" y="300" text-anchor="middle" class="t">internal pool (40/128/256)</text>
-    <text x="150" y="320" text-anchor="middle" class="t">STDP + structural growth</text>
-    <text x="150" y="340" text-anchor="middle" class="t">outputs (12 motor)</text>
-    <text x="150" y="366" text-anchor="middle" class="ts">changes its own wiring</text>
-    <text x="150" y="384" text-anchor="middle" class="ts">per beat, over a life</text>
-  </g>
+  <!-- World -->
+  <rect class="box world" x="430" y="300" width="280" height="190" rx="12"/>
+  <text x="570" y="330" text-anchor="middle" class="hl">3D world</text>
+  <text x="570" y="354" text-anchor="middle" class="t">body (position, heading, pitch, velocity)</text>
+  <text x="570" y="376" text-anchor="middle" class="t">arena 100 x 100, gravity, ground</text>
+  <text x="570" y="398" text-anchor="middle" class="t">food patches (+30 energy)</text>
+  <text x="570" y="420" text-anchor="middle" class="t">energy tank, death at 0</text>
+  <text x="570" y="450" text-anchor="middle" class="ts">steps once per beat</text>
 
-  <!-- home/nest -->
-  <g>
-    <rect class="box" x="40" y="430" width="220" height="70" rx="12"/>
-    <text x="150" y="458" text-anchor="middle" class="hl">Home / rest (optional)</text>
-    <text x="150" y="478" text-anchor="middle" class="t">nest landmark, stamina</text>
-    <text x="150" y="496" text-anchor="middle" class="ts">return to rest and recover</text>
-  </g>
+  <!-- Home -->
+  <rect class="box home" x="30" y="520" width="220" height="80" rx="12"/>
+  <text x="140" y="550" text-anchor="middle" class="hl">Home / rest (optional)</text>
+  <text x="140" y="572" text-anchor="middle" class="t">nest landmark, stamina</text>
+  <text x="140" y="590" text-anchor="middle" class="ts">return to rest and recover</text>
 
-  <!-- evolution -->
-  <g>
-    <rect class="box" x="760" y="230" width="200" height="130" rx="12"/>
-    <text x="860" y="258" text-anchor="middle" class="hl">Evolution (GA)</text>
-    <text x="860" y="280" text-anchor="middle" class="t">4 creatures / generation</text>
-    <text x="860" y="300" text-anchor="middle" class="t">score = fitness (food + life)</text>
-    <text x="860" y="320" text-anchor="middle" class="t">best breed, mutations</text>
-    <text x="860" y="340" text-anchor="middle" class="t">next generation of brains</text>
-  </g>
+  <!-- Evolution -->
+  <rect class="box evo" x="860" y="300" width="210" height="190" rx="12"/>
+  <text x="965" y="330" text-anchor="middle" class="hl">Evolution (GA)</text>
+  <text x="965" y="354" text-anchor="middle" class="t">4 creatures per generation</text>
+  <text x="965" y="376" text-anchor="middle" class="t">score = fitness (food + life)</text>
+  <text x="965" y="398" text-anchor="middle" class="t">best breed, mutations</text>
+  <text x="965" y="420" text-anchor="middle" class="t">next generation of brains</text>
+  <text x="965" y="450" text-anchor="middle" class="ts">selection + variation</text>
 
-  <!-- seed/determinism -->
-  <g>
-    <rect class="box st" x="760" y="90" width="200" height="90" rx="12"/>
-    <text x="860" y="118" text-anchor="middle" class="hl">Determinism</text>
-    <text x="860" y="138" text-anchor="middle" class="t">seeded randomness</text>
-    <text x="860" y="156" text-anchor="middle" class="t">env-gated experiments</text>
-    <text x="860" y="174" text-anchor="middle" class="t">same seed = same run</text>
-  </g>
+  <!-- Determinism -->
+  <rect class="box det" x="860" y="130" width="210" height="105" rx="12"/>
+  <text x="965" y="160" text-anchor="middle" class="hl">Determinism</text>
+  <text x="965" y="184" text-anchor="middle" class="t">seeded randomness</text>
+  <text x="965" y="204" text-anchor="middle" class="t">env-gated switches</text>
+  <text x="965" y="224" text-anchor="middle" class="t">same seed = same run</text>
 
-  <!-- arrows: world -> sensors -->
-  <g>
-    <path class="line" d="M490 300 C 350 220, 280 170, 250 150" />
-    <polygon class="arrow" points="244,146 262,148 252,157"/>
-  </g>
-  <!-- sensors -> brain -->
-  <path class="line" d="M150 170 L 150 230"/>
-  <polygon class="arrow" points="150,236 144,228 156,228"/>
-  <!-- brain -> world -->
-  <path class="line" d="M260 300 C 320 320, 330 330, 360 350"/>
-  <polygon class="arrow" points="366,353 348,350 359,342"/>
-  <!-- home -> brain -->
-  <path class="line" d="M150 430 L 150 400"/>
-  <polygon class="arrow" points="150,394 144,402 156,402"/>
-  <!-- world -> evolution -->
-  <path class="line" d="M620 340 C 690 330, 700 310, 760 290"/>
-  <polygon class="arrow" points="766,288 748,284 758,296"/>
-  <!-- brain -> evolution -->
-  <path class="line" d="M260 280 C 420 200, 600 200, 760 250"/>
-  <polygon class="arrow" points="766,252 748,249 756,261"/>
+  <!-- edges -->
+  <path class="line" d="M430 330 C 330 250, 250 210, 250 190"/>
+  <polygon class="arrow" points="248,182 264,192 252,198"/>
+  <path class="line2" d="M140 240 L 140 290"/>
+  <polygon class="arrow" points="140,298 133,286 147,286"/>
+  <path class="line2" d="M250 340 C 320 350, 350 360, 430 375"/>
+  <polygon class="arrow" points="440,377 424,380 430,369"/>
+  <path class="line3" d="M140 520 L 140 485"/>
+  <polygon class="arrow" points="140,477 133,489 147,489"/>
+  <path class="line4" d="M710 340 C 770 310, 800 300, 860 300"/>
+  <polygon class="arrow" points="868,299 852,295 862,306"/>
+  <path class="line4" d="M250 400 C 420 420, 620 400, 860 360"/>
+  <polygon class="arrow" points="868,358 852,361 859,350"/>
 
-  <!-- legend -->
-  <text x="40" y="540" class="ts">loop: sense - think - act - survive (or die) - repeat. The brain and the population both change over time.</text>
+  <!-- caption -->
+  <text x="30" y="628" class="ts">loop: sense, think, act, survive or die, repeat. The brain changes its wiring inside a life; the population changes across generations.</text>
 </svg>
