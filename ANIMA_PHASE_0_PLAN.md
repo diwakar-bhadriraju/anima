@@ -2,7 +2,7 @@
 
 ## Context
 
-ANIMA is a research program building an experimental developmental artificial nervous system: we fix boundaries (sensory in, output out), environment, curriculum, resource limits, and fundamental plasticity laws; the organism grows its own internal topology. The repo (`/home/walker/Projects/anima`) is empty — this plan is Phase 0 plus the first real experiment (E1).
+ANIMA is a research program building an experimental developmental artificial nervous system: we fix boundaries (sensory in, output out), environment, curriculum, resource limits, and fundamental plasticity laws; the organism grows its own internal topology. The repository root holds this plan plus the first real experiments.
 
 User-locked platform decisions (recorded as decision-log entries D1–D8):
 - **Language**: Rust (workspace, deterministic, seeded).
