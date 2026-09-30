@@ -11,7 +11,7 @@
 
 **[🧠 docs/white-paper.md](docs/white-paper.md)**  — a research story told in plain language:
 what we built, every idea explained, our wins *and* our honest failures, and the two walls we
-measured. (A deeper technical reproduction log lives in the code comments and git history.)
+measured. Every exact number you need to re-run the experiments is in the appendix at the end.
 
 </div>
 
