@@ -7,13 +7,11 @@
 
 <div align="center">
 
-**Read the full technical white paper**
+**Read the friendly, from-the-start white paper**
 
-**[📄 docs/white-paper.md](docs/white-paper.md) · [📑 docs/white-paper.pdf](docs/white-paper.pdf)**
-
-<span go darker>
-
-`Rust · spiking neural network · self-organization · determinism-first research`
+**[🧠 docs/white-paper.md](docs/white-paper.md)**  — a research story told in plain language:
+what we built, every idea explained, our wins *and* our honest failures, and the two walls we
+measured. (A deeper technical reproduction log lives in the code comments and git history.)
 
 </div>
 
@@ -96,8 +94,7 @@ Both are documented with the full measured evidence and reproduction spec in the
 ```
 crates/anima-core/        spiking network core (LIF, STDP, structural plasticity)
 crates/anima-world/       the 3D world, the organism, the experiment binary
-docs/white-paper.md       technical white paper (research record + App. A reproduction spec)
-docs/white-paper.pdf      PDF build of the white paper
+docs/white-paper.md       the white paper — readable, from-the-start research story
 ```
 
 ## Reproducibility & discipline

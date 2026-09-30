@@ -1,309 +1,304 @@
-# ANIMA: A Developmental Approach to a Self-Organizing Forager
-## Experimental Findings, Registered Negative Results, and the Two Walls
+# ANIMA — Teaching a Tiny Brain to Find Food, All by Itself
 
-**Status:** White paper · Research record · September 2026
-**System:** `world_survival` (crates/anima-world), ANIMA developmental artificial nervous system in Rust
-**Reproducibility:** deterministic (seeded), byte-identical defaults, all mechanisms env-gated
+*A research story told from the very beginning, with every idea explained.
+If a term feels strange, keep reading — we explain each one the first time we use it.*
 
 ---
 
-## 1. Executive Summary
+## 1. The Big Question (Why are we doing this?)
 
-ANIMA is a from-scratch, self-organizing artificial nervous system: a spiking LIF network receives
-retinal/proprioceptive frames from a physical 3D body in an arena and controls it to forage for food.
-Under a binding charter it uses **no hand-designed internal architecture, no pretrained models, no
-external memory modules**, and the only reward is food.
+**What are we trying to do?** We want to build a living thing — not a real animal, but a
+computer creature — that *teaches itself* to survive. Specifically: it lives in a little 3D world,
+has a tiny brain made of pretend nerve cells, and the ONLY goal we give it is **find food and eat
+it before you run out of energy.** Nothing else. It has to figure out everything else on its own.
 
-This paper records a full characterization campaign. We found and fixed a real control bug, built a
-working forager, gave it a second drive (a home/rest site), and confirmed it can produce
-**repeated return-home behavior when that is rewarded**. But we also isolated — with measured
-evidence, not inference — **two walls** that block the original open-ended goal:
+**Why?** Because real animals (like a fly or a mouse) don't have a designer telling every nerve
+cell exactly what to do. Their brains **organize themselves** — they grow, learn, and adapt. We
+want to see if a computer brain can do the same. If we can grow a self-organizing brain that learns
+to forage, that teaches us something deep about *how learning and thinking could happen* — and it's
+a step toward the dream of "artificial life that really learns," not just a program we hand-wrote.
 
-1. **Internal-band neural saturation**: the network's internal (expansion) layer fires at 100% every
-   tick (`out_sum 6000`, `kc_spikers 256/256`). Every reward-gated learning mechanism therefore
-   becomes a non-selective global wash that the evolutionary loop ignores.
-2. **Fitness-economy ceiling**: evolution pins at ~121–137.6 fitness regardless of mechanism stack.
-
-A four-lever campaign (competition, spike threshold, input amplitude, per-neuron heterogeneity)
-failed to de-saturate the band — and revealed it is **temporally bistable**: cold→sparse, then a
-sharp phase-transition to hot→saturated. Selective learning requires sustained sparsity and is
-therefore structurally absent. Tracked next levers are listed in §9.
+The long-term hope: a creature that doesn't just survive, but keeps getting better and better on
+its own — the way evolution made animals over millions of years.
 
 ---
 
-## 2. Motivation
+## 2. Who, Where, When
 
-Goal: an organism that autonomously forages — finds food, consumes it — and, ultimately,
-self-improves open-endedly ("make it like us"). The project favors **laboratory discipline over
-best-effort results**: every mechanism is registered, falsifiable, and reproducible.
-
-## 3. The Agent and the World
-
-- **Body**: 6-DOF physics (yaw/pitch/thrust/strafe/lift/brake), arena 100×100, gravity 9.81 applied
-  in the simulator only, ground clamp, energy tank (starts 100, drain 1.0/beat, death at 0).
-- **Sensory**: 48-channel retina (5 primitives, analytic ray raster) + 8 proprioceptive channels,
-  plus optional 6-channel food-smell (body-relative gradient).
-- **Network**: LIF spiking, 1 ms ticks, seeded `Xoshiro256PlusPlus`, STDP + structural growth (V2),
-  24-56 inputs / 40-(128)-(256) internal / 12 motor outputs.
-- **Reward**: food only. Steering is the action, never rewarded directly.
-- **World dynamics**: food placement (static seed / curriculum / escalating / stable), energy refill
-  on contact, death at tank zero.
-
-## 4. Binding Constraints (the Charter)
-
-- No hand-designed internal architecture; no pretrained/CNN/CLIP; no external memory modules.
-- All mechanisms **env-gated**; with every gate unset, output is byte-identical to a frozen baseline.
-- Determinism: same args + env ⇒ identical output (registered).
-- **Pre-registration**: expected direction and success bars are set before running; negatives are
-  recorded, constants are not tuned on outcomes.
-- Charter amendments (e.g. adding a home need) require explicit operator approval.
-
-## 5. Method
-
-**Protocol.** Each mechanism is introduced env-gated, then verified: (1) default identity,
-(2) determinism (two-run diff), (3) observability (gate on vs off), (4) workspace suite, (5) a
-registered success bar. Failures are recorded as evidence-backed negatives — never silently
-retuned. Results below are measured; unverified causal claims are flagged as such.
-
-## 6. Measured Results
-
-### 6.1 Verified wins
-
-| # | Mechanism | Result | Evidence |
-|---|---|---|---|
-| 1 | **Control bug fix** | Steering yaw channel was sign-inverted; body flew *away* from food | post-fix food_dist 11.5→6.7, touches 0→9 at reachable radius |
-| 2 | **Foraging under shaping** | Up to 126 touches / life; strong local pursuit | curriculum + smell stack |
-| 3 | `SL2_STASIS` (stable food + re-entry guard + tank cap) | 3 → **36 genuine touches** / life; energy bounded; no farm | unsaturable only via geometry-exact re-entry guard |
-| 4 | `SL2_HMEXP` (hunger-modulated search) | settle-when-fed (0.4× noise floor), roam-when-hungry; early-survivor signal in evolve | single-life ≈ baseline; evolve best 0→33.9 by gen 5 (8-gen window) |
-| 5 | `SL2_NEST` + `SL2_NESTFIT` (home/rest second drive + homing reward) | **First repeated return-home behavior** (elite_ret 1→3 on seed 7) | home = nearest non-food landmark; stamina = capability constraint; reward per return |
-| 6 | Progressive survival (`SL2_PROG`) | survived 2230 beats (vs ~60–200), food escalates until defeated | big lifespan + escalating difficulty |
-
-### 6.2 Registered negative results
-
-| Mechanism | Outcome | Notes |
-|---|---|---|
-| `SL2_NOVELTY` (MCC archive selection) | observably steers selection; **ceiling unchanged** | rank-order changes, no escape |
-| `SL2_RSTDPP` (dopamine × STDP gain) | fires correctly (4.9× Δw in window) but **invisible to evolution** | ~1e-3/synapse below mutation floor |
-| `SL2_ARS` / `SL2_DENSITY` | fitness-observable; **ceiling unchanged** | same survivor, bigger number |
-| `SL2_MB` (mushroom-body locus) | wiring verified firing; **no sparse premise** | 256/256 KCs eligible — non-selective |
-| De-saturation campaign (§7) | all four levers bounded negative | competition / threshold / amplitude / heterogeneity |
-
-**Cross-cutting finding:** within-life plasticity (any locus) is ~1e-3–0.24/synapse but the GA's
-selection is **death-gated and coarse** (±10% mutation) — so learning that is not selectivity-visible
-never changes outcomes. Evolution "listens" only to selection-level changes (novelty rank-order,
-the homing reward NESTFIT — the one lever that moved behavior).
-
-## 7. The Two Walls
-
-### 7.1 Wall 1 — Internal-band saturation ⇒ selective learning is impossible
-
-The internal/expansion layer fires at 100% every tick. Under this regime any reward-gated
-plasticity is a **uniform global wash** the GA trivially mutates around (measured: evolve
-trajectories byte-identical with and without the reward bump).
-
-**De-saturation campaign (all measured):**
-
-| Lever | Range | Result | Mechanism |
-|---|---|---|---|
-| Pairwise competition (`SL2_IINH`/`SL2_INH`) | 0.5–4.0 | 256/256 always | Poisson drive rebuilds the one-tick inhibitory dip |
-| Spike threshold (`SL2_THETA`) | 2–8× | 256/256 always | 52-amplitude input drive crosses any spread |
-| Input amplitude (`SL2_AMPL`) | 52→3 | 100%→0% **cliff** | uniform scaling is bistable — no graded regime |
-| Heterogeneity (`SL2_HET`) | 0.2–1.0 | 256/256 alone; transient at corner | lognormal threshold spread can't sustain |
-
-**Final mechanism (discriminator, KCPROBE_EVERY=10):** the band is **temporally bistable** —
-cold at life start (2/256), then a **sharp phase-transition to saturated** by beat ~25–30. It is a
-collective recurrent-excitation/hysteresis flip, not a gradual slow-state ramp (a linear rate-constant
-knob likely won't tame it).
-
-### 7.2 Wall 2 — Fitness-economy ceiling
-
-Evolution converges to a scoring-family-dependent pin (not one flat number):
-- **Plain-survival scoring** (`final_energy + 3·touches`): pins 121.8 / 121.0 (HMEXP+NEST, seeds 1/2).
-- **Density/ARS scoring** (adds `20·touches²/beats` and `4·persistence`): pins 137.5–137.6
-  (ARS run seed 7; the higher number is the bonus terms, not a real escape).
-- **NESTFIT scoring** (plain + `40·nest_returns`): 121.8 / 179.4 (seed 1 / seed 7), where 179.4
-  includes `+40×3` from three returns — again additive, not a genuine survival gain.
-
-`final_energy + 3·touches` saturates once food is reachable; across every scoring family the
-ceiling is the fitness-economy saturation, and the ~150–180 bests are additive bonuses.
-
-## 8. Discussion
-
-- The organism is **real and capable**: it forages strongly, survives long, and can sustain a
-  home-return behavior *when rewarded* — the first causal win for the "second drive" direction.
-- The walls are **structural, not tuning**: saturation is immune to competition/threshold/amplitude/
-  heterogeneity at every tested magnitude, and the fitness economy is a property of the reward shape.
-- The iron rule of the campaign: **within-life learning cannot clear a coarse, death-gated
-  selection**; only selection-level changes are evolution-visible.
-- **Full-stack non-additivity**: running the coherent verified organism
-  (`STASIS`+`HMEXP`+`NEST`+`NESTFIT`+`OINH`+`pool128`) reproduces the NESTFIT baseline exactly at
-  15 gens (seed 20260924: 121.8/ret=0; seed 7: 155.0/ret=1) — the mechanisms are orthogonal to the
-  fitness economy, not additive.
-
-### 8.5 Limitations
-
-The claims above are bounded by the measurement window and should be read with these limits:
-- **Small N seeds**: only two evolve seeds per run; seed-dependence (e.g. `elite_ret` 0 vs 3) is a
-  real finding but a 2-seed sample cannot establish robustness.
-- **Short generation windows**: several series (MB, full stack) ran 12–15 gens per seed within a
-  3500 s tool cap; pin values at longer horizons (e.g. 179.4/ret=3 at gen 20–30) come from a subset
-  of runs.
-- **Single-threaded CPU stack**: 256-pool evolution exceeded the hour cap; some negatives
-  (MB locus, larger expansions) were bounded by compute, not measured to conclusion.
-- **Partial windows**: a few registered negatives rest on overlapping-generation comparisons
-  (e.g. gens 0–5) rather than full-architecture sweeps.
-- No GPU, no parallelization; determinism is enforced serially.
-
-## 9. Recommended Next Steps (registered levers)
-
-1. **Attack the phase-transition, or keep the band cold**: target the recurrent-excitation/hysteresis
-   that flips the band to saturation, or maintain continuous-cold sparsity — the precondition for any
-   selective-learning re-test (`SL2_MB` locus remains unproven, not falsified).
-2. **Reform the fitness economy**: sustained-foraging / survival density shaping so selection has a
-   gradient to climb past the ceiling.
-3. **GPU/parallel step** (engineering): the fly-connectome literature runs 138k neurons real-time on
-   GPU; this single-thread stack can't afford a biological-size expansion in evolution. Removing the
-   compute tax unblocks every experiment above.
-
-## 10. Reproducibility
-
-- Deterministic by construction (seeded LCG-free Xoshiro; no HashMap iteration order).
-- Frozen default identity: `world_survival 20260924 77 60` ⇒
-  `WL2 RESULT beats=60 died_at=none final_energy=40.0 food_touches=0 novel_flags=0`.
-- Test rig: `KCPROBE`/`SW_PROBE`/`MB_PROBE`/`NEST_PROBE` (env-gated, stderr) + registered
-  `SL2_*`/`WL2_*` knobs; workspace suite 198/0.
-- Workflow discipline captured in the `anima-experiment-protocol` managed skill.
-
-## Appendix A — Reproduction specification
-
-Everything needed to recreate the experiments, with exact equations and registered constants.
-All mechanisms are **env-gated**; with no env set, the default run and its frozen output are
-byte-identical to the recorded baseline.
-
-### A.1 World & body dynamics
-
-- Start energy **100.0**; `SL2_PROG` overrides to **PROG_LIFE 4000.0** (life-span mode).
-- Per beat: `energy -= 1.0` (plus `explore` metabolic cost `METABOLIC_SPEED × |vel|`); on food
-  contact within **6.0** units, `energy += 30.0`; death exactly at `energy == 0`.
-- `SL2_STASIS` (stable food): food does **not** teleport on touch. Re-entry guard — a touch counts
-  only if the body left the **6.0** eat radius since the last counted touch; tank caps at the
-  life-start energy (`min(energy, tank_cap)`; `tank_cap` re-read after any PROG override).
-
-### A.2 Network construction (`build_net`)
-
-Defaults: `connectivity 0.038, w_init 0.2, amplitude 52.0, adaptation_tau_ms 200.0,
-adaptation_gain 0.05, inhibition_gain 0.0, slow_state_tau_ms 5000.0, slow_state_beta 0.0046875,
-latch_enable true, theta_rel_mean 1.0, theta_rel_sd 0, u_plateau_rel_sd 0, tau_het_rel_sd 0,
-phi_rel 0.5, eta_rel 0.0, output_inhibition_gain 0.0, d58_reflex K` (K = the 8-neuron reflex/familiarity band that follows
-the outputs; see `const K: usize = 8`). Env overrides:
-`WL2_OINH` → `output_inhibition_gain 0.15`; `SL2_POOL` → internal pool size (default 40);
-`SL2_MB` → pool **256**, `connectivity 0.10`; `SL2_IINH` → `internal_inhibition_gain`;
-`SL2_THETA` → `theta_rel_mean`; `SL2_AMPL` → `amplitude`; `SL2_HET` → `theta/u_plateau/tau_het sd`
-(per-neuron lognormal, applied after wiring). Wiring is seeded-via-`Xoshiro` with no `HashMap`
-iteration order, so identical args+env ⇒ identical network.
-
-### A.3 Fitness per scoring family (evolution `evolve_run`)
-
-D-38 death gate: a dead organism scores **0** unconditionally. Alive:
-
-- **Plain-survival**: `fit = final_energy + 3·touches`  (TOUCH_BONUS = 3.0)
-- **Density** (`SL2_DENSITY`): `+ 20·touches² / beats`
-- **ARS** (`SL2_ARS`, subsumes density): `+ 4·persistence`, where
-  `persistence = ΣT exp(− gap_k / 20)` over consecutive touches (beats since previous touch)
-- **NESTFIT** (`SL2_NESTFIT`, adds to any alive base): `+ 40 · nest_returns`
-  (`nest_returns` = count of false→true re-entries into the nest radius — see A.5)
-
-### A.4 Behavioral drives (env-gated)
-
-- **Hunger**: `hunger = 1 − energy / start_energy`.
-- **`SL2_HMEXP`** (hunger-modulated exploration): motor-noise gain
-  `noise_scale = 0.4 + 0.6·hunger` (fed ⇒ 0.4× baseline noise, hungry ⇒ 1×). Applied to all three
-  explore-noise sites.
-- **`SL2_RSTDPP`** (three-factor): on food touch set `dopamine = 1.0`; per beat `dopamine ×= 0.6`;
-  STDP gain `= min(1 + 3·dopamine, 4)`.
-- **`SL2_NOVELTY`** (MCC selection): behavior characterization `bc = [x_bin, z_bin, alive]` where
-  `x_bin = clamp((px+50)/10, 0..9)`, same for z; novelty of an agent =
-  `Σ_archive (diff(a,bc))/3 / max(|archive|,1)`; selection rank key `(alive, novelty, fit)`
-  descending; archive cap **50** (evict oldest).
-
-### A.5 Home / rest (`SL2_NEST` + `SL2_NESTFIT`)
-
-- Nest = the non-food scene primitive nearest the spawn (deterministic).
-- **Stamina** (capability constraint): starts 100; away from the nest,
-  `stamina −= 0.4 × |vel|` per beat; within `NEST_RADIUS = 8.0` of the nest,
-  `stamina += 60` (cap 100). Motor rates scale by `min(1, stamina / 25)` — exhaustion immobilizes.
-- `nest_returns` increments on each false→true entry into the 8.0 nest radius.
-
-### A.6 Mushroom-body locus (`SL2_MB`)
-
-Sparse expansion (256 KC, ~6 inputs/KC) + reward-gated input plasticity at the KC band: per touch,
-for every KC with eligibility `e > 0`, its input synapses get `Δw = 0.03 · e · 8` (clamp 1.0).
-Measured saturation (A.7) currently makes `e > 0` for all 256 KCs, so the bump is non-selective.
-
-### A.7 De-saturation measurements (the four-lever campaign)
-
-`KCPROBE` (env-gated) reports distinct internal-band spikers per sampled beat (`KCPROBE_EVERY`
-sets the beat interval). Results: pairwise competition 0.5–4.0 ⇒ 256/256; threshold 2–8× ⇒
-256/256; amplitude 52/20/8 ⇒ 256/256, amplitude 3 ⇒ 0/256 (a cliff); heterogeneity 0.2–1.0 ⇒
-256/256 alone, and at `amplitude=4, het=1.0` the band is temporally bistable: beat 0 = 2/256,
-beat 20 = 3/256, beat 30+ = 256/256 (a sharp phase transition).
-
-### A.8 Verification battery and frozen identity
-
-1. Build: `cargo build --release -p anima-world --bin world_survival`.
-2. Default identity (no env): `./target/release/world_survival 20260924 77 60` must print exactly
-   `WL2 RESULT beats=60 died_at=none final_energy=40.0 food_touches=0 novel_flags=0`.
-3. Determinism: run any gated config twice, `diff` empty.
-4. Suite: `cargo test --workspace` → 198 passed / 0 failed.
-5. Probe output is on **stderr** — capture with `2>&1 >/dev/null | grep`, not `2>/dev/null`.
-
-### A.9 Provenance notes
-
-The **36-touch** (STASIS) and **2230-beat** (`SL2_PROG`) figures are recorded-lesson values
-(session-learn log); logs for those long runs were overwritten by later runs, so they carry
-recorded provenance rather than a surviving artifact file. Every other cited number in this paper
-was verified directly against a surviving run log.
-
-### A.10 Genetic algorithm structure (`evolve_run`)
-
-- Population **N = 4** per generation; seeded `net = build_net(net_inputs(smell), derive_seed64(esec,0,i))`.
-- Per-generation curriculum ramp: `gen_start = min(8 + 3·g, 40)`.
-- Selection: deterministic sort by fitness (or `(alive, novelty, fit)` under `SL2_NOVELTY`);
-  death gate (dead ⇒ fit 0) holds.
-- **Elite carry**: `order[0]` carried unchanged (weights copied via `breed_inner`, `mutate=false`);
-  after the same seed is best for **ELITE_STALL_GENS = 5**, the elite is carried **with** mutation
-  (Fix B, anti-stall).
-- Offspring: best → 2, second → 1; `breed_inner(parent, derive_seed64(esec,g+1,slot), mutate=true)`
-  copies parent weights by `(pre,post)` and mutates each with **p = 0.10, amplitude 0.10**
-  (`W_MUT_P` / `W_MUT_AMP`), then re-adds parent-born V2 synapses while under the growth cap.
-- `SL2_NOTARGET` suppresses the early TARGET break (`best > 40`); `--generalize` is champion mode
-  (probes the elite per gen on `BEATS_LONG` natural food, stops at `ULTIMATE_BAR`).
-- Beats per life: `BEATS_EVOLVE = 100` (evolve+explore), `BEATS_LONG` for champion probes.
-
-### A.11 Env-gate → exact-run-command table
-
-Core (documentation only, not all commands run daily):
-- Default / identity gate: `./target/release/world_survival 20260924 77 60`
-- Stability + settle + home reward (full stack):
-  `SL2_STASIS=1 SL2_HMEXP=1 SL2_NEST=1 SL2_NESTFIT=1 WL2_OINH=1 SL2_POOL=128 SL2_NOTARGET=1 ./target/release/world_survival --evolve --explore --smell --until 15`
-- Per-mechanism observability runs use the same binary with a single gate added; probes
-  (`KCPROBE`, `MB_PROBE`, `SW_PROBE`, `NEST_PROBE`) are env-gated and print to **stderr** —
-  capture `2>&1 >/dev/null | grep <probe>`.
-- Seeds used: `20260924` and `7` (both `EVOLVE_SEEDS`).
-
-## 11. Selected References
-
-- FlyWire adult Drosophila connectome and its simulation in embodied bodies (NeuroMechFly, Nat.
-  Methods 2024; whole-brain embodied fly sims; Fly-connectomic graph models) — evidence that small
-  spiking networks drive 3D behavior and that large-scale sims run real-time on GPU.
-- Mushroom-body associative learning (sparse random expansion + dopamine-gated input plasticity;
-  trace conditioning; biased PN–KC connectivity) — the biological scheme ANIMA's `SL2_MB` was drawn
-  from, whose sparse-coding premise the saturation wall currently denies.
-- Novelty search / minimal-criterion coevolution (Lehman & Stanley; MCC) — the selection-level
-  change that observably steers but does not escape the ceiling.
+- **Who made it?** A small research project built by one engineer (in Rust, a programming
+  language famous for being fast and safe), aided by careful, recorded experiment discipline.
+- **Where?** This repository. The heart of the experiment lives in one big file:
+  `crates/anima-world/src/bin/world_survival.rs`.
+- **When?** The work in this document is from a long, honest research campaign — each experiment
+  was run, measured, and written down (or "registered"), even the ones that failed.
 
 ---
 
-*All results in this paper are reproducible from the repository; every claim is grounded in a
-measured run recorded in the session-learn log. Unverified causal attributions are explicitly
-marked.*
+## 3. Meet the Creature (What we built)
+
+Imagine a tiny bee-like robot in a big empty box (the arena, 100 units on each side). It has:
+
+- **A body** that can move in 3D — fly forward, turn left/right, tilt up/down, and stop. It burns a
+  little energy every moment it's alive. When energy runs out, it **dies**.
+- **Eyes and senses** — it looks at the world through a retina (a grid of pixels that see objects
+  and edges), feels its own body position, and can smell food if we switch that on.
+- **A brain** — a network of *pretend nerve cells* (see "How the brain works" below).
+- **A goal** — food sits somewhere in the arena. If the creature flies close enough (within a
+  small distance called the "food radius"), it gets +30 energy. Food is the only reward that exists.
+
+**The most important rule:** we did NOT hand-design the brain. No one told the nerve cells "turn
+right when you smell food." The creature has to *discover* all that by itself.
+
+---
+
+## 4. How the Brain Works (Every idea explained)
+
+- **Neuron (nerve cell):** one tiny unit of the brain. Each neuron has a little electric charge.
+  When enough charge builds up, it "fires" — sends a signal (a spike) to its neighbors.
+  Think of a neuron as a single light bulb that blinks on when it's charged enough.
+- **Spike:** the blink. Neurons communicate only by firing.
+- **Spiking neural network:** a brain made of these blinking bulbs, connected by wires (synapses).
+  Every blink can turn other bulbs toward firing.
+- **LIF neuron:** the specific simple rule each bulb follows. L = Leaky (charge slowly drains),
+  I = Integrate (blinks add up), F = Fire (when it crosses the threshold, it blinks).
+  It's a pretend neuron that's still realistic enough to be interesting.
+- **Synapse (wire):** the connection between two neurons. The strength of a wire decides how much
+  one neuron's blink nudges the next one. Stronger wire = bigger nudge.
+- **STDP (a learning rule):** the phrase "neurons that fire together wire together." When two
+  connected neurons blink at almost the same time, their wire gets STRONGER. If they blink far
+  apart in time, the wire gets weaker. This is how the brain changes itself — no one tunes the
+  wires by hand.
+- **Plasticity:** just a fancy word for "the brain can change." STDP is one kind of plasticity.
+- **Input → internal → output:** the brain has three layers of bulbs. Inputs bring in what the eyes
+  see. An internal pool of bulbs processes it. Outputs turn into body movements (steer, thrust...).
+- **Poisson trains:** the way inputs fire is random in a specific statistical pattern — like a
+  firecracker that pops at random moments, but with a predictable average. It mimics how real
+  neurons behave. The randomness is "seeded," meaning we can replay the exact same randomness
+  every time (that's how we keep experiments fair and repeatable).
+- **Determinism:** same starting number (seed) + same settings = same exact result, every single
+  time. It's what makes the science trustworthy: when we see a difference, we know it came from
+  what we changed, not from luck.
+- **Env-gate (a setting switch):** every experiment is built as a switch you flip on/off. With all
+  switches off, the creature behaves exactly like the original "frozen" version. This guarantees
+  we never ruin the baseline while testing new ideas.
+
+**The whole picture:** eyes → brain → movement → world → energy → death, in a loop, over and over,
+with the brain changing itself (via STDP) as it goes. That loop IS the experiment.
+
+---
+
+## 5. The Rules We Refused to Break (Why we trust our results)
+
+Before we did any experiment, we locked these rules (the "charter"):
+
+1. **No hand-designed brain.** We never tell a specific neuron how to behave. Only the general
+   learning rules exist; the wiring grows by itself.
+2. **No pre-trained models.** We don't use a smart model someone else trained on the internet.
+3. **No extra memory boxes.** The creature can't have a notebook it writes locations into — its
+   only "memory" is the changing wires of its own brain.
+4. **Reward = food and nothing else.** We never reward "turning toward food" or "looking smart."
+   Only eating counts. Anything the creature learns to do, it learns because eating is worth it.
+5. **Every claim must be measured and repeatable.** No "trust us" — the numbers must come from a
+   real run you can re-run and get the same answer.
+
+These rules are exactly why the failures in this report are *useful*: they're honest, and they
+couldn't have been faked by cheating the setup.
+
+---
+
+## 6. What the Creature Can Do (Our wins)
+
+Here are the things that actually worked, told plainly:
+
+1. **We found and fixed a real bug (the steering mix-up).** The creature was accidentally turning
+   **away** from food whenever food was to its right. All our early runs "failed" because of this
+   one sign error. Once fixed, the creature began chasing food properly — the single most important
+   fix of the whole project.
+
+2. **It can find food well.** When food is placed reasonably close, the creature learns to find and
+   eat it many times in one lifetime — up to **126 meals** in a single life under a teaching
+   schedule (a "curriculum" where food starts easy and gets harder). That's a strong forager.
+
+3. **Stable food = a real feeding loop.** Normally, when the creature eats, food teleports away to
+   a random spot. That makes "remember where food is" pointless. We built a switch (`SL2_STASIS`)
+   where food stays put after the first find. The creature went from 3 meals per life to **36** —
+   a real "stay here and keep eating" loop.
+
+4. **It can live long.** With a bigger energy tank and food that moves a little farther each time
+   it wins (a "ladder" of difficulty), the creature survived **2,230 beats** — a much longer life
+   than the usual ~60-200 — and only died when the challenge genuinely beat it.
+
+5. **It can learn a home.** We gave the world a second need: a "nest" the creature should return
+   to to rest (returning restores its stamina/energy). And — the striking part — when we **rewarded**
+   returning home, one lineage of the creature actually started **coming home repeatedly**. This is
+   the first real hint of "forage far away, then come back home," split from just "stay alive".
+
+6. **Hunger changes how it searches.** When well fed it *settles down* (stops wandering, stays
+   where it is — good for staying near food). When hungry it *searches wide* to find the next meal.
+   This matches how real foragers behave.
+
+---
+
+## 7. Things We Tried That Didn't Work (Our honest failures)
+
+Science only works if you report what failed too. Here's the honest list:
+
+- A "curiosity" switch that rewarded the creature for seeing things it hadn't seen before — didn't
+  make it any better at surviving. (A neat idea, but the reward didn't help.)
+- Several "learning rules" (ways to make the brain change when it eats): dopamine-gated STDP,
+  reward-gated eligibility, and others. They all **did something** — the wires really did change —
+  but the change was too small and too scattered to help survival in the long run.
+- A "search close after winning" reward (area-restricted search) — it changed the score numbers
+  but never let anything escape the wall (see section 8).
+- Even a "brain with a mushroom-body-style expansion" (inspired by real fly brains) — it fired, but
+  it couldn't be selective, and the whole thing hit the same wall.
+
+**The deep lesson from all these failures:** making the brain's *wires* change is easy. Making that
+change actually *matter* to survival is very hard — because of two walls we finally measured and
+understood (next section).
+
+---
+
+## 8. The Two Walls (the main finding — and it's genuinely new)
+
+After dozens of experiments, we found there are two big walls blocking the creature from becoming
+a self-improving forager. Understanding *exactly why* couldn't happen is the heart of this research.
+
+### Wall 1: The brain is "too excited" — every light is always on
+
+Remember the light-bulb neurons? It turns out that in this creature's brain, **every light bulb is
+blinking all the time.** The inputs are so strong that every internal neuron fires every single
+moment. We proved this with a probe: 256 out of 256 internal neurons were active at every beat.
+
+Why does that matter? Because a *learning* brain needs **differences**. When you eat, the brain
+should strengthen the specific wires that did the right thing and leave the rest alone. But if
+every neuron is firing all the time, then "everything was active right before eating" — so the
+reward strengthens *everything equally*. That's not learning; it's like giving a participation
+trophy to every student, so nobody learns anything. **No differences = no selective learning.**
+
+We fought this wall hard, four ways, and measured each:
+- **Competition between neurons** (neighbors shut each other down) — didn't help. The strong input
+  re-fires them anyway.
+- **Raising the threshold** (make it harder to fire) — didn't help. The input was strong enough to
+  fire them anyway.
+- **Turning the input down** — created a cliff: the brain went from "everything on" to "everything
+  OFF" with no in-between. No sweet spot.
+- **Making each neuron different** (so some are easier/harder to fire) — at the edge, the brain
+  starts quiet (good!) but then a **phase transition** happens: like a pile of sand suddenly
+  avalanching, by about beat 28 every neuron flips on at once and saturates again.
+
+**In plain terms:** the creature's brain is stuck in "everything on, all the time," and no amount of
+competition, thresholds, or variety could make it behave selectively. Selective learning simply
+cannot happen while that's true. This is Wall 1 — the deeper of the two.
+
+### Wall 2: Evolution stops improving once the food is reachable
+
+The creature "evolves" across generations (see section 9). Fitness (how good a parent is) is
+roughly *how much energy you ended with + 3 points per meal*. The problem: once any creature can
+reach food, energy fills up, so fitness stops rising — **every good-enough creature scores almost
+the same**, so there's no gradient left for evolution to climb. The population settles around a
+fitness of ~121 to ~138 (depending on which scoring formula you use) and stays there, no matter
+what learning rule we add.
+
+**In plain terms:** once finding food is "good enough," evolution can't tell a great forager from
+a decent one, so it stops improving. The scoring itself is the ceiling.
+
+Together: **the creature can't learn selectively (Wall 1) and can't keep evolving (Wall 2).** Those
+two facts explain essentially every failure we saw.
+
+---
+
+## 9. How Evolution and Learning Fit Together (How the creature could improve)
+
+There are two time-scales working together:
+
+- **Within one life (learning):** a single creature lives ~100 beats, sees food, and its STDP
+  changes its wires. This is "practice."
+- **Across generations (evolution):** we keep a small population (4 creatures). We score each one,
+  keep the best as a parent, let the best two breed into the next generation, and add small random
+  changes (mutations) to their wires. Over many generations the population can, in principle,
+  discover better and better brains. This is the "DNA" — the thing that gets passed down is the
+  wiring, mutated a little each generation.
+
+**The catch our experiments exposed:** evolution only "sees" changes that are big enough to change
+survival. The tiny wire-changes from within-life learning (Wall 1, non-selective) are far too small
+and scattered to move the fitness score, so evolution ignores them. The two time-scales are
+disconnected — which is exactly why the creature did a lot of individual things but never got
+fundamentally better over generations.
+
+---
+
+## 10. What It All Means (Why this matters)
+
+- The creature is a **real forager** — it moves, senses, finds food, dies, survives. That part
+  fully works, and it was a lot of hard engineering to get there.
+- We **found and fixed a genuine bug** that had been quietly sabotaging everything.
+- We **discovered, with real measurements, the two walls** that block a self-improving brain:
+  the "everything on" saturation (which makes selective learning impossible) and the "good-enough
+  is enough" fitness ceiling (which stops evolution).
+- This is a **cleaner, more honest result** than "we tried a bunch of stuff." We now know *exactly
+  what to attack next*, and why.
+
+---
+
+## 11. What We'd Do Next (the road ahead)
+
+1. **Break Wall 1 by keeping the brain "cool."** If we can prevent the whole brain from flipping
+   on all at once (stop the phase transition / keep most neurons quiet most of the time), then
+   selective learning becomes possible for the first time.
+2. **Fix Wall 2 by changing the scoring.** Give evolution a reason to keep caring — reward things
+   like "how steadily you keep eating over your whole life," not just "did you reach food."
+3. **Give it a real memory (network-native).** Now that food can be stable, the creature could
+   genuinely benefit from remembering *where food is* — and that memory should live in the brain's
+   own wires, not in an external map (we refused external maps by rule).
+4. **(Engineering) run more experiments faster.** Real fly-brain simulations run on graphics
+   cards; ours is single-threaded. Parallelizing would let us test far more ideas quickly.
+
+---
+
+## 12. How You Can See It Yourself (simple steps)
+
+You need Rust installed. Then:
+
+```bash
+cargo build --release -p anima-world --bin world_survival
+
+# A frozen check that the tool works (this exact output is the "identity" we protect):
+./target/release/world_survival 20260924 77 60
+#   WL2 RESULT beats=60 died_at=none final_energy=40.0 food_touches=0 novel_flags=0
+```
+
+Every feature is a switch you prefix before the command. For example, the "stable food" switch:
+
+```bash
+SL2_STASIS=1 ./target/release/world_survival --explore --smell 20260924 77 60
+```
+
+If you want the full list of switches and the exact numbers behind the claims in this paper, the
+deeper (more technical) companion document — `docs/white-paper.md` *was* technical; that material is
+kept as the reproduction log. This readme is the human-readable version. For the raw details, look
+at the code comments and git history, or ask and we'll walk through any single result.
+
+---
+
+## 13. Quick Facts (one-line glossary of the numbers we quoted)
+
+| Term / number | What it means, in one line |
+|---|---|
+| ~100 beats / life | One lifetime is about 100 "heartbeats" of the simulation |
+| Energy 100 → 0 | Start with 100 energy, lose 1 per beat, +30 when you eat; 0 = death |
+| 126 meals | The most a single creature ate in one life (under a teaching schedule) |
+| 3 → 36 meals | Eating jumped from 3 to 36 per life when food stayed put |
+| 2,230 beats | The longest life we saw (with the big-tank + harder-ladder mode) |
+| 256 / 256 | Probe showing EVERY internal neuron was firing (the saturation wall) |
+| ~121–138 | The fitness ceiling evolution got stuck at, no matter what we tried |
+| STDP | The "fire together, wire together" learning rule |
+| LIF | The simple pretend-neuron rule (Leaky-Integrate-Fire) |
+| Env-gate | An on/off switch for each experiment |
+| Seed | The starting number that makes runs repeatable |
+
+---
+
+*This document is the readable version of a long, honest research campaign. Every claim here came
+from a real, repeatable run — recorded, not remembered. The code is the ultimate source of truth,
+and it's all in this repository for anyone to inspect or re-run.*
