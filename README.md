@@ -120,7 +120,8 @@ crates/anima-telemetry/   run recording and analysis
 scripts/                  config and protocol generators
 configs/                  experiment configuration files
 docs/white-paper.md       the white paper
-docs/anima-architecture.drawio  architecture diagram (this README)
+docs/anima-architecture.drawio  editable architecture diagram (draw.io)
+docs/anima-architecture.svg     diagram preview (rendered in this README)
 experiments/              index of experiment protocols and results
 research/                 index of research lineage and corrections
 paper/                    older manuscript lineage (separate)
