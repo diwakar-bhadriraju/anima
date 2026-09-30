@@ -1,23 +1,38 @@
 # ANIMA
 
-A **developmental artificial nervous system** in Rust: a spiking LIF network receives
-retinal/proprioceptive frames from a physical 3D body in an arena and controls it to forage
-for food — written from scratch, with **no hand-designed internal architecture, no pretrained
-models, and no external memory modules**.
+> **A developmental artificial nervous system that forages.** A spiking LIF network receives
+> retinal/proprioceptive frames from a physical 3D body in an arena and controls it to find and
+> consume food — written from scratch in Rust, with **no hand-designed internal architecture, no
+> pretrained models, and no external memory modules.**
 
-> **Read the full technical white paper: [`docs/white-paper.md`](docs/white-paper.md)** —
-> goal, method, measured wins & registered negatives, the two walls, and a complete
-> reproduction specification (App. A).
+<div align="center">
 
-## Key ideas
+**Read the full technical white paper**
 
-- **Self-organization**: the network grows its own internal topology (STDP + structural growth).
-- **Env-gated research discipline**: every experiment is a `SL2_*`/`WL2_*` environment switch;
-  with none set, output is byte-identical to the frozen baseline. Determinism is enforced
-  (seeded RNG, no `HashMap` iteration order) — same args + env ⇒ identical runs.
-- **Reward = food only**; steering is the action, never rewarded directly.
+**[📄 docs/white-paper.md](docs/white-paper.md) · [📑 docs/white-paper.pdf](docs/white-paper.pdf)**
 
-## Build & run
+<span go darker>
+
+`Rust · spiking neural network · self-organization · determinism-first research`
+
+</div>
+
+---
+
+## What is this?
+
+ANIMA is an attempt to grow, rather than build, an intelligent agent. We fix only the *boundaries* —
+sensory inputs in, motor outputs out, a physical world, a survival rule, and fundamental plasticity
+laws — and let the network organize its own internals. The research program is committed to
+**laboratory discipline**: every experiment is env-gated (identity-safe), deterministic, and
+pre-registered before it runs.
+
+The result so far is a genuine forager: it corrects its own steering bug, sustains feeding under
+shaping, and can be given a home second-drive it returns to when rewarded. Two measured walls — an
+internal-band saturation that blocks selective learning, and a fitness-economy ceiling — are mapped
+in the white paper with full reproduction specifications.
+
+## Getting started
 
 ```bash
 cargo build --release -p anima-world --bin world_survival
@@ -26,31 +41,72 @@ cargo build --release -p anima-world --bin world_survival
 ./target/release/world_survival 20260924 77 60
 #   WL2 RESULT beats=60 died_at=none final_energy=40.0 food_touches=0 novel_flags=0
 
-cargo test --workspace   # 198 tests, 0 failures
+cargo test --workspace        # 198 tests, 0 failures
 ```
+
+## Key ideas
+
+| Idea | Detail |
+|---|---|
+| **Self-organization** | STDP + structural plasticity grow the topology; no hand-designed internals |
+| **Env-gated experiments** | every mechanism is a `SL2_*` / `WL2_*` switch; unset ⇒ byte-identical baseline |
+| **Determinism** | seeded RNG, no `HashMap` iteration order ⇒ same args + env ⇒ identical runs |
+| **Reward = food only** | steering is the action, never rewarded directly (charter) |
 
 ## The organism
 
-The core experiment binary is [`crates/anima-world/src/bin/world_survival.rs`](crates/anima-world/src/bin/world_survival.rs)
-and the world/energy/food dynamics live in [`crates/anima-world/src/world.rs`](crates/anima-world/src/world.rs).
+The core experiment lives in [`crates/anima-world/src/bin/world_survival.rs`](crates/anima-world/src/bin/world_survival.rs);
+world dynamics (energy, food, physics) in [`crates/anima-world/src/world.rs`](crates/anima-world/src/world.rs).
 
-Selected env-gated mechanisms (all disable-safe by default):
+```
+        retina / proprio / smell                 motor rates
+   ┌─────────────┐      ┌──────────────┐      ┌──────────────┐
+   │ 62 inputs    │─────▶│ internal pool │─────▶│ 12 outputs    │
+   │ (poisson)    │      │ (LIF + STDP) │      │ (LIF → body)  │
+   └─────────────┘      └──────────────┘      └──────────────┘
+                                          world (energy, food, physics)
+```
 
-| Gate | Mechanism |
-|---|---|
-| `SL2_STASIS` | stable food + re-entry guard + tank-cap energy (3 → 36 genuine touches/life) |
-| `SL2_HMEXP` | hunger-modulated search (settle-when-fed) |
-| `SL2_NEST` / `SL2_NESTFIT` | home/rest second drive + homing reward (repeated return-home) |
-| `SL2_RSTDPP` | dopamine-gated STDP (three-factor) |
-| `SL2_NOVELTY` | minimal-criterion novelty selection |
-| `SL2_MB` + friends | mushroom-body-style expansion + reward-gated input plasticity |
-| `SL2_*` de-saturation levers | `IINH`, `THETA`, `AMPL`, `HET` (de-saturation campaign) |
+## Selected mechanisms (env-gated)
 
-## Results in one paragraph
+| Gate | Mechanism | Status |
+|---|---|---|
+| `SL2_STASIS` | stable food + re-entry guard + tank cap | ✅ verified (3 → 36 genuine touches/life) |
+| `SL2_HMEXP` | hunger-modulated search (settle-when-fed) | ✅ verified |
+| `SL2_NEST` / `SL2_NESTFIT` | home second-drive + homing reward | ✅ verified (repeated return-home on seed 7) |
+| `SL2_RSTDPP` | dopamine-gated STDP (three-factor) | ◻ measured — fires, non-selective under saturation |
+| `SL2_NOVELTY` | minimal-criterion novelty selection | ◻ measured — steers, ceiling unchanged |
+| `SL2_MB` | mushroom-body expansion + input-locus plasticity | ◻ unproven — awaits de-saturation (sparsity premise) |
+| `SL2_IINH/THETA/AMPL/HET` | de-saturation campaign | ✗ measured negative (all four bounded) |
 
-ANIMA is a real forager: it corrects its own steering bug, finds and consumes food strongly under
-shaping, survives long, and (with a home second-drive) can sustain repeated return-home behavior
-when rewarded. Two measured walls block the open-ended goal: **internal-band neural saturation**
-(which makes selective credit impossible — probed exhaustively across competition, threshold,
-amplitude, and heterogeneity) and a **fitness-economy ceiling** (~121–137.6 depending on scoring
-family). The white paper documents the measured evidence for each.
+## The two walls (short version)
+
+1. **Internal-band neural saturation** — the expansion layer fires at 100% every tick, so every
+   reward-gated learning rule is a non-selective global wash the GA ignores. Exhaustively probed
+   (competition, threshold, amplitude, heterogeneity) and found temporally bistable: cold→sparse,
+   then a sharp phase-transition to saturated.
+2. **Fitness-economy ceiling** — evolution pins at ~121–137.6 depending on scoring family;
+   `final_energy + 3·touches` saturates once food is reachable.
+
+Both are documented with the full measured evidence and reproduction spec in the
+[white paper](docs/white-paper.md).
+
+## Repository layout
+
+```
+crates/anima-core/        spiking network core (LIF, STDP, structural plasticity)
+crates/anima-world/       the 3D world, the organism, the experiment binary
+docs/white-paper.md       technical white paper (research record + App. A reproduction spec)
+docs/white-paper.pdf      PDF build of the white paper
+```
+
+## Reproducibility & discipline
+
+Every claim in the white paper is backed by a deterministic run and verifiable from this repo:
+frozen identity line, two-run determinism diff, 198-test suite, and env-gated observability
+probes (`KCPROBE`, `SW_PROBE`, `MB_PROBE`, `NEST_PROBE`). Experiment-protocol discipline is captured
+in the `anima-experiment-protocol` skill used across sessions.
+
+## License
+
+See [`paper/`](paper/) for the older manuscript lineage. (License TBD — ask if you'd like MIT/Apache added.)
