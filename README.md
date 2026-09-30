@@ -28,7 +28,7 @@ pre-registered before it runs.
 The result so far is a genuine forager: it corrects its own steering bug, sustains feeding under
 shaping, and can be given a home second-drive it returns to when rewarded. Two measured walls — an
 internal-band saturation that blocks selective learning, and a fitness-economy ceiling — are mapped
-in the white paper with full reproduction specifications.
+in the white paper, told from the start in plain language.
 
 ## Getting started
 
@@ -86,8 +86,8 @@ world dynamics (energy, food, physics) in [`crates/anima-world/src/world.rs`](cr
 2. **Fitness-economy ceiling** — evolution pins at ~121–137.6 depending on scoring family;
    `final_energy + 3·touches` saturates once food is reachable.
 
-Both are documented with the full measured evidence and reproduction spec in the
-[white paper](docs/white-paper.md).
+Both are explained with their measured evidence in the
+[white paper](docs/white-paper.md) — written so anyone can follow the reasoning.
 
 ## Repository layout
 
