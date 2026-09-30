@@ -2,9 +2,41 @@
 
 *A research story from the beginning, with every idea explained as it appears. If a term feels foreign, keep going; the first time we use it, we define it.*
 
+## Abstract
+
+How much of an agent can you grow with a world, a body, and one need, and no engineer telling the
+brain what to do? We built ANIMA, a developmental spiking neural organism written from scratch in
+Rust, and studied what it can learn on its own. The organism lives in a 3D arena, senses its
+surroundings, controls its own body, finds and eats food, and dies when its energy runs out. It is
+deterministic and experiments are pre-registered, so every result can be re-run. We show that the
+organism learns to forage, that persistent food supports a genuine feeding loop, and that a home
+and rest drive can emerge when returning home is rewarded. Two measured limitations block further
+progress: the internal layer saturates, so selective within-life learning is not possible yet, and
+the fitness economy saturates once food is reachable, so evolution stops improving. The conclusion
+is scoped to foraging and self-organization; we do not claim general intelligence or biological
+equivalence.
+
+## Contributions
+
+- A self-organizing spiking neural foraging organism, implemented from scratch in Rust with no
+  hand-designed internal architecture, no pretrained models, and no external memory modules.
+- A deterministic, pre-registered experimental framework (frozen identity, env-gated switches,
+  seeded randomness) that makes every claim re-runnable.
+- An empirical characterization of the selective-learning wall: the internal band saturates, so
+  reward-gated plasticity becomes non-selective, and no tested competition, threshold, amplitude,
+  or heterogeneity lever fixes it.
+- An empirical characterization of the evolutionary wall: fitness saturates once food is reachable,
+  pinning evolution at a measured ceiling regardless of the mechanism stack tested.
+
 ## 1. The big question (why we built this)
 
-We wanted to see if a computer creature could teach itself to survive. Not a real animal, and not a robot with instructions. A pretend animal, inside a little 3D world, with a tiny brain made of simulated nerve cells. The only goal we ever give it: find food and eat it before your energy runs out. Everything else it has to figure out on its own.
+We wanted to see if a computer creature could teach itself to survive. Not a real animal, and not
+a robot with instructions. A pretend animal, inside a little 3D world, with a tiny brain made of
+simulated nerve cells. The foundational goal we gave it was food: find food and eat it before your
+energy runs out. Everything else it has to figure out on its own. Later, as a separate experimental
+extension, we added a home and rest drive (section 6); that second need was introduced after the
+food-foraging foundation, and the game rules changed to include it. This section tells the
+foundational story first, and the extension appears where it happened in time.
 
 Why care? Real animals do not come with a designer who tells every nerve cell what to do. Their brains organize themselves. They grow, learn, and adapt. Most "artificial brains" skip that part: an engineer decides the wiring. We refused that. We want to know whether a brain can organize itself when all it gets is a world, a body, and hunger.
 
@@ -60,7 +92,7 @@ Two: no pre-trained models. We do not borrow a smart model someone else trained.
 
 Three: no extra memory boxes. The creature cannot carry a notebook and write down where food is. Its only memory is the changing wires of its own brain.
 
-Four: reward equals food, and nothing else. We never reward "turned toward the food," "looked smart," or "moved a lot." Only eating counts. If the creature learns anything, it earns it.
+Four: reward equals food, and nothing else. We never reward "turned toward the food," "looked smart," or "moved a lot." Only eating counts. This is the foundational rule. The later home and rest drive (section 6) was introduced as an explicit experimental extension, with returning home as its own reward, and the paper marks it as a separate chapter of the story rather than part of the original charter.
 
 And rule five, the one under everything: every claim has to be measured and repeatable. No "trust us." The numbers have to come from a real run you can re-run and get the same answer.
 
@@ -126,6 +158,23 @@ The plain version: once finding food is good enough, evolution cannot tell a gre
 
 Together, the two walls explain essentially every failure in this project. The creature cannot learn selectively, and it cannot keep evolving. Those two facts do most of the explaining.
 
+## Results at a glance
+
+| Capability | Status | Evidence |
+|---|---|---|
+| 3D embodiment | Demonstrated | 6-DOF body, physics arena, retina sensing |
+| Movement and steering | Demonstrated | after fixing a sign bug, it steers toward food |
+| Food acquisition | Demonstrated | up to 126 meals in one life under a curriculum |
+| Persistent food foraging | Demonstrated | 3 to 36 meals per life with stable-food mode |
+| Long survival | Demonstrated | up to 2,230 beats under a difficulty ladder |
+| Home / rest behavior | Partial | recurring returns on seed 7; not on seed 20260924 |
+| Selective within-life learning | Not demonstrated | internal band saturates; reward is non-selective |
+| Evolutionary improvement | Partial | reaches a ceiling (~121 to 137.6 by scoring family) |
+| Open-ended improvement | Not demonstrated | the two walls above are not crossed |
+
+The status column uses three words only: demonstrated, partial, or not demonstrated. "Not
+demonstrated" means no measured run crossed that bar yet, not that it is impossible.
+
 ## 9. How evolution and learning fit together
 
 There are two time-scales at work, and the whole project is about whether they can connect.
@@ -146,6 +195,20 @@ We measured, rather than guessed, the two walls that block a self-improving brai
 
 That is a cleaner result than "we tried a bunch of stuff." We now know exactly what to attack next, and why.
 
+## Research lineage
+
+The organism was shaped by experiment, not designed around a fixed answer. Each family below posed a question, tried an intervention, recorded a result, and made a decision. The experiment index (`experiments/README.md`) and the correction notes (`research/corrections.md`) carry the protocols and failed hypotheses in more detail.
+
+- **Foundational dynamics (E1 to E5 era).** Question: can a minimal LIF network tie sensation to movement at all? Intervention: small static spiking nets in the arena. Result: the loop worked, but the organism was sensitive to a sign bug in steering. Decision: fixed the bug, then built determinism and env-gating around the working loop.
+- **Foraging shaping (curriculum).** Question: can shaping help the organism reach food? Intervention: food starts close and moves farther as the creature improves. Result: strong local pursuit, up to 126 meals a life. Decision: kept shaping as the training scaffold.
+- **Persistent food (SL2_STASIS).** Question: does stable food enable a feeding loop? Intervention: keep food in place after the first find, with a re-entry guard. Result: 3 to 36 meals a life. Decision: this became the base for the later experiments.
+- **Selective-learning mechanisms (chemical gating, eligibility, R-STDP, reward gating).** Question: can reward shape within-life learning? Intervention: several reward-gated plasticity rules. Result: the wires changed, but the change was too small and non-selective to matter to survival. Decision: measured the saturation wall that caused it.
+- **Mushroom-body motif (SL2_MB).** Question: does the fly's sparse expansion + input-locus credit help? Intervention: a 256-neuron sparse expansion with reward-gated input plasticity. Result: fired correctly, but non-selectively under saturation. Decision: recorded as unproven until the band is de-saturated.
+- **De-saturation campaign (SL2_IINH, THETA, AMPL, HET).** Question: which lever removes the everything-on regime? Intervention: competition, threshold, input scaling, and heterogeneity. Result: all four bounded negative; the band is temporally bistable. Decision: the phase transition itself is the next target.
+- **Home and rest (SL2_NEST, SL2_NESTFIT).** Question: can a second need drive return-home behavior? Intervention: a nest landmark, a stamina constraint, and a homing reward. Result: recurring returns on seed 7; seed 20260924 stayed parked. Decision: recorded as partial and seed-fragile.
+
+This is the lineage that constrained the organism step by step. It is kept visible precisely because the failures, corrections, and measured walls carry the scientific value.
+
 ## 11. What we would do next
 
 Break wall one by keeping the brain cool. If we can stop the whole brain from flipping on at once, selective learning becomes possible for the first time. That means attacking the phase transition itself, or keeping most neurons quiet most of the time.
@@ -155,6 +218,41 @@ Fix wall two by changing the scoring. Give evolution a reason to keep caring, by
 Give it a real memory, but a network-native one. Now that food can stay put, remembering where food is would actually pay off. The memory has to live in the brain's own wires, because external maps are against our rules.
 
 And on the engineering side, run experiments faster. Real fly-brain simulations run on graphics cards. Ours runs on a single thread. Parallelizing would let us test many more ideas in the same time.
+
+## Limitations and threats to validity
+
+The claims here rest on a small, deterministic setup, and the boundaries below should shape how you
+read them. We deliberately distinguish what was **not demonstrated** from what is **impossible**:
+nothing in this list says a behavior cannot exist, only that no measured run in this project showed
+it.
+
+- Small neural population. The largest internal pool we ran in evolution was 256 neurons; the
+  default is 40. That is a tiny network, and the saturation wall is partly a property of its size.
+- Small evolutionary population. Each generation holds only 4 creatures, with 2 evolution seeds.
+  That is a weak statistical base; a result that appears on one seed and not another is real here,
+  but it does not establish robustness.
+- Synthetic 3D environment. The arena, retina, and body are simplified models, not a physical
+  world. Real-world confounding (noise, partial observability, contact) is absent.
+- Simplified LIF model. We use Leaky-Integrate-Fire neurons, not a detailed biophysical model.
+  LIF captures spiking dynamics well enough for this question but has no dendritic computation,
+  no sustained local inhibition of the kind real circuits use, and no analog neuromodulation beyond
+  what we added explicitly.
+- Limited seeds. Only seeds 20260924 and 7 were used across the campaign. Seed-dependence is a
+  documented finding (the home behavior on one seed, not the other), and it tempers the generality
+  of every positive result.
+- Current saturation regime. The organism spends most of its time in an everything-on regime, which
+  prevents selective learning. The de-saturation campaign bounded four levers negative, but that is
+  evidence about this setup, not a general proof.
+- Fitness formulation dependence. The observed ceiling depends on the scoring function. A
+  different fitness shape could move it, which is why the fitness economy is listed as an open
+  target rather than a law.
+- No demonstrated continual selective learning, and no demonstrated open-ended evolution. These are
+  the two central gaps behind the two walls. We show why they are blocked, and we do not claim they
+  are solved.
+
+Finally, reproducibility guardrails: every result is a seeded, env-gated run; the frozen identity
+line and the 198-test suite guard against silent drift; and the appendix lists the exact constants
+and commands.
 
 ## 12. How you can see it yourself
 
@@ -204,10 +302,25 @@ Probes. These are debugging switches that print extra lines. They all write to t
 
 Identity and seeds. The frozen identity command is `./target/release/world_survival 20260924 77 60`, and its exact output is `WL2 RESULT beats=60 died_at=none final_energy=40.0 food_touches=0 novel_flags=0`. The two evolution seeds used throughout are 20260924 and 7.
 
-## Thank you
+## Conclusion
 
-A note at the end of a long project, and it belongs in this document. This research used the LLM inference API from freeinterference.org, and it helped a lot. Their service let us work through the ideas in this paper, the dead ends and the alive ones, at a pace that would not have been possible on our own. Thank you.
+We built a self-organizing spiking organism and measured, honestly, what it can and cannot do. It
+forages. It survives. With stable food it builds a feeding loop, and with a home and rest drive it
+returns home on one of two seeds. Those are real, reproducible results. They sit inside two clearly
+measured boundaries: the internal band saturates, so selective within-life learning is not
+available yet, and the fitness economy saturates once food is reachable, so open-ended evolution is
+not available yet. The contribution of this project is not that the walls are crossed; it is that
+the walls are mapped with evidence, that the explanatory dead ends are recorded instead of hidden,
+and that every claim can be re-run. The current research boundary is that precise: a capable
+forager, with selective learning and open-ended improvement both still open problems.
+
+## Acknowledgements
+
+This research used the LLM inference API from freeinterference.org, and it helped a lot. Their
+service let us work through the ideas in this paper, the dead ends and the alive ones, at a pace
+that would not have been possible on our own. Thank you.
 
 ---
 
-*Everything in this document came from a run we can re-run. The code is the final source of truth, and it is all in this repository, waiting for the next person who wants to pick up the question.*
+*Everything in this document came from a run we can re-run. The code is the final source of truth,
+and it is all in this repository, waiting for the next person who wants to pick up the question.*

@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use ANIMA in your work, please cite it as follows."
+title: "ANIMA: A Developmental Spiking Neural Organism that Forages"
+abstract: >-
+  ANIMA is a self-organizing spiking neural organism, written from scratch in Rust, that lives in a
+  3D world, senses its surroundings, controls its body, and forages for food. It uses no
+  hand-designed internal architecture, no pretrained models, and no external memory modules. This
+  release documents the demonstrated forager, the measured selective-learning wall, and the
+  measured evolutionary fitness wall, all reproducible from a deterministic frozen identity line.
+authors:
+  - family-names: Bhadriraju
+    given-names: Diwakar
+version: 0.1.0
+date-released: 2026-10-01
+license: MIT
+repository-code: "https://github.com/diwakar-bhadriraju/anima"
+keywords:
+  - spiking neural network
+  - self-organization
+  - artificial life
+  - foraging
+  - developmental robotics
