@@ -369,6 +369,13 @@ fn inh_gain() -> f32 {
 }
 
 fn build_net(n_in: usize, seed: u64) -> Network {
+    build_net_wta(n_in, seed, None)
+}
+
+/// WTA-gene variant: `wta_override` (Some) replaces the SL2_WTA env value
+/// for THIS individual (SL2_WTAEVOLVE co-evolution). None = env behavior
+/// (identity with the frozen baseline when the env is unset).
+fn build_net_wta(n_in: usize, seed: u64, wta_override: Option<f32>) -> Network {
     // Output inhibition (D-46: same-tick pairwise between output
     // neurons): with it, outputs COMPETE instead of all firing at max —
     // the motor demand gains a real dynamic range so the organism can
@@ -405,7 +412,9 @@ fn build_net(n_in: usize, seed: u64) -> Network {
     // rate, so a saturated band suppresses itself maximally while a sparse
     // band is left alone — the mechanism pairwise SL2_IINH could not
     // achieve (its −g is rebuilt by drive every tick).
-    let wta = std::env::var("SL2_WTA").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    let wta = wta_override.unwrap_or_else(|| {
+        std::env::var("SL2_WTA").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0)
+    });
     let mb = std::env::var("SL2_MB").is_ok();
     let n_int = if mb { MB_POOL } else { pool_size() };
     let conn = if mb { MB_CONN } else { 0.038 };
@@ -745,7 +754,11 @@ fn life_with(
             let ev = net.step(&frame);
             // KCPROBE (MB): distinct internal-band spikers this beat —
             // measures de-saturation (saturated = all 256 fire every beat).
-            let kc_probe_on = mb && std::env::var("KCPROBE").is_ok() && kc_every > 0;
+            let kc_probe_on = (mb || std::env::var("SL2_WTAEVOLVE").is_ok())
+                && std::env::var("KCPROBE").is_ok() && kc_every > 0;
+            // Probe denominator: MB mode has the 256-KC expansion pool;
+            // default anatomy has pool_size() internal neurons.
+            let probe_pool = if mb { MB_POOL } else { pool_size() };
             if kc_probe_on {
                 if t == 0 && beat % kc_every == 0 {
                     kc_spike_set.clear();
@@ -760,7 +773,7 @@ fn life_with(
                 if t == io::BEAT_MS - 1 && beat % kc_every == 0 {
                     eprintln!(
                         "KCPROBE beat={beat} kc_spikers={}/{} kc_window={}/{}",
-                        kc_spike_set.len(), MB_POOL, kc_window_set.len(), MB_POOL
+                        kc_spike_set.len(), probe_pool, kc_window_set.len(), probe_pool
                     );
                     kc_window_set.clear();
                 }
@@ -1233,10 +1246,23 @@ fn evolve_run(
 ) {
     for &esec in &EVOLVE_SEEDS {
         println!("=== seed {esec} ===");
-        let mut pop: Vec<(Network, u64)> = (0..N_POP)
+        // SL2_WTAEVOLVE=1: the internal-band k-WTA gain is a HERITABLE
+        // gene (per-individual). Init at the measured live-range center
+        // 0.01 (a 0.0 init can never leave 0 under multiplicative
+        // mutation), mutated multiplicatively x[0.5,2.0] with p=0.1 —
+        // so the population can search the [1e-4, 3e-2] measured live
+        // band. Off = env-gated fixed WTA (SL2_WTA); identity when both
+        // unset.
+        let wta_evolve = std::env::var("SL2_WTAEVOLVE").is_ok();
+        const WTA_GENE_INIT: f32 = 0.01;
+        const WTA_GENE_MUT_P: f32 = 0.1;
+        let mut pop: Vec<(Network, u64, f32)> = (0..N_POP)
             .map(|i| {
                 let s = io::derive_seed64(esec, 0, i as u64);
-                (build_net(net_inputs(smell), s), s)
+                let gene = if wta_evolve { WTA_GENE_INIT } else {
+                    std::env::var("SL2_WTA").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0)
+                };
+                (build_net_wta(net_inputs(smell), s, Some(gene)), s, gene)
             })
             .collect();
         let mut gen_best: Vec<f32> = Vec::new();
@@ -1268,7 +1294,7 @@ fn evolve_run(
             // build approach from longer range — the shaping fix for the
             // generalization failure.
             let gen_start = (FOOD_START_DIST + 3.0 * g as f32).min(FOOD_MAX_DIST);
-            for (i, (net, s)) in pop.iter_mut().enumerate() {
+            for (i, (net, s, _gene)) in pop.iter_mut().enumerate() {
                 let (r, _) = life_with(net, esec, beats, fault, motor_zero, viewer, Some(g), Some(i as u64), explore, explore, smell, gen_start, None);
                 if r.died_at.is_some() {
                     deaths += 1;
@@ -1350,12 +1376,13 @@ fn evolve_run(
                 break;
             }
             // Selection order was computed above (fitness or novelty).
-            let mut next: Vec<(Network, u64)> = Vec::new();
+            let mut next: Vec<(Network, u64, f32)> = Vec::new();
             // ELITE: the winner carried into the next generation
             // UNCHANGED (rebuild from its own seed, weights copied
-            // without mutation).
+            // without mutation; gene inherited unchanged).
             let elite_idx = order[0];
             let elite_seed = pop[elite_idx].1;
+            let elite_gene = pop[elite_idx].2;
             // Fix B: track how many consecutive gens THIS seed has been
             // best; after ELITE_STALL_GENS, carry it WITH mutation so a
             // stagnated winner keeps searching instead of freezing.
@@ -1366,15 +1393,32 @@ fn evolve_run(
                 elite_streak = 0;
             }
             let mutate_elite = elite_streak >= ELITE_STALL_GENS;
-            next.push((breed_inner(&pop[elite_idx].0, elite_seed, mutate_elite), elite_seed));
+            let elite_child_gene = if wta_evolve && mutate_elite {
+                (elite_gene * 1.5).clamp(1e-4, 3e-2)
+            } else { elite_gene };
+            next.push((
+                breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene)),
+                elite_seed,
+                elite_child_gene,
+            ));
             // Offspring: best -> 2, second -> 1 (mirror evolve.rs).
             for (pi, &idx) in order.iter().take(2).enumerate() {
                 let n_off: u64 = if pi == 0 { 2 } else { 1 };
                 for _ in 0..n_off {
                     let slot = next.len();
                     let cs = io::derive_seed64(esec, g + 1, slot as u64);
-                    let child = breed_inner(&pop[idx].0, cs, true);
-                    next.push((child, cs));
+                    // Gene: multiplicative x[0.5,2.0] with p=0.1, drawn
+                    // from the CHILD's own seed stream (deterministic).
+                    let child_gene = if wta_evolve {
+                        let mut grng = Xoshiro256PlusPlus::seed_from_u64(cs ^ 0x5eed);
+                        let mut g2 = pop[idx].2;
+                        if grng.gen::<f32>() < WTA_GENE_MUT_P {
+                            g2 *= 0.5 + grng.gen::<f32>() * 1.5;
+                        }
+                        g2.clamp(1e-4, 3e-2)
+                    } else { pop[idx].2 };
+                    let child = breed_inner_wta(&pop[idx].0, cs, true, Some(child_gene));
+                    next.push((child, cs, child_gene));
                 }
             }
             pop = next;
@@ -1396,7 +1440,7 @@ fn evolve_run(
             // longer implies an unchanged genome — always probe.)
             if generalize {
                 let elite_seed = pop[0].1;
-                let mut probe = breed_inner(&pop[0].0, elite_seed, false);
+                let mut probe = breed_inner_wta(&pop[0].0, elite_seed, false, Some(pop[0].2));
                 let (pr, _) = life_with(&mut probe, esec, BEATS_LONG, fault, motor_zero, viewer, None, None, true, false, smell, FOOD_START_DIST, None);
                 if pr.food_touches >= ULTIMATE_BAR {
                     println!("ULTIMATE seed {esec} at gen {g} net_seed={elite_seed} natural-food touches={} final_energy={:.1}",
@@ -1421,6 +1465,12 @@ fn evolve_run(
 /// during life) are re-added when both endpoints exist in the child —
 /// mirror of evolve.rs breed_inner, simplified (no size mutation).
 fn breed_inner(parent: &Network, seed: u64, mutate: bool) -> Network {
+    breed_inner_wta(parent, seed, mutate, None)
+}
+
+/// WTA-gene variant: `wta_gene` (Some) builds the child with the inherited
+/// internal-competition gain (SL2_WTAEVOLVE); None = env behavior.
+fn breed_inner_wta(parent: &Network, seed: u64, mutate: bool, wta_gene: Option<f32>) -> Network {
     // BTreeMap: ORDERED iteration — residual-add and mutation draws run
     // against ordered keys (HashMap order is per-process nondeterministic).
     let mut wmap: BTreeMap<(u32, u32), f32> = BTreeMap::new();
@@ -1431,7 +1481,7 @@ fn breed_inner(parent: &Network, seed: u64, mutate: bool) -> Network {
         wmap.insert((s.pre.0, s.post.0), s.w);
     }
     let n_in = parent.neurons.len() - pool_size() - 12 - K; // same anatomy as parent
-    let mut child = build_net(n_in, seed);
+    let mut child = build_net_wta(n_in, seed, wta_gene);
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed);
     let mut consumed: Vec<(u32, u32)> = Vec::new();
     for s in child.synapses.iter_mut() {
