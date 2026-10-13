@@ -796,7 +796,11 @@ fn life_with(
                         // (set shifts with food direction) or static.
                         // life label = org (population idx passed by the
                         // evolve loop; None in single-life mode).
-                        let life_idx = org.map(|o| o.to_string()).unwrap_or("single".into());
+                        let life_idx = format!(
+                            "{:x}-{:02x}",
+                            world_seed,
+                            org.unwrap_or(u64::MAX)
+                        );
                         let mut ids: Vec<u32> = kc_spike_set.iter().copied().collect();
                         ids.sort_unstable();
                         eprintln!("KCWINIDS life={life_idx} beat={beat} ids={ids:?}");
