@@ -390,17 +390,34 @@ fn build_net(n_in: usize, seed: u64) -> Network {
     // biological mechanism for sparse partial activation (uniform scaling
     // is a 0%/100% cliff, measured). All sd fields default 0.0 (identity).
     let het = std::env::var("SL2_HET").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    // SL2_LATCH: latch_enable override (0 = off). Registered phase-transition
+    // discriminator: the band's re-saturation engine is the slow-state/latch
+    // accumulation (u_slow builds per spike, z_latch adds a plateau). Turning
+    // the latch off tests whether the band stays permanently cold/sparse.
+    let latch = std::env::var("SL2_LATCH").ok().and_then(|v| v.parse::<u8>().ok())
+        .map(|v| v != 0).unwrap_or(true);
+    // SL2_SLOWBETA: slow_state_beta override (per-spike u_slow increment).
+    // 0 = no accumulation. Scales how fast the band re-saturates.
+    let slowbeta = std::env::var("SL2_SLOWBETA").ok().and_then(|v| v.parse().ok())
+        .unwrap_or(0.0046875);
+    // SL2_WTA: internal-band rate-dependent competition gain (0 = identity,
+    // default). Registered candidate A2c: suppression scales WITH firing
+    // rate, so a saturated band suppresses itself maximally while a sparse
+    // band is left alone — the mechanism pairwise SL2_IINH could not
+    // achieve (its −g is rebuilt by drive every tick).
+    let wta = std::env::var("SL2_WTA").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
     let mb = std::env::var("SL2_MB").is_ok();
     let n_int = if mb { MB_POOL } else { pool_size() };
     let conn = if mb { MB_CONN } else { 0.038 };
     let cfg = NetworkConfig {
         connectivity: conn, w_init: 0.2, amplitude: ampl, adaptation_tau_ms: 200.0,
-        adaptation_gain: 0.05, inhibition_gain: inh_gain(), slow_state_beta: 0.0046875,
-        slow_state_tau_ms: 5000.0, slow_state_beta_drive: false, latch_enable: true,
+        adaptation_gain: 0.05, inhibition_gain: inh_gain(), slow_state_beta: slowbeta,
+        slow_state_tau_ms: 5000.0, slow_state_beta_drive: false, latch_enable: latch,
         theta_rel_mean: theta, theta_rel_sd: het, u_plateau_rel_mean: 1.0, u_plateau_rel_sd: het,
         tau_het_rel_sd: het, phi_rel: 0.5, eta_rel: 0.0,
         output_inhibition_gain: oinh,
         internal_inhibition_gain: iinh,
+        internal_competition_gain: wta,
         d58_reflex: K,
         ..NetworkConfig::default()
     };
@@ -602,6 +619,11 @@ fn life_with(
     let mb_lo = n_ins;
     let mb_hi = mb_lo + if mb { MB_POOL } else { pool_size() };
     let mut kc_spike_set: HashSet<u32> = HashSet::new();
+    // Windowed union of distinct KC spikers across the beats between
+    // KCPROBE reports — answers whether the sparse per-beat set is a
+    // stable winner group or a rotating one (rotation over ~7 beats =
+    // full-band eligibility = MB credit still non-selective).
+    let mut kc_window_set: HashSet<u32> = HashSet::new();
     let kc_every: u64 = std::env::var("KCPROBE_EVERY").ok().and_then(|v| v.parse().ok()).unwrap_or(50);
     let band_lo = net_n - K;      // reflex band = last K
     let out_hi = band_lo;         // outputs = the n_out before the band
@@ -723,15 +745,24 @@ fn life_with(
             let ev = net.step(&frame);
             // KCPROBE (MB): distinct internal-band spikers this beat —
             // measures de-saturation (saturated = all 256 fire every beat).
-            if mb && std::env::var("KCPROBE").is_ok() && kc_every > 0 && beat % kc_every == 0 {
-                if t == 0 {
+            let kc_probe_on = mb && std::env::var("KCPROBE").is_ok() && kc_every > 0;
+            if kc_probe_on {
+                if t == 0 && beat % kc_every == 0 {
                     kc_spike_set.clear();
                 }
                 for c in &ev.spikes {
                     let ci = c.0 as usize;
                     if ci >= mb_lo && ci < mb_hi {
                         kc_spike_set.insert(ci as u32);
+                        kc_window_set.insert(ci as u32);
                     }
+                }
+                if t == io::BEAT_MS - 1 && beat % kc_every == 0 {
+                    eprintln!(
+                        "KCPROBE beat={beat} kc_spikers={}/{} kc_window={}/{}",
+                        kc_spike_set.len(), MB_POOL, kc_window_set.len(), MB_POOL
+                    );
+                    kc_window_set.clear();
                 }
             }
             for c in &ev.spikes {
@@ -762,11 +793,6 @@ fn life_with(
                 let _ = v2.window(net, tk);
             }
             net.tick = Tick(net.tick.0 + 1);
-        }
-        if mb && std::env::var("KCPROBE").is_ok() && kc_every > 0 && beat % kc_every == 0 {
-            let n = kc_spike_set.len();
-            eprintln!("KCPROBE beat={beat} kc_spikers={n}/{}", MB_POOL);
-            kc_spike_set.clear();
         }
         // Verdict BEFORE window update (ordering rule, D-59).
         let min_l = if window.is_empty() {
@@ -1014,9 +1040,14 @@ fn life_with(
                 let mb_probe = mb && std::env::var("MB_PROBE").is_ok();
                 let mut kc_elig: u32 = 0;
                 let mut kc_pot: u32 = 0;
+                // Probe threshold: elig > 0.0 counts f32-tiny remnants
+                // (0.5^24 ~ 6e-8) from beat-0's saturated burst — an
+                // artifact that made every touch look full-band eligible.
+                // Credit that matters is recent: elig > 0.1 = spiked within
+                // the last ~3 beats (0.5^3 = 0.125).
                 for o in tgt_lo..tgt_hi {
                     let e = elig[o];
-                    if mb_probe && e > 0.0 {
+                    if mb_probe && e > 0.1 {
                         kc_elig += 1;
                     }
                     if e <= 0.0 {

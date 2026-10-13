@@ -428,6 +428,16 @@ pub struct NetworkConfig {
     /// 0 = identity (bit-identical baseline).
     #[serde(default)]
     pub internal_inhibition_gain: f32,
+
+    /// SL2_WTA: rate-dependent winner-take-MOST competition INSIDE the
+    /// internal (KC) band. Unlike SL2_IINH's constant pairwise −g (which
+    /// sustained drive rebuilds every tick), suppression here scales WITH
+    /// each competitor's firing rate, so a fully-saturated band generates
+    /// maximal mutual suppression and a sparse band generates almost none.
+    /// Suppression on neuron b = gain * rate_hz(a) summed over other
+    /// internal co-spikers a. 0 = identity (default).
+    #[serde(default)]
+    pub internal_competition_gain: f32,
     /// V2.1 (docs/v2_1-spec.md): slow depolarizing intrinsic state.
     /// slow_state_beta = per-spike increment; slow_state_tau_ms = decay.
     /// beta = 0 (default) => bit-identical V2.
@@ -621,6 +631,7 @@ impl Default for NetworkConfig {
             output_competition_gain: 0.0,
             // SL2_IINH internal-band inhibition default OFF: 0 = identity.
             internal_inhibition_gain: 0.0,
+            internal_competition_gain: 0.0,
             // V2.1 default OFF: beta 0 => u stays exactly 0.0 => V2 identity.
             slow_state_beta: 0.0,
             slow_state_tau_ms: default_slow_tau(),
@@ -1505,6 +1516,26 @@ impl Network {
             for &a in &int_sp {
                 for &b in &int_sp {
                     if a != b { self.neurons[b.idx()].i_syn -= ig; }
+                }
+            }
+        }
+
+        // SL2_WTA: internal-band rate-dependent winner-take-most. Same-tick
+        // internal co-spikers suppress each other in proportion to their
+        // EMA firing rate — suppression vanishes when the band is sparse
+        // (the regime SL2_IINH's constant −g could not reach). 0 = identity.
+        if self.cfg.internal_competition_gain != 0.0 {
+            let cg = self.cfg.internal_competition_gain;
+            let int_rates: Vec<(usize, f32)> = (0..self.neurons.len())
+                .filter(|&i| self.neurons[i].class == NeuronClass::Internal)
+                .map(|i| (i, self.neurons[i].rate_hz))
+                .collect();
+            for &(a, rate_a) in &int_rates {
+                let suppress = cg * rate_a;
+                if suppress > 0.0 {
+                    for &(b, _) in &int_rates {
+                        if a != b { self.neurons[b].i_syn -= suppress; }
+                    }
                 }
             }
         }
