@@ -60,6 +60,10 @@ const W_MUT_P: f32 = 0.10;
 const W_MUT_AMP: f32 = 0.10;
 /// Fitness tiebreaker: +3.0 per food touch (registered).
 const TOUCH_BONUS: f32 = 3.0;
+/// SL2_TOUCHRAMP: max bonus for early first touch (frac=1 = touched at
+/// beat 0). 30 = one extra touch's worth at best — comparable pressure
+/// to a real meal, not dominant.
+const TOUCHRAMP_BONUS: f32 = 30.0;
 /// Exploration / curriculum constants (registered, NOT tuned on outcomes).
 const BEATS_DEFAULT: u64 = 60;
 const BEATS_LONG: u64 = 600;           // longer lives: single-life --explore watch
@@ -1370,6 +1374,17 @@ fn evolve_run(
                 } else {
                     r.final_energy + TOUCH_BONUS * r.food_touches as f32
                 };
+                // SL2_TOUCHRAMP: fitness shaping for funnel progress —
+                // reward EARLY first touch (approach speed) with a bonus
+                // proportional to the life fraction remaining after the
+                // first touch. Alive genomes only (death gate above).
+                // Default off = identity.
+                if std::env::var("SL2_TOUCHRAMP").is_ok() && r.died_at.is_none() {
+                    if let Some(ft) = r.first_touch {
+                        let frac = 1.0 - ft as f32 / beats.max(1) as f32;
+                        fit += TOUCHRAMP_BONUS * frac;
+                    }
+                }
                 if nest_fit && r.died_at.is_none() {
                     fit += NEST_RETURN_BONUS * r.nest_returns as f32;
                 }
