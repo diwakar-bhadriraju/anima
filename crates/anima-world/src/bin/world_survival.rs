@@ -758,7 +758,8 @@ fn life_with(
             let ev = net.step(&frame);
             // KCPROBE (MB): distinct internal-band spikers this beat —
             // measures de-saturation (saturated = all 256 fire every beat).
-            let kc_probe_on = (mb || std::env::var("SL2_WTAEVOLVE").is_ok())
+            let kc_probe_on = (mb || std::env::var("SL2_WTAEVOLVE").is_ok()
+                || std::env::var("SL2_WTA").is_ok())
                 && std::env::var("KCPROBE").is_ok() && kc_every > 0;
             // Probe denominator: MB mode has the 256-KC expansion pool;
             // default anatomy has pool_size() internal neurons.
@@ -783,9 +784,12 @@ fn life_with(
                         // Winner-set IDs (sorted, deterministic): tracks
                         // whether the sparse winners are input-dependent
                         // (set shifts with food direction) or static.
+                        // life label = org (population idx passed by the
+                        // evolve loop; None in single-life mode).
+                        let life_idx = org.map(|o| o.to_string()).unwrap_or("single".into());
                         let mut ids: Vec<u32> = kc_spike_set.iter().copied().collect();
                         ids.sort_unstable();
-                        eprintln!("KCWINIDS beat={beat} ids={ids:?}");
+                        eprintln!("KCWINIDS life={life_idx} beat={beat} ids={ids:?}");
                     }
                     kc_window_set.clear();
                 }
