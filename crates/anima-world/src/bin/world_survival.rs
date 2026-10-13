@@ -335,6 +335,9 @@ struct LifeResult {
     died_at: Option<u64>,
     final_energy: f32,
     food_touches: u32,
+    /// Beat of the FIRST food touch (None = never touched). SL2_FUNNEL
+    /// navigation metric: beats-to-first-touch measures approach quality.
+    first_touch: Option<u64>,
     novel_flags: u32,
     coverage: u32,
     ext_news: u32,
@@ -566,6 +569,7 @@ fn life_with(
     // ARS persistence tracker (persistence rewards quick re-approach).
     let mut persistence: f32 = 0.0;
     let mut last_touch_beat: i64 = -1;
+    let mut first_touch_beat: Option<u64> = None;
     if prog && std::env::var("SL2_START").is_err() {
         world.body.energy = PROG_LIFE;
     }
@@ -775,6 +779,14 @@ fn life_with(
                         "KCPROBE beat={beat} kc_spikers={}/{} kc_window={}/{}",
                         kc_spike_set.len(), probe_pool, kc_window_set.len(), probe_pool
                     );
+                    if std::env::var("KCWINIDS").is_ok() {
+                        // Winner-set IDs (sorted, deterministic): tracks
+                        // whether the sparse winners are input-dependent
+                        // (set shifts with food direction) or static.
+                        let mut ids: Vec<u32> = kc_spike_set.iter().copied().collect();
+                        ids.sort_unstable();
+                        eprintln!("KCWINIDS beat={beat} ids={ids:?}");
+                    }
                     kc_window_set.clear();
                 }
             }
@@ -1017,6 +1029,9 @@ fn life_with(
         };
         if touched {
             food_touches += 1;
+            if first_touch_beat.is_none() {
+                first_touch_beat = Some(beat);
+            }
             failures_since_touch = 0;
             // ARS persistence: quick re-approach (few beats since last
             // touch) adds exp(-gap/ARS_TAU); the first touch (no prior)
@@ -1210,6 +1225,7 @@ fn life_with(
             died_at,
             final_energy: world.body.energy,
             food_touches,
+            first_touch: first_touch_beat,
             novel_flags,
             coverage,
             ext_news,
@@ -1307,9 +1323,11 @@ fn evolve_run(
                 // touches > 0). stderr-gated, identity-safe.
                 if std::env::var("SL2_FUNNEL").is_ok() {
                     eprintln!(
-                        "FUNNEL gen={g} idx={i} died_at={} touches={} energy={:.1}",
+                        "FUNNEL gen={g} idx={i} died_at={} touches={} first_touch={} energy={:.1}",
                         r.died_at.map(|d| d.to_string()).unwrap_or("none".into()),
-                        r.food_touches, r.final_energy
+                        r.food_touches,
+                        r.first_touch.map(|d| d.to_string()).unwrap_or("none".into()),
+                        r.final_energy
                     );
                 }
                 if r.died_at.is_some() {
