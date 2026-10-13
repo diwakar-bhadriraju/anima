@@ -1397,7 +1397,11 @@ fn evolve_run(
                 last_elite = elite_seed;
                 elite_streak = 0;
             }
-            let mutate_elite = elite_streak >= ELITE_STALL_GENS;
+            let mutate_elite = if std::env::var("SL2_NOSTALL").is_ok() {
+                false // registered discriminator: Fix-B elite mutation OFF
+            } else {
+                elite_streak >= ELITE_STALL_GENS
+            };
             // Elite gene mutation on stall: same unbiased multiplicative
             // draw as the offspring path (x[0.5,2.0], p=0.1) — NOT a fixed
             // upward multiplier (a ×1.5 ratchet would drift the gene to the
