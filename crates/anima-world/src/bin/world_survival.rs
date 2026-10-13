@@ -1301,6 +1301,17 @@ fn evolve_run(
             let gen_start = (FOOD_START_DIST + 3.0 * g as f32).min(FOOD_MAX_DIST);
             for (i, (net, s, _gene)) in pop.iter_mut().enumerate() {
                 let (r, _) = life_with(net, esec, beats, fault, motor_zero, viewer, Some(g), Some(i as u64), explore, explore, smell, gen_start, None);
+                // SL2_FUNNEL: per-genome survival probe — died_at + touches,
+                // to discriminate navigation-failure death (early died_at,
+                // 0 touches) from burn-exceeds-gain death (late died_at,
+                // touches > 0). stderr-gated, identity-safe.
+                if std::env::var("SL2_FUNNEL").is_ok() {
+                    eprintln!(
+                        "FUNNEL gen={g} idx={i} died_at={} touches={} energy={:.1}",
+                        r.died_at.map(|d| d.to_string()).unwrap_or("none".into()),
+                        r.food_touches, r.final_energy
+                    );
+                }
                 if r.died_at.is_some() {
                     deaths += 1;
                 }
