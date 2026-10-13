@@ -1256,7 +1256,12 @@ fn evolve_run(
         let wta_evolve = std::env::var("SL2_WTAEVOLVE").is_ok();
         const WTA_GENE_INIT: f32 = 0.01;
         const WTA_GENE_MUT_P: f32 = 0.1;
-        let mut pop: Vec<(Network, u64, f32)> = (0..N_POP)
+        // SL2_POP: env-gated population size (default N_POP=4). The gene-
+        // selection study measured that N_POP=4 cannot resolve a 1-D gene
+        // under weight-lottery noise; a larger population (env-gated,
+        // identity-safe) is the registered candidate.
+        let n_pop: usize = std::env::var("SL2_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(N_POP);
+        let mut pop: Vec<(Network, u64, f32)> = (0..n_pop)
             .map(|i| {
                 let s = io::derive_seed64(esec, 0, i as u64);
                 let gene = if wta_evolve { WTA_GENE_INIT } else {
@@ -1331,7 +1336,7 @@ fn evolve_run(
             gen_best.push(best);
             // Novelty of each organism vs the archive (0 when archive
             // empty or novelty search off).
-            let mut nov: Vec<f32> = vec![0.0; N_POP];
+            let mut nov: Vec<f32> = vec![0.0; n_pop];
             if novelty_sel {
                 for (n, bc) in bcs.iter().enumerate() {
                     if !archive.is_empty() {
@@ -1345,7 +1350,7 @@ fn evolve_run(
                     }
                 }
             }
-            let mut order: Vec<usize> = (0..N_POP).collect();
+            let mut order: Vec<usize> = (0..n_pop).collect();
             if novelty_sel {
                 // Minimal criterion + behavioral novelty: survivors
                 // (fit > 0) rank by (alive, novelty, fitness), so the
@@ -1393,31 +1398,60 @@ fn evolve_run(
                 elite_streak = 0;
             }
             let mutate_elite = elite_streak >= ELITE_STALL_GENS;
+            // Elite gene mutation on stall: same unbiased multiplicative
+            // draw as the offspring path (x[0.5,2.0], p=0.1) — NOT a fixed
+            // upward multiplier (a ×1.5 ratchet would drift the gene to the
+            // clamp without selection pressure). Deterministic: drawn from
+            // the elite's own seed stream.
             let elite_child_gene = if wta_evolve && mutate_elite {
-                (elite_gene * 1.5).clamp(1e-4, 3e-2)
+                let mut er = Xoshiro256PlusPlus::seed_from_u64(elite_seed ^ 0x5eed);
+                let mut g2 = elite_gene;
+                if er.gen::<f32>() < WTA_GENE_MUT_P {
+                    g2 *= 0.5 + er.gen::<f32>() * 1.5;
+                }
+                g2.clamp(1e-4, 3e-2)
             } else { elite_gene };
             next.push((
                 breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene)),
                 elite_seed,
                 elite_child_gene,
             ));
-            // Offspring: best -> 2, second -> 1 (mirror evolve.rs).
-            for (pi, &idx) in order.iter().take(2).enumerate() {
-                let n_off: u64 = if pi == 0 { 2 } else { 1 };
-                for _ in 0..n_off {
+            // Offspring: fill the rest of the population. At n_pop=4 this
+            // reproduces the frozen genealogy EXACTLY (best->2, second->1,
+            // then the SECOND parent again for the 4th slot — the old code
+            // gave counts [2,1,0,0] with the 4th member being the elite...
+            // it did not: old total = 1 elite + 3 offspring = [2,1,0,0]).
+            // To stay byte-identical at n_pop=4: slot order = [0,0,1]
+            // (best twice, second once). For n_pop>4: continue cycling
+            // [0,1,2,3,...] after the fixed head.
+            {
+                // Offspring parent sequence by RANK: [0, 0, 1] reproduces
+                // the frozen best->2/second->1 genealogy at n_pop=4 exactly;
+                // the tail cycles ranks [2, 3, ...] for larger populations.
+                let mut seq: Vec<usize> = vec![0, 0, 1];
+                let mut r = 2;
+                while seq.len() < n_pop - 1 {
+                    seq.push(r % n_pop);
+                    r += 1;
+                }
+                for &rank in seq.iter().take(n_pop - 1) {
+                    let pi2 = order[rank];
                     let slot = next.len();
                     let cs = io::derive_seed64(esec, g + 1, slot as u64);
                     // Gene: multiplicative x[0.5,2.0] with p=0.1, drawn
                     // from the CHILD's own seed stream (deterministic).
                     let child_gene = if wta_evolve {
                         let mut grng = Xoshiro256PlusPlus::seed_from_u64(cs ^ 0x5eed);
-                        let mut g2 = pop[idx].2;
+                        let mut g2 = pop[pi2].2;
                         if grng.gen::<f32>() < WTA_GENE_MUT_P {
                             g2 *= 0.5 + grng.gen::<f32>() * 1.5;
                         }
                         g2.clamp(1e-4, 3e-2)
-                    } else { pop[idx].2 };
-                    let child = breed_inner_wta(&pop[idx].0, cs, true, Some(child_gene));
+                    } else { pop[pi2].2 };
+                    if wta_evolve && std::env::var("GENEPROBE").is_ok() {
+                        eprintln!("GENEPROBE gen={g} slot={slot} parent_gene={:.5} child_gene={child_gene:.5}", pop[pi2].2);
+                    }
+                    let child = breed_inner_wta(&pop[pi2].0, cs, true, Some(child_gene));
                     next.push((child, cs, child_gene));
                 }
             }
@@ -1456,6 +1490,14 @@ fn evolve_run(
             *gen_best.last().unwrap(),
             last_win_ret
         );
+        // SL2_WTAEVOLVE: report the winning gene trajectory so selection
+        // of the gain is visible (identity: absent when gate off).
+        if wta_evolve {
+            println!(
+                " GENETRAJECTORY seed {esec}: {:?}",
+                pop.iter().map(|(_, _, g2)| *g2).collect::<Vec<f32>>()
+            );
+        }
     }
 }
 
