@@ -794,11 +794,13 @@ fn life_with(
                         // Winner-set IDs (sorted, deterministic): tracks
                         // whether the sparse winners are input-dependent
                         // (set shifts with food direction) or static.
-                        // life label = org (population idx passed by the
-                        // evolve loop; None in single-life mode).
+                        // life label = {seed}-{gen}-{org}: org alone
+                        // collides across gens AND seeds (the bug that
+                        // invalidated runs 15-17's analyses).
                         let life_idx = format!(
-                            "{:x}-{:02x}",
+                            "{:x}-g{}-{:02x}",
                             world_seed,
+                            gen.map(|g| g.to_string()).unwrap_or("s".into()),
                             org.unwrap_or(u64::MAX)
                         );
                         let mut ids: Vec<u32> = kc_spike_set.iter().copied().collect();
