@@ -51,9 +51,9 @@ if [ -n "$ARMS" ]; then
     [ "$IDE_ACTUAL" = "$EXPECTED" ] && identity_ok=1
   fi
   echo "identity(gated): $IDE_ACTUAL"
-  env $ARMS "$BIN" 20260924 7 100 --evolve >"$LOG" 2>&1 || true
+  env $ARMS SL2_NOTARGET=1 "$BIN" --evolve --explore --smell 20260924 7 --until 3 >"$LOG" 2>&1 || true
 else
-  "$BIN" 20260924 7 100 --evolve >"$LOG" 2>&1 || true
+  SL2_NOTARGET=1 "$BIN" --evolve --explore --smell 20260924 7 --until 3 >"$LOG" 2>&1 || true
 fi
 
 best=$(grep -oE 'best=[0-9]+\.?[0-9]*' "$LOG" | cut -d= -f2 | sort -g | tail -1)
@@ -64,6 +64,8 @@ best=${best:-0}
 touches=${touches:-0}
 
 # Primary metric: foraging efficiency (best fitness per 1000 beats of life).
+# Explore+smell evolve forces BEATS_EVOLVE=100 per life (line 307); --until 3
+# caps generations at 3 for a bounded harness.
 beats=100
 eff=$(awk -v b="$best" -v t="$beats" 'BEGIN{ if (t<=0) {print 0} else {printf "%.4f", b/t*1000} }')
 echo "METRIC foraging_efficiency=$eff"
