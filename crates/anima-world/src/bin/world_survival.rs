@@ -780,6 +780,16 @@ fn life_with(
                         "KCPROBE beat={beat} kc_spikers={}/{} kc_window={}/{}",
                         kc_spike_set.len(), probe_pool, kc_window_set.len(), probe_pool
                     );
+                    if std::env::var("KCBEARING").is_ok() {
+                        // Food bearing from the body (atan2 in xz plane,
+                        // degrees) — correlates winner-set shifts with
+                        // bearing shifts within one life (input-tracking
+                        // test). Gated, identity-safe, deterministic.
+                        let fp = world.primitives[food_idx].pos;
+                        let bp = world.body.pos;
+                        let bearing = (fp.z - bp.z).atan2(fp.x - bp.x).to_degrees();
+                        eprintln!("KCBEARING beat={beat} bearing={bearing:.1}");
+                    }
                     if std::env::var("KCWINIDS").is_ok() {
                         // Winner-set IDs (sorted, deterministic): tracks
                         // whether the sparse winners are input-dependent
