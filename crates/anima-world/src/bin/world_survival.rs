@@ -1490,6 +1490,12 @@ fn evolve_run(
             } else {
                 order.sort_by(|&a, &b| fits[b].0.partial_cmp(&fits[a].0).unwrap());
             }
+            // WINSEED: per-gen winner identity (seed) — verifies whether
+            // the winning lineage ever receives fill-side material
+            // (crossover/immigrant children). Gated, identity-safe.
+            if std::env::var("WINSEED").is_ok() {
+                eprintln!("WINSEED g={g} winner_seed={} fit={:.1}", fits[order[0]].2, fits[order[0]].0);
+            }
             let win_nov = if novelty_sel && !archive.is_empty() { nov[order[0]] } else { 0.0 };
             let win_ret = nest_ret[order[0]];
             last_win_ret = win_ret;
