@@ -60,6 +60,9 @@ const W_MUT_P: f32 = 0.10;
 const W_MUT_AMP: f32 = 0.10;
 /// Fitness tiebreaker: +3.0 per food touch (registered).
 const TOUCH_BONUS: f32 = 3.0;
+/// SL2_BASIN: champion re-entry cadence (re-enter the best-ever genome
+/// every N gens at the last fill slot). Registered anti-decay cadence.
+const BASIN_EVERY: u64 = 5;
 /// SL2_TOUCHRAMP: max bonus for early first touch (frac=1 = touched at
 /// beat 0). 30 = one extra touch's worth at best — comparable pressure
 /// to a real meal, not dominant.
@@ -1361,6 +1364,14 @@ fn evolve_run(
         // behavioral novelty against an archive of past winners' final
         // positions (minimal-criterion coevolution, Lehman/Stanley).
         let novelty_sel = std::env::var("SL2_NOVELTY").is_ok();
+        // SL2_BASIN: champion archive — the best-ever genome is CLONED
+        // (stored) when it beats the archive, and re-entered UNMUTATED at
+        // one fill slot every BASIN_EVERY gens (anti-decay directed
+        // re-entry: the lineage can't permanently lose its best genome).
+        // Selector-side bookkeeping; the organism stays memory-less.
+        // Off = identity.
+        let basin = std::env::var("SL2_BASIN").is_ok();
+        let mut champion: Option<(f32, Network)> = None;
         // SL2_APRIM: A′ approach-effort credit in selection (design:
         // PHASE_B_DESIGN.md §7). Off = identity.
         let aprim_sel = std::env::var("SL2_APRIM").is_ok();
@@ -1495,6 +1506,16 @@ fn evolve_run(
             // (crossover/immigrant children). Gated, identity-safe.
             if std::env::var("WINSEED").is_ok() {
                 eprintln!("WINSEED g={g} slot={} winner_seed={} fit={:.1}", order[0], fits[order[0]].2, fits[order[0]].0);
+            }
+            // SL2_BASIN: champion update — when the current best beats the
+            // archived best, clone it (net) into the archive. Gated.
+            if basin {
+                let best = &fits[order[0]];
+                let best_net = pop[best.1].0.clone();
+                match &mut champion {
+                    Some((cfit, cnet)) if *cfit >= best.0 => {}
+                    _ => champion = Some((best.0, best_net)),
+                }
             }
             let win_nov = if novelty_sel && !archive.is_empty() { nov[order[0]] } else { 0.0 };
             let win_ret = nest_ret[order[0]];
@@ -1651,6 +1672,16 @@ fn evolve_run(
                     let pi2 = parent_pool[pool_rank.min(parent_pool.len() - 1)];
                     let slot = next.len();
                     let cs = io::derive_seed64(esec, g + 1, slot as u64);
+                    // SL2_BASIN: champion re-entry — the LAST fill slot
+                    // (every BASIN_EVERY gens) becomes an UNMUTATED exact
+                    // copy of the best-ever archived genome. Off = identity.
+                    if basin && slot == n_pop - 1 && g > 0 && g % BASIN_EVERY == 0 {
+                        if let Some((_, champ_net)) = &champion {
+                            let reentered = breed_inner_wta(champ_net, cs, false, Some(pop[pi2].2));
+                            next.push((reentered, cs, pop[pi2].2));
+                            continue;
+                        }
+                    }
                     // SL2_XOVER: two-parent crossover — per-synapse 50/50
                     // merge of the primary parent (pi2) and the secondary
                     // parent (the rank+2 corpse). Gene from the primary

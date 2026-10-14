@@ -652,6 +652,7 @@ impl Default for NetworkConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct Network {
     pub cfg: NetworkConfig,
     pub neurons: Vec<Neuron>,
