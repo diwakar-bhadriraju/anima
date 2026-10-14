@@ -342,6 +342,9 @@ struct LifeResult {
     /// Beat of the FIRST food touch (None = never touched). SL2_FUNNEL
     /// navigation metric: beats-to-first-touch measures approach quality.
     first_touch: Option<u64>,
+    /// SL2_APRIM: A′ approach-effort credit (rate-form, teleport-masked),
+    /// PHASE_B_DESIGN.md §2. 0.0 when the gate is off (no accumulation).
+    credit_rate: f32,
     novel_flags: u32,
     coverage: u32,
     ext_news: u32,
@@ -574,6 +577,9 @@ fn life_with(
     let mut persistence: f32 = 0.0;
     let mut last_touch_beat: i64 = -1;
     let mut first_touch_beat: Option<u64> = None;
+    // SL2_APRIM: A′ approach-effort accumulation (gated; empty = identity).
+    let aprim = std::env::var("SL2_APRIM").is_ok();
+    let mut credit_terms: Vec<(Vec3, Vec3, bool)> = Vec::new();
     if prog && std::env::var("SL2_START").is_err() {
         world.body.energy = PROG_LIFE;
     }
@@ -1184,6 +1190,13 @@ fn life_with(
             + (b.pos.y - fp.y).powi(2)
             + (b.pos.z - fp.z).powi(2))
         .sqrt();
+        // SL2_APRIM: accumulate the A′ approach-effort term for this beat
+        // (velocity x bearing-to-current-food; masked on touch/respawn
+        // beats). Gated: ungated lives skip the work entirely (identity).
+        if aprim {
+            let to_food = Vec3::new(fp.x - b.pos.x, fp.y - b.pos.y, fp.z - b.pos.z);
+            credit_terms.push((world.body.vel, to_food, touched));
+        }
         let out_sum: f32 = out.iter().sum();
         println!(
             "WL2 beat={} energy={:.1} alive={} food_dist={:.2} out_sum={:.0} minL2={:.1} flag={}",
@@ -1247,6 +1260,12 @@ fn life_with(
         LifeResult {
             beats: died_at.unwrap_or(beats),
             died_at,
+            credit_rate: if aprim {
+                let alive_beats = died_at.unwrap_or(beats) as usize;
+                credit_rate(&credit_terms, alive_beats)
+            } else {
+                0.0
+            },
             final_energy: world.body.energy,
             food_touches,
             first_touch: first_touch_beat,
@@ -1318,6 +1337,9 @@ fn evolve_run(
         // behavioral novelty against an archive of past winners' final
         // positions (minimal-criterion coevolution, Lehman/Stanley).
         let novelty_sel = std::env::var("SL2_NOVELTY").is_ok();
+        // SL2_APRIM: A′ approach-effort credit in selection (design:
+        // PHASE_B_DESIGN.md §7). Off = identity.
+        let aprim_sel = std::env::var("SL2_APRIM").is_ok();
         let mut archive: Vec<[u32; 3]> = Vec::new();
         // A — SL2_DENSITY=1: grade fitness on sustained foraging density
         // (touches^2 / beats) in addition to terminal energy + touches.
@@ -1329,6 +1351,8 @@ fn evolve_run(
         let nest_fit = std::env::var("SL2_NESTFIT").is_ok();
         for g in 0..max_gens {
             let mut fits: Vec<(f32, usize, u64)> = Vec::new();
+            // SL2_APRIM: per-org A′ credit (rate-form; 0.0 ungated).
+            let mut credits: Vec<f32> = Vec::new();
             let mut bcs: Vec<[u32; 3]> = Vec::new();
             let mut nest_ret: Vec<u32> = Vec::new();
             let mut deaths = 0u32;
@@ -1389,6 +1413,7 @@ fn evolve_run(
                     fit += NEST_RETURN_BONUS * r.nest_returns as f32;
                 }
                 fits.push((fit, i, *s));
+                credits.push(r.credit_rate);
                 // Behavior characterization: quantized final (x, z) +
                 // alive flag -> 10x10 arena bins + survival bit.
                 let xb = (((r.final_pos[0] + 50.0) / 10.0) as i32).clamp(0, 9) as u32;
@@ -1415,7 +1440,17 @@ fn evolve_run(
                 }
             }
             let mut order: Vec<usize> = (0..n_pop).collect();
-            if novelty_sel {
+            // SL2_APRIM: the A′ approach-effort credit participates in
+            // selection — the chosen C-shaped composition (fit-primary
+            // within tier, credit as tiebreak), tier made explicit. Off =
+            // identity (the exact pre-gate sorts).
+            if aprim_sel {
+                order.sort_by(|&a, &b| {
+                    let ka = (fits[a].0 > 0.0, fits[a].0, credits[a]);
+                    let kb = (fits[b].0 > 0.0, fits[b].0, credits[b]);
+                    kb.partial_cmp(&ka).unwrap()
+                });
+            } else if novelty_sel {
                 // Minimal criterion + behavioral novelty: survivors
                 // (fit > 0) rank by (alive, novelty, fitness), so the
                 // death gate is preserved while novelty breaks ties
