@@ -1554,7 +1554,44 @@ fn evolve_run(
                 }
                 g2.clamp(1e-4, 3e-2)
             } else { elite_gene };
-            let elite_child = breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene));
+            let mut elite_child = breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene));
+            // SL2_STRUCTMUT: ADD-only structural mutation in the elite
+            // child — one new parent-born synapse per gen (random pre from
+            // inputs+internal, random internal post, small weight). The
+            // ADD persists across generations via breed_inner_wta's
+            // residual-add path (verified: parent-born keys re-add when
+            // endpoints exist; PRUNEs would self-heal to default weights,
+            // so they're excluded — weight-zeroing covers that class).
+            // Registered against the mutation-robustness finding: weights
+            // don't move fitness; topology might. Off = identity.
+            if std::env::var("SL2_STRUCTMUT").is_ok() {
+                let mut srng = Xoshiro256PlusPlus::seed_from_u64(elite_seed ^ 0x5724);
+                let n_neurons = elite_child.neurons.len();
+                // Layout: inputs+internal first, then outputs (n_out=12),
+                // then the K reflex band at the tail — matches mb_lo/mb_hi.
+                let mb_here = std::env::var("SL2_MB").is_ok();
+                let pool = if mb_here { MB_POOL } else { pool_size() };
+                let out_start = n_neurons - 12 - K; // first output index
+                let band_lo = out_start - pool;     // first internal index
+                // Existing keys (avoid duplicates + self-loops).
+                let have: HashSet<(u32, u32)> = elite_child.synapses.iter()
+                    .filter(|s| s.silent_ticks != u64::MAX)
+                    .map(|s| (s.pre.0, s.post.0))
+                    .collect();
+                for _ in 0..8 {
+                    let pre_id = NeuronId((srng.gen::<f32>() * (out_start as f32)) as u32);
+                    let post_id = NeuronId((band_lo + (srng.gen::<f32>() * (pool as f32)) as usize) as u32);
+                    if pre_id.0 == post_id.0 || have.contains(&(pre_id.0, post_id.0)) {
+                        continue; // redraw (bounded attempts)
+                    }
+                    let w = 0.02 + srng.gen::<f32>() * 0.04; // w_in_lo..w_in_hi range
+                    elite_child.add_synapse(pre_id, post_id, w, true, Tick(0));
+                    if std::env::var("STRUCTPROBE").is_ok() {
+                        eprintln!("STRUCTMUT g={g} added {}->{} w={w:.3}", pre_id.0, post_id.0);
+                    }
+                    break; // one ADD per gen (registered rate)
+                }
+            }
             next.push((
                 elite_child,
                 elite_seed,
