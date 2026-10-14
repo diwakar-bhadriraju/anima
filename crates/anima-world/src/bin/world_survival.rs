@@ -1317,7 +1317,17 @@ fn evolve_run(
     max_gens: u64, beats: u64, fault: bool, motor_zero: bool, viewer: Option<&Server>,
     explore: bool, generalize: bool, smell: bool,
 ) {
-    for &esec in &EVOLVE_SEEDS {
+    // SL2_SEEDS: comma-separated evolve-seed override (e.g.
+    // "20260924,7,424242") for multi-seed batteries. Default = the frozen
+    // pair; unset = identity.
+    let seeds: Vec<u64> = match std::env::var("SL2_SEEDS") {
+        Ok(s) => s
+            .split(',')
+            .filter_map(|t| t.trim().parse().ok())
+            .collect(),
+        Err(_) => EVOLVE_SEEDS.to_vec(),
+    };
+    for &esec in &seeds {
         println!("=== seed {esec} ===");
         // SL2_WTAEVOLVE=1: the internal-band k-WTA gain is a HERITABLE
         // gene (per-individual). Init at the measured live-range center
