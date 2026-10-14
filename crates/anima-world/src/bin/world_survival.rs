@@ -1542,6 +1542,18 @@ fn evolve_run(
             // (best twice, second once). For n_pop>4: continue cycling
             // [0,1,2,3,...] after the fixed head.
             {
+                // SL2_NOFILL: survivors-only fill — corpses never parent.
+                // The registered selection-structure candidate (a): with
+                // 1-2 survivors, ALL offspring descend from survivors
+                // (repeated ranks) instead of cycling into corpse ranks
+                // 2+. Tests whether corpse-parentage helps (diversity) or
+                // hurts (garbage parents). Off = identity (frozen fill).
+                let n_surv = order.iter().filter(|&&i| fits[i].0 > 0.0).count();
+                let parent_pool: Vec<usize> = if std::env::var("SL2_NOFILL").is_ok() && n_surv > 0 {
+                    order.iter().take(n_surv).copied().collect()
+                } else {
+                    (0..n_pop).collect()
+                };
                 // Offspring parent sequence by RANK: [0, 0, 1] reproduces
                 // the frozen best->2/second->1 genealogy at n_pop=4 exactly;
                 // the tail cycles ranks [2, 3, ...] for larger populations.
@@ -1552,7 +1564,14 @@ fn evolve_run(
                     r += 1;
                 }
                 for &rank in seq.iter().take(n_pop - 1) {
-                    let pi2 = order[rank];
+                    // NOFILL: rank indexes the SURVIVOR pool (cycling it);
+                    // identity: rank indexes the full order.
+                    let pool_rank = if std::env::var("SL2_NOFILL").is_ok() && n_surv > 0 {
+                        rank % parent_pool.len()
+                    } else {
+                        rank.min(n_pop - 1)
+                    };
+                    let pi2 = parent_pool[pool_rank.min(parent_pool.len() - 1)];
                     let slot = next.len();
                     let cs = io::derive_seed64(esec, g + 1, slot as u64);
                     // Gene: multiplicative x[0.5,2.0] with p=0.1, drawn
