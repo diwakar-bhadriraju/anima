@@ -580,6 +580,9 @@ fn life_with(
     // SL2_APRIM: A′ approach-effort accumulation (gated; empty = identity).
     let aprim = std::env::var("SL2_APRIM").is_ok();
     let mut credit_terms: Vec<(Vec3, Vec3, bool)> = Vec::new();
+    // Beat of the last food teleport (touch OR contraction respawn) — the
+    // credit mask. u64::MAX = never moved.
+    let mut food_moved_beat: u64 = u64::MAX;
     if prog && std::env::var("SL2_START").is_err() {
         world.body.energy = PROG_LIFE;
     }
@@ -1143,10 +1146,13 @@ fn life_with(
                 // Curriculum: reward success by moving food further out.
                 food_distance = (food_distance + FOOD_STEP).min(FOOD_MAX_DIST);
                 respawn_food_at(&mut world, food_idx, &mut rng, food_distance);
+                if aprim { food_moved_beat = beat; }
             } else if food_radius < f32::MAX {
                 respawn_near(&mut world, food_idx, &mut rng, food_radius);
+                if aprim { food_moved_beat = beat; }
             } else {
                 respawn_food(&mut world, food_idx, &mut rng);
+                if aprim { food_moved_beat = beat; }
             }
             if let Some(v) = viewer {
                 v.push_scene(render_scene_live(&world, None));
@@ -1159,6 +1165,11 @@ fn life_with(
                 failures_since_touch = 0;
                 food_distance = (food_distance - FOOD_CONTRACT).max(FOOD_MIN_DIST);
                 respawn_food_at(&mut world, food_idx, &mut rng, food_distance);
+                if aprim {
+                    // food position teleported this beat: the bearing
+                    // vector is stale — mask this beat's credit term.
+                    food_moved_beat = beat;
+                }
                 if let Some(v) = viewer {
                     v.push_scene(render_scene_live(&world, None));
                 }
@@ -1191,11 +1202,14 @@ fn life_with(
             + (b.pos.z - fp.z).powi(2))
         .sqrt();
         // SL2_APRIM: accumulate the A′ approach-effort term for this beat
-        // (velocity x bearing-to-current-food; masked on touch/respawn
-        // beats). Gated: ungated lives skip the work entirely (identity).
+        // (velocity x bearing-to-current-food; masked on food-teleport
+        // beats — touch/respawn AND contraction — plus the beat
+        // immediately after, when the body hasn't yet observed the new
+        // position). Gated: ungated lives skip the work entirely.
         if aprim {
+            let masked = touched || beat <= food_moved_beat + 1;
             let to_food = Vec3::new(fp.x - b.pos.x, fp.y - b.pos.y, fp.z - b.pos.z);
-            credit_terms.push((world.body.vel, to_food, touched));
+            credit_terms.push((world.body.vel, to_food, masked));
         }
         let out_sum: f32 = out.iter().sum();
         println!(
