@@ -1529,7 +1529,14 @@ fn evolve_run(
                 last_elite = elite_seed;
                 elite_streak = 0;
             }
-            let mutate_elite = if std::env::var("SL2_NOSTALL").is_ok() {
+            let mutate_elite = if std::env::var("SL2_REEARN").is_ok() {
+                // Registered dynasty-side candidate: NO free carry — the
+                // elite is re-bred WITH mutation EVERY generation (Fix-B
+                // generalized from stall>=5 to always). The fill-side
+                // mechanisms can't touch the dynasty (verified via WINSEED);
+                // this opens the elite's own fine-tuning channel.
+                true
+            } else if std::env::var("SL2_NOSTALL").is_ok() {
                 false // registered discriminator: Fix-B elite mutation OFF
             } else {
                 elite_streak >= ELITE_STALL_GENS
