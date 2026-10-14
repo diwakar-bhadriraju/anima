@@ -1494,7 +1494,7 @@ fn evolve_run(
             // the winning lineage ever receives fill-side material
             // (crossover/immigrant children). Gated, identity-safe.
             if std::env::var("WINSEED").is_ok() {
-                eprintln!("WINSEED g={g} winner_seed={} fit={:.1}", fits[order[0]].2, fits[order[0]].0);
+                eprintln!("WINSEED g={g} slot={} winner_seed={} fit={:.1}", order[0], fits[order[0]].2, fits[order[0]].0);
             }
             let win_nov = if novelty_sel && !archive.is_empty() { nov[order[0]] } else { 0.0 };
             let win_ret = nest_ret[order[0]];
@@ -1554,8 +1554,9 @@ fn evolve_run(
                 }
                 g2.clamp(1e-4, 3e-2)
             } else { elite_gene };
+            let elite_child = breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene));
             next.push((
-                breed_inner_wta(&pop[elite_idx].0, elite_seed, mutate_elite, Some(elite_child_gene)),
+                elite_child,
                 elite_seed,
                 elite_child_gene,
             ));
