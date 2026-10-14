@@ -1364,6 +1364,9 @@ fn evolve_run(
         // SL2_APRIM: A′ approach-effort credit in selection (design:
         // PHASE_B_DESIGN.md §7). Off = identity.
         let aprim_sel = std::env::var("SL2_APRIM").is_ok();
+        // SL2_XOVER: two-parent crossover in the offspring fill (design:
+        // run #34 — stuck-mutant diversity recombination). Off = identity.
+        let xover_sel = std::env::var("SL2_XOVER").is_ok();
         let mut archive: Vec<[u32; 3]> = Vec::new();
         // A — SL2_DENSITY=1: grade fitness on sustained foraging density
         // (touches^2 / beats) in addition to terminal energy + touches.
@@ -1584,6 +1587,16 @@ fn evolve_run(
                     let pi2 = parent_pool[pool_rank.min(parent_pool.len() - 1)];
                     let slot = next.len();
                     let cs = io::derive_seed64(esec, g + 1, slot as u64);
+                    // SL2_XOVER: two-parent crossover — per-synapse 50/50
+                    // merge of the primary parent (pi2) and the secondary
+                    // parent (the rank+2 corpse). Gene from the primary
+                    // parent (slot-lineage continuity). Off = identity.
+                    if xover_sel {
+                        let p2 = parent_pool[(pool_rank + 2).min(parent_pool.len() - 1)];
+                        let child = breed_xover(&pop[pi2].0, &pop[p2].0, cs);
+                        next.push((child, cs, pop[pi2].2));
+                        continue;
+                    }
                     // Gene: multiplicative x[0.5,2.0] with p=0.1, drawn
                     // from the CHILD's own seed stream (deterministic).
                     let child_gene = if wta_evolve {
@@ -1676,6 +1689,41 @@ fn evolve_run(
 /// mirror of evolve.rs breed_inner, simplified (no size mutation).
 fn breed_inner(parent: &Network, seed: u64, mutate: bool) -> Network {
     breed_inner_wta(parent, seed, mutate, None)
+}
+
+/// SL2_XOVER: two-parent crossover. The child is built from parent A
+/// (anatomy + seed), then each synapse takes A's or B's weight by a
+/// per-synapse coin flip (seeded from seed^0x0dd — a separate stream
+/// from the gene salt). Only SHARED keys swap: B-unique keys are never
+/// added (the child's anatomy/synapse set stays A's). Weights clamp [0,1].
+/// Mutation applies AFTER the merge via the caller (breed_inner_wta with
+/// mutate=true is re-run's contract — see the fill loop: xover children
+/// get the same 10% per-synapse mutation as ordinary children, applied
+/// by merging INTO a mutated base).
+fn breed_xover(parent_a: &Network, parent_b: &Network, seed: u64) -> Network {
+    // Base child: parent A WITH mutation (the ordinary fill contract).
+    let mut child = breed_inner_wta(parent_a, seed, true, None);
+    // B's map: (pre, post) -> weight, skipping silent synapses.
+    let mut bmap: BTreeMap<(u32, u32), f32> = BTreeMap::new();
+    for s in &parent_b.synapses {
+        if s.silent_ticks == u64::MAX {
+            continue;
+        }
+        bmap.insert((s.pre.0, s.post.0), s.w);
+    }
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(seed ^ 0x0dd);
+    for s in child.synapses.iter_mut() {
+        if s.silent_ticks == u64::MAX {
+            continue;
+        }
+        let key = (s.pre.0, s.post.0);
+        if rng.gen::<f32>() < 0.5 {
+            if let Some(&w) = bmap.get(&key) {
+                s.w = w.clamp(0.0, 1.0);
+            }
+        }
+    }
+    child
 }
 
 /// WTA-gene variant: `wta_gene` (Some) builds the child with the inherited
