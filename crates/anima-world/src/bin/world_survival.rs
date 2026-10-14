@@ -2484,3 +2484,210 @@ arm();
 </body>
 </html>
 "##;
+// ---------------------------------------------------------------------------
+// PHASE B DESIGN (docs: ~/Projects/skynet/PHASE_B_DESIGN.md) — production
+// comparators. PURE FUNCTIONS: not yet wired into life_with/selection
+// (design approval pending); carried in the release build as dead code until
+// wiring lands. The fixture/ordering tests below call THESE functions, so
+// the tests pin the production comparators, not copies.
+// ---------------------------------------------------------------------------
+
+/// A′ credit (registered primary form, rate-normalized):
+/// credit_rate = (1/beats_alive) * Σ_t mask_t * <v_t, û_t>
+/// where û_t = unit(body -> food_current), masked (skipped) on
+/// respawn beats. Spec: PHASE_B_DESIGN.md §2.
+/// `terms`: (velocity, body->food vector, masked?) per alive beat.
+#[allow(dead_code)]
+fn credit_rate(terms: &[(Vec3, Vec3, bool)], beats_alive: usize) -> f32 {
+    if beats_alive == 0 {
+        return 0.0;
+    }
+    let sum: f32 = terms
+        .iter()
+        .filter(|(_, _, masked)| !masked)
+        .map(|(v, to_food, _)| {
+            let d = (to_food.x * to_food.x
+                + to_food.y * to_food.y
+                + to_food.z * to_food.z)
+                .sqrt();
+            if d == 0.0 {
+                0.0 // degenerate: body at food position (contact beat)
+            } else {
+                (v.x * to_food.x + v.y * to_food.y + v.z * to_food.z) / d
+            }
+        })
+        .sum();
+    sum / beats_alive as f32
+}
+
+/// Selection ordering key — the CHOSEN composition from
+/// PHASE_B_DESIGN.md §7 (C-shaped: fit-primary within tier, credit as
+/// tiebreak), with the tier made explicit. Key tuple layout:
+/// (alive, fit, credit). The bool tier dominates: no dead credit outranks
+/// any live genome. Credit breaks ties WITHIN tiers; fitness stays primary.
+#[allow(dead_code)]
+fn outranks(ka: (bool, f32, f32), kb: (bool, f32, f32)) -> bool {
+    use std::cmp::Ordering;
+    let cmp = ka
+        .0
+        .partial_cmp(&kb.0)
+        .unwrap_or(std::cmp::Ordering::Equal)
+        .then(ka.1.partial_cmp(&kb.1).unwrap_or(Ordering::Equal))
+        .then(ka.2.partial_cmp(&kb.2).unwrap_or(Ordering::Equal));
+    cmp == Ordering::Greater
+}
+
+#[cfg(test)]
+mod phase_b_design_tests {
+    use super::{credit_rate, outranks};
+    use anima_world::world::Vec3;
+
+
+
+    #[test]
+    fn fixture_motor_zero_hover_credit_is_zero() {
+        // WL2_MOTOR=0 fixture (reproduced live: died 58, coverage 1/400):
+        // velocity is identically zero for every beat -> credit exactly 0.
+        let terms: Vec<(Vec3, Vec3, bool)> = (0..58)
+            .map(|_| (Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 2.0, 4.0), false))
+            .collect();
+        let c = credit_rate(&terms, 58);
+        assert_eq!(c, 0.0, "hover (v=0) must earn exactly zero credit");
+    }
+
+    #[test]
+    fn fixture_stationary_body_contraction_farm_is_zero() {
+        // Food contracts toward a stationary body (up to 32 units):
+        // no motion => no credit regardless of how close the food comes.
+        // to_food shrinks across beats (contraction) but v stays 0.
+        let terms: Vec<(Vec3, Vec3, bool)> = (0..100)
+            .map(|t| {
+                let d = 40.0 - 0.32 * t as f32; // contraction closing in
+                (Vec3::new(0.0, 0.0, 0.0), Vec3::new(d, 2.0, 0.0), false)
+            })
+            .collect();
+        let c = credit_rate(&terms, 100);
+        assert_eq!(c, 0.0, "contraction toward a stationary body must earn zero");
+    }
+
+    #[test]
+    fn fixture_approach_positive_retreat_negative() {
+        let uf = Vec3::new(1.0, 0.0, 0.0); // food dead ahead (+x)
+        // 10 beats at +1 unit/beat toward food
+        let approach: Vec<(Vec3, Vec3, bool)> =
+            (0..10).map(|_| (Vec3::new(1.0, 0.0, 0.0), uf, false)).collect();
+        let c = credit_rate(&approach, 10);
+        assert!((c - 1.0).abs() < 1e-5, "direct approach earns |v| per beat, got {c}");
+        // 10 beats retreating at +1: credit must be negative
+        let retreat: Vec<(Vec3, Vec3, bool)> =
+            (0..10).map(|_| (Vec3::new(-1.0, 0.0, 0.0), uf, false)).collect();
+        let c = credit_rate(&retreat, 10);
+        assert!((c + 1.0).abs() < 1e-5, "retreat must self-penalize, got {c}");
+    }
+
+    #[test]
+    fn fixture_equal_legs_oscillation_nets_zero() {
+        // approach 10 beats, retreat 10 beats, repeat 5x: net ~0 per cycle.
+        let uf = Vec3::new(1.0, 0.0, 0.0);
+        let mut terms = Vec::new();
+        for _ in 0..5 {
+            for _ in 0..10 {
+                terms.push((Vec3::new(1.0, 0.0, 0.0), uf, false));
+            }
+            for _ in 0..10 {
+                terms.push((Vec3::new(-1.0, 0.0, 0.0), uf, false));
+            }
+        }
+        let c = credit_rate(&terms, 100);
+        assert!(c.abs() < 1e-6, "equal-leg oscillation must net ~0, got {c}");
+    }
+
+    #[test]
+    fn fixture_oscillation_per_unit_distance_bound() {
+        // The proven bound: credit per unit PATH LENGTH <= 1 for any
+        // pattern. Oscillator: 50 toward + 50 away (path 100, credit 50).
+        // Direct walker: 100 toward (path 100, credit 100).
+        // Equal path length => oscillator's credit is strictly lower.
+        let uf = Vec3::new(1.0, 0.0, 0.0);
+        let mut osc = Vec::new();
+        for _ in 0..5 {
+            for _ in 0..10 {
+                osc.push((Vec3::new(1.0, 0.0, 0.0), uf, false));
+            }
+            for _ in 0..10 {
+                osc.push((Vec3::new(-1.0, 0.0, 0.0), uf, false));
+            }
+        }
+        let direct: Vec<(Vec3, Vec3, bool)> =
+            (0..100).map(|_| (Vec3::new(1.0, 0.0, 0.0), uf, false)).collect();
+        let c_osc = credit_rate(&osc, 100); // = 0.5 * 1.0
+        let c_dir = credit_rate(&direct, 100); // = 1.0
+        assert!(
+            c_dir > c_osc,
+            "honest walker must out-earn equal-path oscillator: {c_dir} vs {c_osc}"
+        );
+        // and the per-unit-distance bound itself: credit/path <= 1
+        assert!(c_dir <= 1.0 + 1e-6);
+    }
+
+    #[test]
+    fn fixture_teleport_beat_masked() {
+        // On the respawn beat the bearing vector is stale/meaningless:
+        // the masked term must be skipped, not counted.
+        let uf = Vec3::new(1.0, 0.0, 0.0);
+        let terms = vec![
+            (Vec3::new(1.0, 0.0, 0.0), uf, false),           // beat 0: toward
+            (Vec3::new(1.0, 0.0, 0.0), Vec3::new(-5.0, 0.0, 0.0), true), // respawn beat: masked
+            (Vec3::new(1.0, 0.0, 0.0), uf, false),           // beat 2: toward
+        ];
+        let c = credit_rate(&terms, 3);
+        // masked term excluded: (1 + 1)/3 = 2/3
+        assert!((c - 2.0 / 3.0).abs() < 1e-6, "masked beat must not contribute, got {c}");
+    }
+
+    #[test]
+    fn fixture_degenerate_contact_beat_zero_credit() {
+        // Body exactly at the food position: u is undefined; the beat
+        // contributes 0 (not NaN).
+        let terms = vec![(Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 0.0), false)];
+        let c = credit_rate(&terms, 1);
+        assert_eq!(c, 0.0, "contact beat must contribute zero, not NaN");
+    }
+
+    #[test]
+    fn ordering_primary_invariant_dead_never_above_live() {
+        // THE invariant: no amount of dead credit outranks any live genome,
+        // even at maximum dead credit and minimum (epsilon) live fitness.
+        let dead_max = (false, 0.0, 5.0); // (alive, fit, credit) — credit at its [−5,5] max
+        let live_min = (true, 1e-6, -5.0); // min live fit (survivor energy)
+        assert!(
+            outranks(live_min, dead_max),
+            "PRIMARY INVARIANT VIOLATION: dead genome outranked a live survivor"
+        );
+    }
+
+    #[test]
+    fn ordering_equal_credit_dead_tie_is_stable() {
+        // Two dead genomes, equal credit: neither outranks the other on the
+        // key (stable sort then preserves index order — determinism).
+        let a = (false, 0.5, 0.0);
+        let b = (false, 0.5, 0.0);
+        assert!(!outranks(a, b) && !outranks(b, a));
+    }
+
+    #[test]
+    fn ordering_dead_tier_sorted_by_credit() {
+        let high = (false, 0.0, 1.0);
+        let low = (false, 0.0, 0.2);
+        assert!(outranks(high, low) && !outranks(low, high));
+    }
+
+    #[test]
+    fn ordering_live_tier_unaffected_by_credit_at_distinct_fit() {
+        // Within the live tier, credit is a tiebreak AFTER fit: a genome
+        // with higher fit outranks one with lower fit regardless of credit.
+        let fit_high_lowcredit = (true, 100.0, -1.0);
+        let fit_low_highcredit = (true, 50.0, 5.0);
+        assert!(outranks(fit_high_lowcredit, fit_low_highcredit));
+    }
+}
