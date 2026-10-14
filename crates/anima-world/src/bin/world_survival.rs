@@ -1602,6 +1602,28 @@ fn evolve_run(
                 }
             }
             pop = next;
+            // SL2_IMMIGRANT: anti-freeze diversity injection — every
+            // IMMIGRANT_EVERY gens, replace the IMMIGRANT_N worst genomes
+            // with fresh random ones (new seeds, new networks). Registered
+            // candidate against the measured lineage-freeze (both arms'
+            // best pins for 10+ gens at 30-gen horizons; Fix-B's elite
+            // mutation cannot escape the frozen basin). Off = identity.
+            if let Ok(s) = std::env::var("SL2_IMMIGRANT") {
+                let parts: Vec<u64> = s.split(',').filter_map(|t| t.trim().parse().ok()).collect();
+                if parts.len() == 2 && g > 0 && g % parts[0].max(1) == 0 {
+                    let n_inj = (parts[1] as usize).min(n_pop - 1);
+                    // immigrants take the WORST slots' seeds (deterministic:
+                    // fresh seeds derived from (esec, g, slot^0x1mm)).
+                    for k in 0..n_inj {
+                        let slot = n_pop - 1 - k;
+                        // Immigrant gene: inherits the slot's gene value
+                        // (under WTAEVOLVE the gene follows the slot's
+                        // lineage pool, not the population init — intended).
+                        let iseed = io::derive_seed64(esec, g + 1, (slot as u64) ^ 0x1a1a);
+                        pop[slot] = (build_net_wta(net_inputs(smell), iseed, Some(pop[slot].2)), iseed, pop[slot].2);
+                    }
+                }
+            }
             // Archive the winner's BC (cap 50, evict oldest) so novelty
             // pressures diverge from what has already been selected.
             if novelty_sel {
