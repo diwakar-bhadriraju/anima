@@ -1587,9 +1587,10 @@ fn evolve_run(
             // don't move fitness; topology might. Off = identity.
             if std::env::var("SL2_STRUCTMUT").is_ok() {
                 // Params "n,wlo,whi" (default "1,0.02,0.04" = the tested
-                // weak regime); SL2_STRUCTMUT_STRONG presets "5,0.2,0.2".
+                // weak regime); SL2_STRUCTMUT_STRONG presets "20,0.2,0.2"
+                // (L3 rung: 4x the L2 rate, same weight scale).
                 let params = std::env::var("SL2_STRUCTMUT_STRONG")
-                    .map(|_| "5,0.2,0.2".to_string())
+                    .map(|_| "20,0.2,0.2".to_string())
                     .unwrap_or_else(|_| "1,0.02,0.04".to_string());
                 let pp: Vec<f32> = params.split(',').filter_map(|t| t.trim().parse().ok()).collect();
                 let (n_adds, w_lo, w_hi) = (pp[0] as usize, pp[1], pp[2]);
