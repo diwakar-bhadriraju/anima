@@ -1627,6 +1627,31 @@ fn evolve_run(
                     if !added { break; } // dense-key fallback: stop cleanly
                 }
             }
+            // SL2_STRUCTMUT_FULL (L5): full topological rewrite — re-roll
+            // EVERY non-silent weight to a fresh random value in [0.02, 1.0],
+            // keeping the topology (including any STRUCTMUT adds). The last
+            // rung: if the fitness survives THIS, the claim is operator-
+            // absolute — the survival structure is invariant to every
+            // reachable network perturbation. Off = identity.
+            if std::env::var("SL2_STRUCTMUT_FULL").is_ok() {
+                let mut frng = Xoshiro256PlusPlus::seed_from_u64(elite_seed ^ 0xF011);
+                for s in elite_child.synapses.iter_mut() {
+                    if s.silent_ticks == u64::MAX {
+                        continue;
+                    }
+                    s.w = 0.02 + frng.gen::<f32>() * 0.98;
+                }
+                if std::env::var("STRUCTPROBE").is_ok() {
+                    let n_alive = elite_child.synapses.iter()
+                        .filter(|s| s.silent_ticks != u64::MAX)
+                        .count();
+                    let sum: f32 = elite_child.synapses.iter()
+                        .filter(|s| s.silent_ticks != u64::MAX)
+                        .map(|s| s.w)
+                        .sum();
+                    eprintln!("FULLREWRITE g={g} synapses={n_alive} wsum_after={sum:.3}");
+                }
+            }
             next.push((
                 elite_child,
                 elite_seed,
