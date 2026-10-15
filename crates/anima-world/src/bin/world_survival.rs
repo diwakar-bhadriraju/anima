@@ -1660,6 +1660,38 @@ fn evolve_run(
                     eprintln!("FULLREWRITE g={g} synapses={n_alive} wsum_after={sum:.3}");
                 }
             }
+            // SL2_STRUCTMUT_PCT=<fraction>: partial-set rewrite — re-roll a
+            // RANDOM UNIFORM SUBSET (fraction of non-silent synapses) to
+            // fresh [0.02, 1.0] values. The coverage axis: how much of the
+            // set can be rewritten before fitness responds? Independent of
+            // the mix axis (champion blending); runs on its own when set.
+            // Off = identity.
+            if let Ok(pct) = std::env::var("SL2_STRUCTMUT_PCT") {
+                let frac: f32 = pct.trim().parse().unwrap_or(0.0);
+                if frac > 0.0 {
+                    let alive: Vec<usize> = elite_child.synapses.iter()
+                        .enumerate()
+                        .filter(|(_, s)| s.silent_ticks != u64::MAX)
+                        .map(|(i, _)| i)
+                        .collect();
+                    let n_touch = ((alive.len() as f32) * frac.clamp(0.0, 1.0)) as usize;
+                    let mut prng = Xoshiro256PlusPlus::seed_from_u64(elite_seed ^ 0x9C7);
+                    // Deterministic shuffle-pick: partially Fisher-Yates over
+                    // a scratch vec (no HashMap iteration).
+                    let n_alive = alive.len();
+                    let mut pool: Vec<usize> = alive;
+                    for i in (1..pool.len()).rev() {
+                        let j = (prng.gen::<f32>() * (i + 1) as f32) as usize;
+                        pool.swap(i, j);
+                    }
+                    for &idx in pool.iter().take(n_touch) {
+                        elite_child.synapses[idx].w = 0.02 + prng.gen::<f32>() * 0.98;
+                    }
+                    if std::env::var("STRUCTPROBE").is_ok() {
+                        eprintln!("PCTREWRITE g={g} touched={n_touch}/{n_alive} frac={frac}");
+                    }
+                }
+            }
             // SL2_BASIN_TARGET: post-rewrite targeting — when the lineage is
             // STALE (elite_streak >= STALL) AND the champion archive holds a
             // better basin, the rewrite blends the elite child's weights
