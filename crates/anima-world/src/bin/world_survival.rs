@@ -580,6 +580,9 @@ fn life_with(
     let mut persistence: f32 = 0.0;
     let mut last_touch_beat: i64 = -1;
     let mut first_touch_beat: Option<u64> = None;
+    // SL2_FMIN: contraction floor override (economy lever). Default 8.0.
+    let fmin_override: Option<f32> = std::env::var("SL2_FMIN")
+        .ok().and_then(|v| v.parse().ok());
     // SL2_APRIM: A′ approach-effort accumulation (gated; empty = identity).
     let aprim = std::env::var("SL2_APRIM").is_ok();
     let mut credit_terms: Vec<(Vec3, Vec3, bool)> = Vec::new();
@@ -1166,7 +1169,8 @@ fn life_with(
             failures_since_touch += 1;
             if failures_since_touch >= FAILURES_BEFORE_CONTRACT {
                 failures_since_touch = 0;
-                food_distance = (food_distance - FOOD_CONTRACT).max(FOOD_MIN_DIST);
+                food_distance = (food_distance - FOOD_CONTRACT)
+                    .max(fmin_override.unwrap_or(FOOD_MIN_DIST));
                 respawn_food_at(&mut world, food_idx, &mut rng, food_distance);
                 if aprim {
                     // food position teleported this beat: the bearing
@@ -1332,6 +1336,15 @@ fn evolve_run(
     };
     for &esec in &seeds {
         println!("=== seed {esec} ===");
+        // SL2_GENSTART: curriculum difficulty-ramp rate override (economy
+        // lever: the g0->g4 food-distance gradient 8 + rate*g). Default 3.0
+        // (the frozen baseline). SL2_FMIN: contraction floor override
+        // (default 8.0). Both economy levers test whether the basin's
+        // deterministic attractor shifts with the survival structure.
+        let genstart_rate: f32 = std::env::var("SL2_GENSTART")
+            .ok().and_then(|v| v.parse().ok()).unwrap_or(3.0);
+        let fmin_dist: f32 = std::env::var("SL2_FMIN")
+            .ok().and_then(|v| v.parse().ok()).unwrap_or(8.0);
         // SL2_WTAEVOLVE=1: the internal-band k-WTA gain is a HERITABLE
         // gene (per-individual). Init at the measured live-range center
         // 0.01 (a 0.0 init can never leave 0 under multiplicative
@@ -1403,7 +1416,7 @@ fn evolve_run(
             // generation (8 + 3·g, capped 40) so selection is forced to
             // build approach from longer range — the shaping fix for the
             // generalization failure.
-            let gen_start = (FOOD_START_DIST + 3.0 * g as f32).min(FOOD_MAX_DIST);
+            let gen_start = (FOOD_START_DIST + genstart_rate * g as f32).min(FOOD_MAX_DIST);
             for (i, (net, s, _gene)) in pop.iter_mut().enumerate() {
                 let (r, _) = life_with(net, esec, beats, fault, motor_zero, viewer, Some(g), Some(i as u64), explore, explore, smell, gen_start, None);
                 // SL2_FUNNEL: per-genome survival probe — died_at + touches,
