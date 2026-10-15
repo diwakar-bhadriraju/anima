@@ -580,9 +580,12 @@ fn life_with(
     let mut persistence: f32 = 0.0;
     let mut last_touch_beat: i64 = -1;
     let mut first_touch_beat: Option<u64> = None;
-    // SL2_FMIN: contraction floor override (economy lever). Default 8.0.
+    // SL2_FMIN: contraction floor override (economy lever). Clamped to
+    // >= 6.1 (the 6.0 eat radius + 0.1 margin): a floor below the eat
+    // radius lets food sit inside the mouth — the mouth-farm surface
+    // (registered invariant, run #59's invalid EASY arm).
     let fmin_override: Option<f32> = std::env::var("SL2_FMIN")
-        .ok().and_then(|v| v.parse().ok());
+        .ok().and_then(|v| v.parse::<f32>().ok().map(|f| f.max(6.1)));
     // SL2_APRIM: A′ approach-effort accumulation (gated; empty = identity).
     let aprim = std::env::var("SL2_APRIM").is_ok();
     let mut credit_terms: Vec<(Vec3, Vec3, bool)> = Vec::new();
