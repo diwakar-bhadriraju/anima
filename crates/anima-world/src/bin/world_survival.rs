@@ -1590,7 +1590,7 @@ fn evolve_run(
                 // weak regime); SL2_STRUCTMUT_STRONG presets "20,0.2,0.2"
                 // (L3 rung: 4x the L2 rate, same weight scale).
                 let params = std::env::var("SL2_STRUCTMUT_STRONG")
-                    .map(|_| "20,0.2,0.2".to_string())
+                    .map(|_| "50,0.5,0.5".to_string())
                     .unwrap_or_else(|_| "1,0.02,0.04".to_string());
                 let pp: Vec<f32> = params.split(',').filter_map(|t| t.trim().parse().ok()).collect();
                 let (n_adds, w_lo, w_hi) = (pp[0] as usize, pp[1], pp[2]);
