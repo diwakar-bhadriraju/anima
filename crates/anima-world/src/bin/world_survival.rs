@@ -1371,6 +1371,9 @@ fn evolve_run(
         // Selector-side bookkeeping; the organism stays memory-less.
         // Off = identity.
         let basin = std::env::var("SL2_BASIN").is_ok();
+        // SL2_BASIN_TARGET="stall,mix": targeted post-rewrite blending
+        // (PHASE_B_DESIGN.md §7 extension) — needs the champion archive.
+        let basin_target = std::env::var("SL2_BASIN_TARGET").is_ok();
         let mut champion: Option<(f32, Network)> = None;
         // SL2_APRIM: A′ approach-effort credit in selection (design:
         // PHASE_B_DESIGN.md §7). Off = identity.
@@ -1509,7 +1512,12 @@ fn evolve_run(
             }
             // SL2_BASIN: champion update — when the current best beats the
             // archived best, clone it (net) into the archive. Gated.
-            if basin {
+            // SL2_BASIN / SL2_BASIN_TARGET: champion update — when the
+            // current best beats the archived best, clone it (net) into the
+            // archive. Gated on EITHER mechanism (TARGET needs the champion
+            // to exist; BASIN needs it for re-entry). Ungated = champion
+            // stays None, block never fires, identity preserved.
+            if basin || basin_target {
                 let best = &fits[order[0]];
                 let best_net = pop[best.1].0.clone();
                 match &mut champion {
@@ -1650,6 +1658,43 @@ fn evolve_run(
                         .map(|s| s.w)
                         .sum();
                     eprintln!("FULLREWRITE g={g} synapses={n_alive} wsum_after={sum:.3}");
+                }
+            }
+            // SL2_BASIN_TARGET: post-rewrite targeting — when the lineage is
+            // STALE (elite_streak >= STALL) AND the champion archive holds a
+            // better basin, the rewrite blends the elite child's weights
+            // toward the champion's (per-synapse mix toward the archived
+            // weights at mix_ratio) instead of fully randomizing. The
+            // hypothesis (pre-registered): a PARTIAL rewrite crosses the
+            // robustness boundary while preserving enough configuration to
+            // re-land in the champion's basin — directed escape, not a kick.
+            // Falsification: WINSEED divergence + endpoint delta vs control
+            // and vs plain-L5. Off = identity (the L5 path above runs).
+            if std::env::var("SL2_BASIN_TARGET").is_ok() {
+                if let (Some((cfit, cnet)), Some(params)) =
+                    (&champion, std::env::var("SL2_BASIN_TARGET").ok())
+                {
+                    let pp: Vec<f32> = params.split(',')
+                        .filter_map(|t| t.trim().parse().ok()).collect();
+                    if pp.len() == 2 && elite_streak >= pp[0] as u32 && *cfit > 0.0 {
+                        let mix = pp[1].clamp(0.0, 1.0); // 1.0 = full champion
+                        let mut cmap: std::collections::BTreeMap<(u32, u32), f32> =
+                            std::collections::BTreeMap::new();
+                        for s in &cnet.synapses {
+                            if s.silent_ticks == u64::MAX { continue; }
+                            cmap.insert((s.pre.0, s.post.0), s.w);
+                        }
+                        for s in elite_child.synapses.iter_mut() {
+                            if s.silent_ticks == u64::MAX { continue; }
+                            let key = (s.pre.0, s.post.0);
+                            if let Some(&cw) = cmap.get(&key) {
+                                s.w = (mix * cw + (1.0 - mix) * s.w).clamp(0.0, 1.0);
+                            }
+                        }
+                        if std::env::var("STRUCTPROBE").is_ok() {
+                            eprintln!("BASINTARGET g={g} streak={elite_streak} mix={mix:.2} champ_fit={cfit:.1}");
+                        }
+                    }
                 }
             }
             next.push((
