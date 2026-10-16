@@ -1007,7 +1007,13 @@ fn life_with(
                 + world.body.vel.y * world.body.vel.y
                 + world.body.vel.z * world.body.vel.z)
             .sqrt();
-            let cost = METABOLIC_SPEED * speed;
+            // SL2_METABOLIC: drain-rate override (the energy window's burn
+            // side). Default = METABOLIC_SPEED (0.15). Lower = wider window
+            // (less burn), higher = narrower. Identity-safe.
+            let metabolic = std::env::var("SL2_METABOLIC")
+                .ok().and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(METABOLIC_SPEED);
+            let cost = metabolic * speed;
             world.body.energy -= cost;
             if world.body.energy <= 0.0 {
                 world.body.energy = 0.0;
