@@ -294,6 +294,9 @@ impl World {
         if !self.body.alive {
             return;
         }
+        let refill = std::env::var("SL2_REFILL")
+            .ok().and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(30.0);
         for p in &self.primitives {
             if p.food {
                 let dx = p.pos.x - self.body.pos.x;
@@ -301,7 +304,7 @@ impl World {
                 let dz = p.pos.z - self.body.pos.z;
                 let d2 = dx * dx + dy * dy + dz * dz;
                 if d2 < 6.0 * 6.0 {
-                    self.body.energy += 30.0;
+                    self.body.energy += refill;
                     break;
                 }
             }
